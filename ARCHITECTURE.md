@@ -43,8 +43,8 @@ O mock (`src/mocks/socket.ts`) emite um `nft.updated` logo após o handshake e o
 
 ### Correções necessárias no spike
 
-1. **`ws.link` na raiz do host.** O link é `ws.link('wss://realtime.kurio.mock/*')`. Com `'/socket.io/*'` nada casa, porque o MSW remove o prefixo `/socket.io/` da URL do cliente antes de comparar (`msw/src/core/handlers/WebSocketHandler.ts:79`). Sem match, o MSW deixa passar e o navegador abre um WebSocket real.
-2. **O `main.tsx` só importa o app depois do `worker.start`.** O `engine.io-client` guarda `globalThis.WebSocket` quando o módulo é avaliado; se o `socket.io-client` entrar no grafo estático do `main.tsx`, ele captura o WebSocket original antes do patch do MSW. Chamar `socket.connect()` depois do `enableMocks()` não basta. Por isso `src/main.tsx` faz `enableMocks().then(() => import('./app/start'))`. **Regra para M1+: nada em `main.tsx` pode importar `socket.io-client`, direta ou indiretamente.**
+1. **`ws.link` na raiz do host.** O link é `ws.link('<VITE_SOCKET_URL>/*')` (padrão `wss://realtime.kurio.mock`, definido uma vez em `src/app/env.ts` e usado também pelo cliente em `src/realtime/socket.ts`; o mesmo vale para `API_URL` no Axios e no handler de `health`). Com `'/socket.io/*'` nada casa, porque o MSW remove o prefixo `/socket.io/` da URL do cliente antes de comparar (`msw/src/core/handlers/WebSocketHandler.ts:79`). Sem match, o MSW deixa passar e o navegador abre um WebSocket real.
+2. **O `main.tsx` só importa o app depois do `worker.start`.** O `engine.io-client` guarda `globalThis.WebSocket` quando o módulo é avaliado; se o `socket.io-client` entrar no grafo estático do `main.tsx`, ele captura o WebSocket original antes do patch do MSW. Chamar `socket.connect()` depois do `enableMocks()` não basta. Por isso `src/main.tsx` faz `await enableMocks()` e só então `import('./app/start')`; se o mock falhar, o erro vai para `console.error('[mocks]', e)` e o app sobe mesmo assim. **Regra para M1+: nada em `main.tsx` pode importar `socket.io-client`, direta ou indiretamente.**
 3. **Heartbeat no mock.** O handshake falso do binding anuncia `pingInterval` de 25s, mas o binding nunca envia ping, e o cliente derrubava a conexão em cerca de 30s. O mock envia o ping do Engine.IO (`'2'`) a cada 25s.
 
 ### Limitações observadas
@@ -66,7 +66,7 @@ O mock (`src/mocks/socket.ts`) emite um `nft.updated` logo após o handshake e o
 
 `src/app/queryClient.ts`: `staleTime: 30_000` e `retry: 1` para queries. A intenção é evitar refetch a cada navegação e deixar o tempo real atualizar preço e estoque. São valores iniciais do M0.
 
-TODO (M4): política por recurso, mutações, e a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache.
+TODO (M4): política por recurso, mutações, e a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache. `withCredentials` no Axios entra com a sessão no M3.
 
 ## Tema
 
@@ -78,7 +78,7 @@ TODO (M4): política por recurso, mutações, e a ligação dos eventos do socke
 
 ## Desempenho (base do R2)
 
-Base aplicada: fonte self-hosted com preload, code splitting por rota (`autoCodeSplitting` do TanStack Router) e MSW fora do chunk de entrada (import dinâmico; o chunk `browser-*` só existe com `VITE_ENABLE_MOCKS=true`). TODO (M5): imagens, LCP/CLS/TBT e medição com Lighthouse. Ainda não foi medido.
+Base aplicada: fonte self-hosted com preload, code splitting por rota (`autoCodeSplitting` do TanStack Router) e MSW fora do chunk de entrada (import dinâmico; o chunk `browser-*` só existe com `VITE_ENABLE_MOCKS=true`). TODO (M5): imagens, LCP/CLS/TBT e medição com Lighthouse. Ainda não foi medido. Scripts `test:e2e` e `lighthouse` entram no M5.
 
 ## Seções do enunciado (§12) a preencher
 
@@ -114,14 +114,14 @@ Parcial: os tipos existem em `src/contracts` (`nft`, `quote`, `order`, `session`
 
 ### Decisões de UX
 
-> TODO (M2/M6): consolidar as decisões de UX tomadas durante a implementação das telas. Nenhuma tela existe ainda. Decisões já definidas no planejamento (não implementadas):
+> TODO (M2/M6): consolidar as decisões de UX tomadas durante a implementação das telas. Nenhuma tela implementada ainda (só placeholders). Decisões já definidas no planejamento (não implementadas):
 >
 > - Ações fora do escopo do desafio ficam **desabilitadas com tooltip "Em breve"** (planejado; ainda a confirmar na MYK-1059).
 > - O app é **dark-only**, conforme o Figma. Esta decisão já está aplicada no tema (ver "Tema").
 
 ### Substituição de assets
 
-> TODO (M2/M6): registrar assets do Figma que foram substituídos (imagens, ícones, fontes) e o motivo. Até o M0 só a fonte Roboto Mono foi adicionada, self-hosted.
+> TODO (M2/M6): registrar assets do Figma que foram substituídos (imagens, ícones, fontes) e o motivo. Até o M0 só a fonte Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
 
 ### Ajustes de acessibilidade
 

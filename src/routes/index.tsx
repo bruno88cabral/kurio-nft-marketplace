@@ -6,6 +6,7 @@ import { ApiError, type HealthStatus, type NftUpdatedEvent } from '@/contracts'
 import { socket } from '@/realtime/socket'
 
 export const Route = createFileRoute('/')({
+  head: () => ({ meta: [{ title: 'Início · Kurio' }] }),
   component: HomePage,
 })
 

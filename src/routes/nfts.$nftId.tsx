@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/nfts/$nftId')({
+  head: () => ({ meta: [{ title: 'Detalhe do NFT · Kurio' }] }),
   component: NftDetailPage,
 })
 

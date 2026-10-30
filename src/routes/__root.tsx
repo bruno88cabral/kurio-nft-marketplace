@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import { HeadContent, Outlet, createRootRouteWithContext } from '@tanstack/react-router'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -8,6 +8,7 @@ interface RouterContext {
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({ meta: [{ title: 'Kurio' }] }),
   component: RootLayout,
   notFoundComponent: NotFound,
 })
@@ -15,6 +16,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootLayout() {
   return (
     <TooltipProvider>
+      <HeadContent />
       <div className="bg-background text-foreground font-sans min-h-dvh">
         <Outlet />
       </div>

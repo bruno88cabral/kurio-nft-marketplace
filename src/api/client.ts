@@ -1,8 +1,9 @@
 import axios, { isAxiosError, type AxiosResponse } from 'axios'
+import { API_URL } from '@/app/env'
 import { ApiError, isApiErrorBody, type ApiErrorCode } from '@/contracts/errors'
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? '/api',
+  baseURL: API_URL,
   timeout: 10_000,
 })
 

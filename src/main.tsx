@@ -10,4 +10,16 @@ async function enableMocks() {
 // O app inteiro só é avaliado depois do worker. O engine.io-client guarda `globalThis.WebSocket`
 // quando o módulo é avaliado; se o socket.io-client carregar antes do patch do MSW, o socket
 // abre um WebSocket real e o mock não intercepta (R1). Por isso nada aqui importa o app estaticamente.
-void enableMocks().then(() => import('./app/start'))
+// Se o mock falhar, o app sobe mesmo assim (sem tela em branco); o erro vai para o console
+async function bootstrap() {
+  try {
+    await enableMocks()
+  } catch (e) {
+    console.error('[mocks]', e)
+  }
+  await import('./app/start')
+}
+
+bootstrap().catch((e: unknown) => {
+  console.error('[start]', e)
+})

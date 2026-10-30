@@ -26,6 +26,7 @@ export const Route = createFileRoute('/dev/tokens')({
   beforeLoad: () => {
     if (!import.meta.env.DEV) throw notFound()
   },
+  head: () => ({ meta: [{ title: 'Tokens · Kurio' }] }),
   component: TokensPage,
 })
 

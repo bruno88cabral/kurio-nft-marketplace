@@ -31,7 +31,7 @@ Definidas em `.env.example` e tipadas em `src/vite-env.d.ts`.
 | -- | -- | -- |
 | `VITE_ENABLE_MOCKS` | `true` | Quando `true`, o app inicia o MSW (REST via Service Worker e Socket.IO mockado) antes de renderizar. Com qualquer outro valor o MSW não é carregado e as chamadas `/api` falham com `ApiError`. |
 | `VITE_API_URL` | `/api` | `baseURL` do cliente Axios (`src/api/client.ts`). Se ausente, usa `/api`. |
-| `VITE_SOCKET_URL` | `wss://realtime.kurio.mock` | Host do Socket.IO. O mock responde neste host (`ws.link`). **Não tem valor padrão** (`src/realtime/socket.ts` passa o valor direto para `io()`): sem ela, `io(undefined)` conecta na mesma origem, o `ws.link` do mock não casa e o tempo real mockado não funciona. |
+| `VITE_SOCKET_URL` | `wss://realtime.kurio.mock` | Host do Socket.IO. O mock responde neste host (`ws.link`). Se não for definida, o padrão `wss://realtime.kurio.mock` (`src/app/env.ts`) vale tanto para o cliente (`src/realtime/socket.ts`) quanto para o `ws.link` do mock, que nunca divergem. |
 
 ## Comandos
 

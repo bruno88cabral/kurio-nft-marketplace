@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/orders/$orderId')({
+  head: () => ({ meta: [{ title: 'Pedido · Kurio' }] }),
   component: OrderPage,
 })
 

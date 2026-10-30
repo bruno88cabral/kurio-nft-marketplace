@@ -1,6 +1,7 @@
 import { toSocketIo } from '@mswjs/socket.io-binding'
 import { ws } from 'msw'
 import type { NftUpdatedEvent } from '@/contracts'
+import { SOCKET_URL } from '@/app/env'
 import { parseEth } from '@/lib/eth'
 
 const EMIT_INTERVAL_MS = 5_000
@@ -9,10 +10,10 @@ const EMIT_INTERVAL_MS = 5_000
 const PING_INTERVAL_MS = 25_000
 const ENGINE_IO_PING = '2'
 
-// O socket.io-client abre wss://realtime.kurio.mock/socket.io/?EIO=4&transport=websocket, mas o MSW
+// O socket.io-client abre <VITE_SOCKET_URL>/socket.io/?EIO=4&transport=websocket, mas o MSW
 // tira o prefixo /socket.io/ da URL do cliente antes de comparar (msw 2.15, WebSocketHandler.parse).
 // Por isso o link é a raiz: com '/socket.io/*' nada casa e o WebSocket real passa direto.
-const realtime = ws.link('wss://realtime.kurio.mock/*')
+const realtime = ws.link(`${SOCKET_URL.replace(/\/+$/, '')}/*`)
 
 export const socketHandlers = [
   realtime.addEventListener('connection', (connection) => {
