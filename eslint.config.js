@@ -31,6 +31,22 @@ export default defineConfig([
     files: ['src/routes/**/*.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
+      // notFound() e redirect() do TanStack Router são lançados por design
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allow: [
+            { from: 'package', package: '@tanstack/router-core', name: ['NotFoundError', 'Redirect'] },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // shadcn exporta as variantes (cva) junto do componente; é o padrão do gerador
+    files: ['src/components/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

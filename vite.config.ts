@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -9,6 +10,7 @@ export default defineConfig({
     // O plugin do router precisa vir antes do react()
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     react(),
+    tailwindcss(),
   ],
   resolve: {
     alias: {

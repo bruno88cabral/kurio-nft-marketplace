@@ -1,5 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -11,7 +13,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootLayout() {
-  return <Outlet />
+  return (
+    <TooltipProvider>
+      <div className="bg-background text-foreground font-sans min-h-dvh">
+        <Outlet />
+      </div>
+      <Toaster />
+    </TooltipProvider>
+  )
 }
 
 function NotFound() {
