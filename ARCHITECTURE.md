@@ -41,7 +41,7 @@ O mock (`src/mocks/socket.ts`) emite um `nft.updated` logo após o handshake e o
 - **Validado em `pnpm build && pnpm preview` local** (Chrome headless via CDP): `GET /api/health` mockado, `socket: connected`, `nft.updated` a cada 5s, uma única conexão estável por 62s (12 eventos, sem reconexão).
 - **Vercel: PENDENTE.** Não houve deploy. Por isso o R1 está **parcialmente mitigado**, não mitigado. Os passos do deploy estão no `README.md`.
 
-### Três correções ao plano original (necessárias para funcionar)
+### Correções necessárias no spike
 
 1. **`ws.link` na raiz do host.** O link é `ws.link('wss://realtime.kurio.mock/*')`. Com `'/socket.io/*'` nada casa, porque o MSW remove o prefixo `/socket.io/` da URL do cliente antes de comparar (`msw/src/core/handlers/WebSocketHandler.ts:79`). Sem match, o MSW deixa passar e o navegador abre um WebSocket real.
 2. **O `main.tsx` só importa o app depois do `worker.start`.** O `engine.io-client` guarda `globalThis.WebSocket` quando o módulo é avaliado; se o `socket.io-client` entrar no grafo estático do `main.tsx`, ele captura o WebSocket original antes do patch do MSW. Chamar `socket.connect()` depois do `enableMocks()` não basta. Por isso `src/main.tsx` faz `enableMocks().then(() => import('./app/start'))`. **Regra para M1+: nada em `main.tsx` pode importar `socket.io-client`, direta ou indiretamente.**
@@ -59,7 +59,7 @@ O mock (`src/mocks/socket.ts`) emite um `nft.updated` logo após o handshake e o
 
 - `msw@^2.15` (2.x): é o peer do `@mswjs/socket.io-binding` (0.2.0). O `msw init` deve ser feito com a versão local (`pnpm exec msw init public --save`), não com `pnpm dlx`, que baixaria o msw 3.x e geraria um worker incompatível.
 - `typescript@~6.0.3`: limite de suporte do `typescript-eslint`. O template atual do Vite vinha com oxlint/TS 7; foram trocados por ESLint + TS 6.
-- `pnpm` 12.x e Node 24.x (o plano falava em pnpm 11.x; o ambiente real é 12.x).
+- `pnpm` 12.x e Node 24.x (12.x é a versão usada no desenvolvimento).
 - `pnpm-workspace.yaml` com `allowBuilds: { msw: false }`: o pnpm 12 falha o install com `ERR_PNPM_IGNORED_BUILDS` por causa do postinstall do msw. O worker já está commitado em `public/mockServiceWorker.js`, então o postinstall não faz falta.
 
 ## Política inicial do QueryClient
@@ -111,3 +111,18 @@ Parcial: os tipos existem em `src/contracts` (`nft`, `quote`, `order`, `session`
 ### Desvios do Figma
 
 > TODO (M2/M6): registrar divergências entre as telas implementadas e o Figma. Nenhuma tela foi implementada ainda.
+
+### Decisões de UX
+
+> TODO (M2/M6): consolidar as decisões de UX tomadas durante a implementação das telas. Nenhuma tela existe ainda. Decisões já definidas no planejamento (não implementadas):
+>
+> - Ações fora do escopo do desafio ficam **desabilitadas com tooltip "Em breve"** (planejado; ainda a confirmar na MYK-1059).
+> - O app é **dark-only**, conforme o Figma. Esta decisão já está aplicada no tema (ver "Tema").
+
+### Substituição de assets
+
+> TODO (M2/M6): registrar assets do Figma que foram substituídos (imagens, ícones, fontes) e o motivo. Até o M0 só a fonte Roboto Mono foi adicionada, self-hosted.
+
+### Ajustes de acessibilidade
+
+> TODO (M2/M5/M6): registrar ajustes de acessibilidade feitos em relação ao Figma (contraste, foco, rótulos). Ainda não auditado.
