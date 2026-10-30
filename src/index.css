@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* App dark-only: a variante dark: fica sempre ativa, sem depender de prefers-color-scheme nem de classe no html */
+@custom-variant dark (&:is(*));
+
 @font-face {
   font-family: 'Roboto Mono';
   font-style: normal;
@@ -74,6 +77,7 @@
 }
 
 :root {
+    color-scheme: dark;
     --kurio-ink: #140D0A;
     --kurio-surface-card: #241612;
     --kurio-surface-dark: #38220F;
@@ -151,11 +155,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }
