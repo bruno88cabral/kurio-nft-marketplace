@@ -1,0 +1,1 @@
+{ "rewrites": [{ "source": "/((?!assets/|fonts/|mockServiceWorker\\.js).*)", "destination": "/index.html" }] }

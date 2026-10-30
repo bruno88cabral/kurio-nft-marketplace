@@ -1,0 +1,165 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* App dark-only: a variante dark: fica sempre ativa, sem depender de prefers-color-scheme nem de classe no html */
+@custom-variant dark (&:is(*));
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/roboto-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('/fonts/roboto-mono-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/fonts/roboto-mono-latin-700-normal.woff2') format('woff2');
+}
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Roboto Mono', ui-monospace, monospace;
+    --font-mono: 'Roboto Mono', ui-monospace, monospace;
+    --color-border-soft: var(--kurio-border-soft);
+    --color-text-accent: var(--kurio-text-accent);
+    --color-elevated: var(--kurio-elevated);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    color-scheme: dark;
+    --kurio-ink: #140D0A;
+    --kurio-surface-card: #241612;
+    --kurio-surface-dark: #38220F;
+    --kurio-primary: #D28A4C;
+    --kurio-text-accent: #E89B55;
+    --kurio-secondary: #B39463;
+    --kurio-text-primary: #F7F3EC;
+    --kurio-text-secondary: #CFB28C;
+    --kurio-border: #3F2319;
+    --kurio-border-soft: #55321F;
+    --kurio-elevated: #FBFBFB;
+
+    --background: var(--kurio-ink);
+    --foreground: var(--kurio-text-primary);
+    --card: var(--kurio-surface-card);
+    --card-foreground: var(--kurio-text-primary);
+    --popover: var(--kurio-surface-dark);
+    --popover-foreground: var(--kurio-text-primary);
+    --muted: var(--kurio-surface-dark);
+    --muted-foreground: var(--kurio-text-secondary);
+    --primary: var(--kurio-primary);
+    --primary-foreground: var(--kurio-ink);
+    --secondary: var(--kurio-secondary);
+    --secondary-foreground: var(--kurio-ink);
+    --accent: var(--kurio-text-accent);
+    --accent-foreground: var(--kurio-ink);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: var(--kurio-border);
+    --input: var(--kurio-border);
+    --ring: var(--kurio-primary);
+    --chart-1: var(--kurio-primary);
+    --chart-2: var(--kurio-text-accent);
+    --chart-3: var(--kurio-secondary);
+    --chart-4: var(--kurio-text-secondary);
+    --chart-5: var(--kurio-border-soft);
+    --radius: 0.625rem;
+    --sidebar: var(--kurio-surface-card);
+    --sidebar-foreground: var(--kurio-text-primary);
+    --sidebar-primary: var(--kurio-primary);
+    --sidebar-primary-foreground: var(--kurio-ink);
+    --sidebar-accent: var(--kurio-surface-dark);
+    --sidebar-accent-foreground: var(--kurio-text-primary);
+    --sidebar-border: var(--kurio-border);
+    --sidebar-ring: var(--kurio-primary);
+}
+
+/* Escala tipografica (doc "Analise do Figma e design tokens"); pesos via font-* */
+@utility text-display {
+  font-size: 43px;
+  line-height: 70px;
+  font-weight: 700;
+}
+@utility text-heading {
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+@utility text-body-lg {
+  font-size: 16px;
+  line-height: 1.5;
+}
+@utility text-body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+@utility text-caption {
+  font-size: 12px;
+  line-height: 1.5;
+}
+@utility text-tiny {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
