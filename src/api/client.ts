@@ -1,4 +1,4 @@
-import axios, { isAxiosError } from 'axios'
+import axios, { isAxiosError, type AxiosResponse } from 'axios'
 import { ApiError, isApiErrorBody, type ApiErrorCode } from '@/contracts/errors'
 
 export const apiClient = axios.create({
@@ -13,8 +13,23 @@ const CODE_BY_STATUS: Record<number, ApiErrorCode> = {
   409: 'conflict',
 }
 
+// A API só fala JSON. HTML com 2xx é o fallback da SPA (Vite/Vercel) respondendo /api sem API atrás,
+// por exemplo com VITE_ENABLE_MOCKS=false. Tratar como indisponível em vez de sucesso.
+function isHtmlResponse(response: AxiosResponse) {
+  const contentType: unknown = response.headers['content-type']
+  return typeof contentType === 'string' && contentType.includes('text/html')
+}
+
 // Normaliza qualquer falha em ApiError. Sem fallback de dados (enunciado §6).
-apiClient.interceptors.response.use(undefined, (error: unknown) => {
+apiClient.interceptors.response.use((response) => {
+  if (isHtmlResponse(response)) {
+    throw new ApiError(
+      { code: 'transient', message: 'Resposta HTML em vez de JSON: API indisponível' },
+      response.status,
+    )
+  }
+  return response
+}, (error: unknown) => {
   if (!isAxiosError(error)) {
     throw error
   }

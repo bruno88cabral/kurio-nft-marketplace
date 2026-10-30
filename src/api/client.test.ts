@@ -14,6 +14,11 @@ describe('apiClient: normalização de erros', () => {
       if (req.url === '/body') {
         res.statusCode = 422
         res.end(JSON.stringify({ code: 'validation', message: 'inválido', fieldErrors: { email: 'obrigatório' } }))
+      } else if (req.url === '/spa-fallback') {
+        // o que o fallback da SPA (Vite/Vercel) devolve quando não há API atrás de /api
+        res.setHeader('content-type', 'text/html')
+        res.statusCode = 200
+        res.end('<!doctype html><html><body><div id="root"></div></body></html>')
       } else if (req.url === '/hang') {
         // nunca responde
       } else {
@@ -47,6 +52,12 @@ describe('apiClient: normalização de erros', () => {
     const err = await apiClient.get('/body', { baseURL: base }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err).toMatchObject({ code: 'validation', status: 422, fieldErrors: { email: 'obrigatório' } })
+  })
+
+  it('HTML com 200 (fallback da SPA, sem API) rejeita com ApiError transient', async () => {
+    const err = await apiClient.get('/spa-fallback', { baseURL: base }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err).toMatchObject({ code: 'transient', status: 200 })
   })
 
   it('body fora do contrato mapeia pelo status', async () => {
