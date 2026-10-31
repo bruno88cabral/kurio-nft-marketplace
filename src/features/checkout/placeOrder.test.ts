@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { orderKeys } from '@/api/orders'
-import { ApiError, type CreateOrderRequest, type Order } from '@/contracts'
+import { ApiError, type CreateOrderRequest, type Order, type Quote } from '@/contracts'
 import { addEth, parseEth } from '@/lib/eth'
 import { addItem } from '@/mocks/db/cart'
 import { DomainError } from '@/mocks/db/domainError'
@@ -9,7 +9,8 @@ import { applyQuoteDrift, createOrder as createOrderInMock, toOrder } from '@/mo
 import { buildQuote } from '@/mocks/db/quote'
 import { createStore } from '@/mocks/db/store'
 import { getScenario } from '@/mocks/scenarios'
-import { createDraftStore, pendingAttempt } from './checkoutDraft'
+import { attemptSnapshotOf } from './attemptSnapshot'
+import { createDraftStore, pendingAttempt, pendingAttemptSnapshot } from './checkoutDraft'
 import { classifyOrderError, confirmPurchase, resendPendingOrder, type PlaceOrderDeps } from './placeOrder'
 import { snapshotOf } from './reviewSnapshot'
 
@@ -204,6 +205,41 @@ describe('confirmPurchase', () => {
     expect(again.kind).toBe('created')
     expect(t.calls.map((c) => c.key)).toEqual(['key-1', 'key-2'])
     expect(t.orders()).toHaveLength(1)
+  })
+
+  it('a tentativa grava o snapshot da cotação enviada; ele só exibe e o reenvio segue com a mesma chave e o mesmo corpo', async () => {
+    const t = setup()
+    const reviewed = snapshotOf(await t.requote())
+    t.failOnce()
+    await confirmPurchase(t.deps, { reviewed, walletId: WALLET, requote: t.requote })
+    // A cotação enviada é a da recotação do clique (a que bateu com o revisado)
+    const sentQuote: Quote = await (t.requote.mock.results.at(-1)?.value as Promise<Quote>)
+    const sent = t.calls[0]
+    expect(sent?.body).toEqual({ quoteId: sentQuote.quoteId, walletId: WALLET })
+    expect(t.drafts.get().attemptSnapshot).toEqual(attemptSnapshotOf(sentQuote))
+
+    // O carrinho muda depois do timeout: o snapshot continua o da tentativa
+    t.store.mutate((db, touch) => {
+      addItem(db, touch, ANA, { nftId: 'nft-001', edition: '1/1', quantity: 1 })
+    })
+    expect(pendingAttemptSnapshot(t.drafts.get())?.items.map((i) => i.nftId)).toEqual(['nft-002'])
+
+    const retry = await resendPendingOrder(t.deps)
+    expect(retry?.kind).toBe('created')
+    expect(t.calls[1]).toEqual(sent)
+    expect(t.orders()).toHaveLength(1)
+  })
+
+  it('409 e fatal descartam o snapshot junto com a tentativa', async () => {
+    const t = setup('price-changed')
+    const reviewed = snapshotOf(await t.requote())
+    expect((await confirmPurchase(t.deps, { reviewed, walletId: WALLET, requote: t.requote })).kind).toBe('items')
+    expect(t.drafts.get().attemptSnapshot).toBeUndefined()
+
+    const f = setup()
+    const reviewedF = snapshotOf(await f.requote())
+    expect((await confirmPurchase(f.deps, { reviewed: reviewedF, walletId: 'wallet-removida', requote: f.requote })).kind).toBe('fatal')
+    expect(f.drafts.get().attemptSnapshot).toBeUndefined()
   })
 
   it('troca de sessão no meio não grava o pedido no cache', async () => {

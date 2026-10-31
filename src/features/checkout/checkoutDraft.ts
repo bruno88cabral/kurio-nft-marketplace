@@ -1,5 +1,6 @@
 import type { SessionStorageLike } from '@/auth/sessionStorage'
 import type { CreateOrderRequest, Id, Order } from '@/contracts'
+import { parseAttemptSnapshot, type AttemptSnapshot } from './attemptSnapshot'
 
 /** Rascunho do checkout em `sessionStorage` (morre com a aba; não vaza para outra aba nem outro login). */
 export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
@@ -24,6 +25,12 @@ export interface CheckoutDraft {
    * rascunho mesmo com a Confirmação fechada. Só vale junto da tentativa.
    */
   orderId?: Id
+  /**
+   * Itens e valores da cotação enviada pela tentativa (`attemptSnapshotOf`). Só para exibir: com a tentativa
+   * pendente, a Revisão e o resumo mostram o que "Tentar de novo" compra, não o carrinho atual. Só vale junto
+   * da tentativa e com o mesmo `quoteId`; nunca muda o corpo nem a chave do reenvio.
+   */
+  attemptSnapshot?: AttemptSnapshot
 }
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== ''
@@ -50,6 +57,9 @@ export function parseCheckoutDraft(raw: string | null): CheckoutDraft {
       draft.keyFingerprint = value.keyFingerprint
       draft.attempt = { quoteId: value.attempt.quoteId, walletId: value.attempt.walletId }
       if (isString(value.orderId)) draft.orderId = value.orderId
+      // Snapshot ausente, malformado ou de outra cotação: a tentativa fica, só sem o que exibir (rascunho antigo)
+      const snapshot = parseAttemptSnapshot(value.attemptSnapshot)
+      if (snapshot && snapshot.quoteId === draft.attempt.quoteId) draft.attemptSnapshot = snapshot
     }
     return draft
   } catch {
@@ -98,20 +108,25 @@ export const keyFingerprint = (attempt: CreateOrderRequest) => `${attempt.quoteI
 
 /**
  * Chave da tentativa: a guardada se o par cotação+carteira é o mesmo (repetir a mesma tentativa nunca cria
- * outro pedido); senão uma nova. Devolve o rascunho já com a chave, o fingerprint e o corpo, para gravar
- * **antes** do POST.
+ * outro pedido); senão uma nova. Devolve o rascunho já com a chave, o fingerprint, o corpo e o `snapshot` do
+ * que a tentativa compra (só para exibir), para gravar **antes** do POST. O snapshot não entra na chave nem no corpo.
  */
 export function withOrderKey(
   draft: CheckoutDraft,
   attempt: CreateOrderRequest,
   newKey: () => string = () => crypto.randomUUID(),
+  snapshot?: AttemptSnapshot,
 ): { key: string; draft: CheckoutDraft } {
   const fingerprint = keyFingerprint(attempt)
   const reused = draft.idempotencyKey && draft.keyFingerprint === fingerprint ? draft.idempotencyKey : undefined
   const key = reused ?? newKey()
   const next: CheckoutDraft = { ...draft, idempotencyKey: key, keyFingerprint: fingerprint, attempt: { ...attempt } }
-  // Chave nova é outra tentativa: o pedido da anterior não é dela
-  if (!reused) delete next.orderId
+  // Chave nova é outra tentativa: o pedido e o snapshot da anterior não são dela
+  if (!reused) {
+    delete next.orderId
+    delete next.attemptSnapshot
+  }
+  if (snapshot && snapshot.quoteId === attempt.quoteId) next.attemptSnapshot = snapshot
   return { key, draft: next }
 }
 
@@ -127,7 +142,7 @@ export function withConnectedWallet(draft: CheckoutDraft, walletId: Id): Checkou
 
 /**
  * Sem a conexão da carteira, e só ela. `walletId` e a tentativa pendente (`idempotencyKey`, `keyFingerprint`,
- * `attempt`, `orderId`) ficam: apagar a tentativa abriria caminho para um pedido duplicado depois de um timeout (R4).
+ * `attempt`, `orderId`, `attemptSnapshot`) ficam: apagar a tentativa abriria caminho para um pedido duplicado depois de um timeout (R4).
  */
 export function withoutConnection(draft: CheckoutDraft): CheckoutDraft {
   const next = { ...draft }
@@ -147,6 +162,7 @@ export function withoutOrderKey(draft: CheckoutDraft): CheckoutDraft {
   delete next.keyFingerprint
   delete next.attempt
   delete next.orderId
+  delete next.attemptSnapshot
   return next
 }
 
@@ -179,6 +195,16 @@ export function settleCheckoutDraft(
 export function pendingAttempt(draft: CheckoutDraft): { key: string; body: CreateOrderRequest } | undefined {
   if (!draft.idempotencyKey || !draft.attempt || draft.keyFingerprint !== keyFingerprint(draft.attempt)) return undefined
   return { key: draft.idempotencyKey, body: draft.attempt }
+}
+
+/**
+ * Itens e valores que "Tentar de novo" compra: o snapshot da tentativa pendente. `undefined` sem tentativa ou
+ * com rascunho antigo, sem snapshot (a tela segue mostrando o carrinho atual).
+ */
+export function pendingAttemptSnapshot(draft: CheckoutDraft): AttemptSnapshot | undefined {
+  const pending = pendingAttempt(draft)
+  if (!pending || !draft.attemptSnapshot || draft.attemptSnapshot.quoteId !== pending.body.quoteId) return undefined
+  return draft.attemptSnapshot
 }
 
 /** Interface mínima de leitura/escrita do rascunho, injetável nos testes. */

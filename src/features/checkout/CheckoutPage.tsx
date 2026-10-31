@@ -32,6 +32,7 @@ import {
   type PlaceOrderOutcome,
 } from './placeOrder'
 import { ReviewStep } from './ReviewStep'
+import { ATTEMPT_REVIEW_MESSAGE, reviewSource } from './reviewSource'
 import { changeMessages, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
 import { usePendingOrder } from './usePendingOrder'
@@ -192,8 +193,15 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
 
   const profile = useQuery(profileQuery(accountId))
   const wallets = useQuery(walletsQuery(accountId))
-  const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
   const quote = useCartQuote(accountId, cart)
+  // Com tentativa pendente (e snapshot), a Revisão e o resumo mostram o que "Tentar de novo" compra
+  const source = reviewSource(cart.items, draft)
+  const attempt = source.kind === 'attempt' ? source.snapshot : undefined
+  // Nome e arte dos NFTs do carrinho e da tentativa: o conjunto não ganha queries quando a tentativa termina e a
+  // Revisão volta ao carrinho (criar query no render dispararia os assinantes do cache, ex. `useQueryInvalidated`)
+  const nftIds = [...new Set([...cart.items, ...(attempt?.items ?? [])].map((item) => item.nftId))]
+  const details = useQueries({ queries: nftIds.map((nftId) => nftDetailQuery(nftId)) })
+  const nftOf = (nftId: Id) => details[nftIds.indexOf(nftId)]?.data
 
   // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança
   const [reviewed, setReviewed] = useState<ReviewSnapshot>()
@@ -338,11 +346,12 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     void run(() => resendPendingOrder(deps())).finally(() => setResending(false))
   }
 
-  const lines = cart.items.map((item, index) => {
+  const lines = source.items.map((item, index) => {
     const key = lineKey(item)
+    if (attempt) return { item, nft: nftOf(item.nftId), unitPrice: attempt.items[index]?.unitPrice }
     return {
       item,
-      nft: details[index]?.data,
+      nft: nftOf(item.nftId),
       unitPrice: quote.unitPriceOf(item),
       issue: issues.get(key),
       message: (notice?.kind === 'items' ? notice.fieldErrors[key] : undefined) ?? messages?.byLine.get(key),
@@ -351,7 +360,9 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
 
   let staleMessage: string | undefined
   let staleAction: ReactNode
-  if (staleAfterError) {
+  if (attempt) {
+    // Os valores da tentativa são os do pedido enviado: a cotação do carrinho atual não os torna desatualizados
+  } else if (staleAfterError) {
     staleMessage = 'Não foi possível atualizar a cotação. Tente de novo antes de confirmar.'
     staleAction = (
       <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void quote.refetch()}>
@@ -398,12 +409,15 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
         </Step>
 
         <Step number={3} title="Revisão">
+          {attempt && <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>}
           <ReviewStep lines={lines} />
         </Step>
       </div>
 
       <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
-        {quote.isError && !quoteData ? (
+        {attempt ? (
+          <PriceSummary title="Resumo" quote={attempt} />
+        ) : quote.isError && !quoteData ? (
           <QuoteErrorState quote={quote} />
         ) : (
           <PriceSummary
@@ -415,7 +429,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
           />
         )}
 
-        {(hasIssues || notice?.kind === 'blocked') && (
+        {!attempt && (hasIssues || notice?.kind === 'blocked') && (
           <div role="alert" className="text-destructive text-caption flex flex-col gap-2">
             <p>{QUOTE_ISSUES_MESSAGE}</p>
             <Link to="/cart" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
