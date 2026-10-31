@@ -14,7 +14,12 @@ import {
   validateLogin,
   validateNewPassword,
   validateSignup,
+  MAX_DISPLAY_NAME,
+  validateDisplayName,
+  validatePassword,
+  validateProfile,
 } from './validation'
+import { MAX_DISPLAY_NAME as MOCK_MAX_DISPLAY_NAME } from '@/mocks/handlers/profile'
 
 const validSignup = { name: 'Carla', email: 'carla@kurio.test', password: 'Kurio#2026', confirmPassword: 'Kurio#2026' }
 
@@ -144,5 +149,85 @@ describe('toFormErrors', () => {
       fieldErrors: {},
     })
     expect(toFormErrors(new Error('boom'), login).formError).toBe(GENERIC_FORM_ERROR)
+  })
+})
+
+describe('toFormErrors nas telas logadas', () => {
+  it('401 usa a mensagem dada (sessão expirada), não a de credenciais', () => {
+    const error = new ApiError({ code: 'unauthorized', message: 'qualquer' }, 401)
+    expect(toFormErrors(error, ['displayName'], { unauthorizedMessage: 'Sessão expirou.' })).toEqual({
+      formError: 'Sessão expirou.',
+      fieldErrors: {},
+    })
+  })
+
+  it('422 da senha atual vai para o campo', () => {
+    const error = new ApiError(
+      { code: 'validation', message: 'Dados inválidos.', fieldErrors: { currentPassword: 'Senha atual incorreta.' } },
+      422,
+    )
+    expect(toFormErrors(error, ['currentPassword', 'newPassword', 'confirmPassword'] as const)).toEqual({
+      fieldErrors: { currentPassword: 'Senha atual incorreta.' },
+    })
+  })
+})
+
+describe('validateDisplayName / validateProfile', () => {
+  it('mesmo máximo do mock', () => {
+    expect(MAX_DISPLAY_NAME).toBe(MOCK_MAX_DISPLAY_NAME)
+  })
+
+  it('aceita até 60 depois do trim', () => {
+    expect(validateDisplayName('Ana')).toBeUndefined()
+    expect(validateDisplayName('a'.repeat(60))).toBeUndefined()
+    expect(validateDisplayName(`  ${'a'.repeat(60)}  `)).toBeUndefined()
+  })
+
+  it('vazio ou só espaços é obrigatório', () => {
+    expect(validateDisplayName('')).toBe(FIELD_MESSAGES.displayNameRequired)
+    expect(validateDisplayName('   ')).toBe(FIELD_MESSAGES.displayNameRequired)
+  })
+
+  it('61 caracteres é longo demais', () => {
+    expect(validateDisplayName('a'.repeat(61))).toBe(FIELD_MESSAGES.displayNameTooLong)
+    expect(validateProfile({ displayName: 'a'.repeat(61) })).toEqual({ displayName: FIELD_MESSAGES.displayNameTooLong })
+  })
+
+  it('válido não tem erros', () => {
+    expect(validateProfile({ displayName: 'Ana' })).toEqual({})
+  })
+})
+
+describe('validatePassword', () => {
+  const valid = { currentPassword: 'Kurio#2026', newPassword: 'Nova#2026x', confirmPassword: 'Nova#2026x' }
+
+  it('válido não tem erros', () => {
+    expect(validatePassword(valid)).toEqual({})
+  })
+
+  it('tudo vazio: um erro por campo', () => {
+    expect(validatePassword({ currentPassword: '', newPassword: '', confirmPassword: '' })).toEqual({
+      currentPassword: FIELD_MESSAGES.currentPasswordRequired,
+      newPassword: FIELD_MESSAGES.passwordRequired,
+      confirmPassword: FIELD_MESSAGES.confirmRequired,
+    })
+  })
+
+  it('nova com menos de 8', () => {
+    expect(validatePassword({ ...valid, newPassword: '1234567', confirmPassword: '1234567' })).toEqual({
+      newPassword: FIELD_MESSAGES.passwordTooShort,
+    })
+  })
+
+  it('nova igual à atual', () => {
+    expect(validatePassword({ ...valid, newPassword: 'Kurio#2026', confirmPassword: 'Kurio#2026' })).toEqual({
+      newPassword: FIELD_MESSAGES.newPasswordSameAsCurrent,
+    })
+  })
+
+  it('confirmação diferente', () => {
+    expect(validatePassword({ ...valid, confirmPassword: 'outra-senha' })).toEqual({
+      confirmPassword: FIELD_MESSAGES.confirmMismatch,
+    })
   })
 })

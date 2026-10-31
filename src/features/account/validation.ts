@@ -10,6 +10,8 @@ export type FieldErrors<K extends string> = Partial<Record<K, string>>
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Mesmo mínimo do mock para senha. */
 export const MIN_PASSWORD_LENGTH = 8
+/** Mesmo máximo do mock para o nome de exibição (contado depois do trim). */
+export const MAX_DISPLAY_NAME = 60
 
 export const INVALID_CREDENTIALS_MESSAGE = 'E-mail ou senha inválidos.'
 export const SIGNUP_CONFLICT_MESSAGE = 'Já existe uma conta com este e-mail.'
@@ -24,7 +26,14 @@ export const FIELD_MESSAGES = {
   passwordTooShort: `A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`,
   confirmRequired: 'Confirme sua senha.',
   confirmMismatch: 'As senhas não conferem.',
+  displayNameRequired: 'Informe um nome de exibição.',
+  displayNameTooLong: `Use até ${MAX_DISPLAY_NAME} caracteres.`,
+  currentPasswordRequired: 'Informe a senha atual.',
+  newPasswordSameAsCurrent: 'A nova senha deve ser diferente da atual.',
 } as const
+
+export const PROFILE_UPDATED_MESSAGE = 'Perfil atualizado.'
+export const PASSWORD_CHANGED_MESSAGE = 'Senha alterada.'
 
 export interface LoginValues {
   email: string
@@ -86,6 +95,50 @@ export function validateSignup({
   })
 }
 
+export interface ProfileValues {
+  displayName: string
+}
+
+export interface PasswordValues {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
+/** Nome de exibição: obrigatório e até 60 caracteres, depois do trim (como o mock). */
+export function validateDisplayName(displayName: string): string | undefined {
+  const value = displayName.trim()
+  if (!value) return FIELD_MESSAGES.displayNameRequired
+  if (value.length > MAX_DISPLAY_NAME) return FIELD_MESSAGES.displayNameTooLong
+  return undefined
+}
+
+export function validateProfile({ displayName }: ProfileValues): FieldErrors<keyof ProfileValues> {
+  return compact({ displayName: validateDisplayName(displayName) })
+}
+
+/**
+ * Troca de senha: atual obrigatória; nova com o mínimo e diferente da atual (como o mock);
+ * confirmação igual à nova (só no cliente: o contrato não tem o campo).
+ */
+export function validatePassword({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+}: PasswordValues): FieldErrors<keyof PasswordValues> {
+  return compact({
+    currentPassword: currentPassword ? undefined : FIELD_MESSAGES.currentPasswordRequired,
+    newPassword:
+      validateNewPassword(newPassword) ??
+      (currentPassword && newPassword === currentPassword ? FIELD_MESSAGES.newPasswordSameAsCurrent : undefined),
+    confirmPassword: !confirmPassword
+      ? FIELD_MESSAGES.confirmRequired
+      : confirmPassword !== newPassword
+        ? FIELD_MESSAGES.confirmMismatch
+        : undefined,
+  })
+}
+
 export function hasErrors(errors: FieldErrors<string>): boolean {
   return Object.values(errors).some((message) => message !== undefined)
 }
@@ -109,7 +162,19 @@ export interface FormErrorState<K extends string> {
  * - `conflict` (409, só no cadastro): erro no campo e-mail;
  * - o resto (`transient`, rede, inesperado): mensagem genérica para tentar de novo.
  */
-export function toFormErrors<K extends string>(error: unknown, fields: readonly K[]): FormErrorState<K> {
+export interface ToFormErrorsOptions {
+  /**
+   * Mensagem do 401. Padrão: "E-mail ou senha inválidos." (login). Nas telas logadas o 401 é sessão
+   * expirada: o ciclo de vida já avisa e leva ao login, então passe `SESSION_EXPIRED_MESSAGE`.
+   */
+  unauthorizedMessage?: string
+}
+
+export function toFormErrors<K extends string>(
+  error: unknown,
+  fields: readonly K[],
+  { unauthorizedMessage = INVALID_CREDENTIALS_MESSAGE }: ToFormErrorsOptions = {},
+): FormErrorState<K> {
   if (error instanceof ApiError) {
     if (error.code === 'validation') {
       const fieldErrors: FieldErrors<K> = {}
@@ -119,7 +184,7 @@ export function toFormErrors<K extends string>(error: unknown, fields: readonly 
       }
       return hasErrors(fieldErrors) ? { fieldErrors } : { formError: error.message, fieldErrors }
     }
-    if (error.code === 'unauthorized') return { formError: INVALID_CREDENTIALS_MESSAGE, fieldErrors: {} }
+    if (error.code === 'unauthorized') return { formError: unauthorizedMessage, fieldErrors: {} }
     if (error.code === 'conflict' && (fields as readonly string[]).includes('email')) {
       return { fieldErrors: { email: SIGNUP_CONFLICT_MESSAGE } as FieldErrors<K> }
     }
