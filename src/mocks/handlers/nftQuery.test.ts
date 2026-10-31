@@ -1,14 +1,16 @@
+import Big from 'big.js'
 import { describe, expect, it } from 'vitest'
 import type { Nft } from '@/contracts'
 import { parseEth } from '@/lib/eth'
 import { NFTS } from '../fixtures/nfts'
-import { filterNfts, paginate, sortNfts } from './nftQuery'
+import { computeFacets, filterNfts, paginate, sortNfts } from './nftQuery'
 
 function nft(id: string, over: Partial<Nft> = {}): Nft {
   return {
     id,
     name: id,
     imageUrl: '',
+    images: [''],
     collection: 'Alpha',
     description: '',
     creator: 'someone',
@@ -112,5 +114,46 @@ describe('paginate', () => {
   it('página fora do intervalo vem vazia com o total correto', () => {
     expect(paginate(items, 9, 2)).toEqual({ items: [], page: 9, pageSize: 2, total: 5 })
     expect(paginate([], 1, 12)).toEqual({ items: [], page: 1, pageSize: 12, total: 0 })
+  })
+})
+
+describe('computeFacets', () => {
+  it('catálogo vazio devolve listas vazias e preço 0..0', () => {
+    expect(computeFacets([])).toEqual({ collections: [], networks: [], price: { min: '0', max: '0' } })
+  })
+
+  it('conta por coleção e rede, ordenado por nome, e acha min/max com Big', () => {
+    const list = [
+      nft('a', { collection: 'Beta', network: 'polygon', price: parseEth('10') }),
+      nft('b', { collection: 'Alpha', network: 'ethereum', price: parseEth('9.5') }),
+      nft('c', { collection: 'Beta', network: 'ethereum', price: parseEth('0.05') }),
+    ]
+    expect(computeFacets(list)).toEqual({
+      collections: [{ name: 'Alpha', count: 1 }, { name: 'Beta', count: 2 }],
+      networks: [{ network: 'ethereum', count: 2 }, { network: 'polygon', count: 1 }],
+      price: { min: '0.05', max: '10' },
+    })
+  })
+
+  it('no seed, as contagens somam o catálogo inteiro', () => {
+    const f = computeFacets(NFTS)
+    expect(f.collections.reduce((s, c) => s + c.count, 0)).toBe(NFTS.length)
+    expect(f.networks.reduce((s, c) => s + c.count, 0)).toBe(NFTS.length)
+  })
+})
+
+describe('fixtures: galeria e preço anterior', () => {
+  it('images nunca vazio e images[0] é a capa', () => {
+    for (const n of NFTS) {
+      expect(n.images.length).toBeGreaterThan(0)
+      expect(n.images[0]).toBe(n.imageUrl)
+    }
+  })
+
+  it('3 ou 4 NFTs têm previousPrice maior que price', () => {
+    const promo = NFTS.filter((n) => n.previousPrice !== undefined)
+    expect(promo.length).toBeGreaterThanOrEqual(3)
+    expect(promo.length).toBeLessThanOrEqual(4)
+    for (const n of promo) expect(new Big(n.previousPrice!).gt(n.price)).toBe(true)
   })
 })

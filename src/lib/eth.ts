@@ -30,6 +30,16 @@ export function formatEth(value: EthAmount, opts: FormatEthOptions = {}): string
   return padded ? `${int}.${padded}` : int
 }
 
+/** Texto de exibição de um valor em ETH, ex.: `"0.125 ETH"` (mesmas opções de `formatEth`). */
+export function formatEthLabel(value: EthAmount, opts?: FormatEthOptions): string {
+  return `${formatEth(value, opts)} ETH`
+}
+
+/** Comparação numérica: `-1` se `a < b`, `0` se iguais, `1` se `a > b`. */
+export function cmpEth(a: EthAmount, b: EthAmount): -1 | 0 | 1 {
+  return new Big(a).cmp(b)
+}
+
 /** Igualdade numérica: `'3'` e `'3.0'` são o mesmo valor. */
 export function eqEth(a: EthAmount, b: EthAmount): boolean {
   return new Big(a).eq(b)

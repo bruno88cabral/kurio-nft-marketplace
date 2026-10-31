@@ -1,16 +1,23 @@
 # Arquitetura
 
-Documento vivo. Hoje cobre o **M0 (Fundação)** e a **camada de mocks do M1** (estado, handlers REST, socket e cenários): as decisões já tomadas e implementadas estão preenchidas; o que depende das telas e do cliente (M2 em diante) está como `TODO` e **não** deve ser lido como funcionando.
+Documento vivo. Hoje cobre o **M0 (Fundação)**, a **camada de mocks do M1** (estado, handlers REST, socket e cenários) e o **M2 (Início, Detalhe do NFT, favoritos, layout e a base da sessão no cliente)**: as decisões já tomadas e implementadas estão preenchidas; o que depende de login, perfil, carteiras, carrinho, checkout e tempo real no cache (M3 em diante) está como `TODO` e **não** deve ser lido como funcionando. As telas do M2 **não foram conferidas contra o Figma** (o MCP estava sem cota): ver "Desvios do Figma".
 
 ## Estrutura de pastas
 
 ```
 src/
-  api/          cliente HTTP (Axios) e normalização de erros em ApiError
+  api/          cliente HTTP (Axios), normalização de erros em ApiError e fábricas de query (nfts, favorites)
   app/          bootstrap (start.tsx), router e QueryClient
+  auth/         sessão no cliente: sessionStorage.ts (chave kurio:session) e useSession.ts
   components/ui componentes shadcn/ui (estilo radix-vega)
+  components/kurio kit de componentes de produto (MYK-1059), só props; conferência em /dev/kit (só DEV)
+  components/layout moldura do app: SkipLink, SiteHeader (+ HeaderSearch), SiteFooter, MobileTabBar, SessionLink, BrandLogo
   contracts/    contratos tipados de REST e eventos (fonte única)
-  lib/          utilitários puros (cn, eth, redirectSearch)
+  features/     telas do M2, por assunto:
+    catalog/      Início: hero, catálogo (filtros, toolbar, grid, paginação), promos, Diário da Cunhagem
+    nft-detail/   Detalhe: galeria, info, painel de compra (edição e quantidade), "Mais desta coleção", chrome mobile
+    favorites/    favoritos otimistas: favoriteCache, useToggleFavorite, FavoriteButton
+  lib/          utilitários puros (cn, eth, catalogSearch, priceRange, redirectSearch, editions, quantity, nftArt)
   mocks/        MSW (ver "Mock"):
     browser.ts    setupWorker, startMocks() e instalação do window.__kurioMock
     runtime.ts    instância única de store + cenário (escolhido na carga via ?scenario=)
@@ -38,7 +45,7 @@ Alias `@/` aponta para `src/` (via `paths`, sem `baseUrl`, que é obsoleto no Ty
 - `src/lib/eth.ts` usa `big.js`: `parseEth` (valida e cria o brand), `formatEth`, `addEth`, `mulEth`. Testes em `src/lib/eth.test.ts`.
 - Decisão: **o cálculo (subtotal, desconto, taxa) é responsabilidade do mock**, que é a fonte da verdade da cotação; o cliente só formata para exibição.
 - A cotação (`POST /quotes`, `src/mocks/db/quote.ts`) é calculada no mock só com os helpers de `src/lib/eth.ts` (`addEth`, `subEth`, `mulEth`, `percentEth`): `subtotal = Σ unitPrice × quantity`, `desconto = subtotal × percentOff`, `total = subtotal − desconto + networkFee` (taxa fixa de `0.002`). Os preços unitários ficam congelados no snapshot da cotação. Filtros de preço do catálogo usam `Big` (nunca `Number`).
-- TODO (M4): o consumo de `formatEth` nas telas ainda não existe.
+- No M2 as telas já exibem preços (`PriceTag`, `PriceSummary`, faixa de preço dos filtros) sem aritmética de ponto flutuante. TODO (M4): o consumo nos totais do carrinho e do checkout.
 
 ## Transporte de tempo real
 
@@ -55,7 +62,7 @@ O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nf
 ### Resultado do spike R1 (MYK-1057)
 
 - **Validado em `pnpm build && pnpm preview` local** (Chrome headless via CDP): `GET /api/health` mockado, `socket: connected`, `nft.updated` a cada 5s (emissor removido no M1), uma única conexão estável por 62s (12 eventos, sem reconexão).
-- **Vercel: PENDENTE.** Não houve deploy. Por isso o R1 está **parcialmente mitigado**, não mitigado. Os passos do deploy estão no `README.md`.
+- **Vercel: PENDENTE.** O projeto já faz deploy a cada push pela integração Git, mas os domínios estão atrás da Deployment Protection e nada foi conferido no ambiente publicado. Por isso o R1 está **parcialmente mitigado**, não mitigado. O deploy e a conferência estão no `README.md`.
 
 ### Correções necessárias no spike
 
@@ -69,7 +76,7 @@ O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nf
 - Sem **rooms, namespaces ou broadcast** (limitação do binding). O mock contorna: cada conexão assina o bus e filtra por conta (`nft.updated` para todas; `order.updated` só para o dono do pedido, identificado pelo token da `query`).
 - Sem **long-polling**: o binding intercepta o `WebSocket`, não HTTP. Por isso `transports: ['websocket']` é obrigatório.
 - Um evento publicado logo após o handshake pode chegar antes de a rota registrar o `socket.on` (a rota é carregada sob demanda) e se perde. É semântica normal de tempo real e fica para a reconciliação (ver seção própria).
-- O painel de debug em `src/routes/index.tsx` é temporário (removido na MYK-1049).
+- O painel de debug do spike saiu de `src/routes/index.tsx` na MYK-1075. Hoje nenhuma tela escuta o socket: `src/app/start.tsx` só chama `socket.connect()` (mantido) e nenhum evento atualiza o cache (M4). Por isso a checagem do R1 no deploy não tem mais o painel como evidência (ver `README.md`).
 
 ## Mock (camada do M1)
 
@@ -105,9 +112,9 @@ O mock é a "API" do app: tudo passa pelos handlers do MSW, nada é respondido n
 
 ## Política inicial do QueryClient
 
-`src/app/queryClient.ts`: `staleTime: 30_000` e `retry: 1` para queries. A intenção é evitar refetch a cada navegação e deixar o tempo real atualizar preço e estoque. São valores iniciais do M0.
+`src/app/queryClient.ts`: `staleTime: 30_000` e `retry: 1` para queries. A intenção é evitar refetch a cada navegação e deixar o tempo real atualizar preço e estoque. São os valores padrão; o M2 acrescentou as exceções por recurso descritas em "Cache" (chaves, `keepPreviousData`, sem retry no 404, favoritos otimistas). O router usa `defaultPreload: 'intent'` (`src/app/router.tsx`).
 
-TODO (M4): política por recurso, mutações, e a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache. `withCredentials` no Axios entra com a sessão no M3.
+TODO (M4): a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache. `withCredentials` no Axios entra com a sessão no M3.
 
 ## Tema
 
@@ -119,11 +126,20 @@ TODO (M4): política por recurso, mutações, e a ligação dos eventos do socke
 
 ## Desempenho (base do R2)
 
-Base aplicada: fonte self-hosted com preload, code splitting por rota (`autoCodeSplitting` do TanStack Router) e MSW fora do chunk de entrada (import dinâmico; o chunk `browser-*` só existe com `VITE_ENABLE_MOCKS=true`). TODO (M5): imagens, LCP/CLS/TBT e medição com Lighthouse. Ainda não foi medido. Scripts `test:e2e` e `lighthouse` entram no M5.
+Base aplicada: fonte self-hosted com preload, code splitting por rota (`autoCodeSplitting` do TanStack Router) e MSW fora do chunk de entrada (import dinâmico; o chunk `browser-*` só existe com `VITE_ENABLE_MOCKS=true`).
+
+Base do M2 para CLS e LCP (**ainda não medida**):
+
+- **Dimensões fixas nas artes.** `NftCard` e `NftGallery` passam `width`/`height` do manifest (`nftArtSize`, `src/lib/nftArt.ts`) ao `<img>`, e o card usa `aspect-square`.
+- **Skeletons com a mesma caixa da tela pronta.** `NftCardSkeleton` repete as alturas de linha do card; o `NftDetailSkeleton` compartilha as classes de `src/features/nft-detail/layout.ts`; o hero e o erro de destaques ocupam o mesmo tamanho. Medido em browser: caixas iguais entre skeleton e conteúdo em 390 e 1440 (Início e Detalhe). Skeletons usam `motion-reduce:animate-none`.
+- **`fetchpriority="high"`** na arte do hero (Início) e na arte principal do Detalhe (`eager`); as demais ficam lazy.
+- **Rota do Início em chunk próprio** (`dist/assets/routes-*.js`, ~28 kB), separada do `start-*.js`.
+
+Pendente: AVIF/WebP (as artes ainda são SVG, ver "Substituição de assets"), LCP/CLS/TBT e medição com Lighthouse, que fecham o R2 no M5. Uma consequência conhecida do CLS: na primeira carga a paginação aparece só depois dos dados e empurra as promos para baixo. Scripts `test:e2e` e `lighthouse` entram no M5.
 
 ## Seções do enunciado (§12) a preencher
 
-> Os títulos abaixo seguem o que o enunciado exige no ARCHITECTURE.md. **Contratos**, a parte do mock em **Sessão** e **Carrinho** estão documentados (camada de mocks do M1); o restante ainda é `TODO` e não está implementado.
+> Os títulos abaixo seguem o que o enunciado exige no ARCHITECTURE.md. **Contratos**, **Sessão** (mock e base do cliente), **Telas do M2**, **Cache**, **Desvios do Figma**, **Decisões de UX** e **Ajustes de acessibilidade** estão documentados até o M2; **Carrinho** documenta só o mock (M1); **Reconciliação** e o restante ainda são `TODO` e não estão implementados.
 
 ### Contratos
 
@@ -138,10 +154,10 @@ Os tipos ficam em `src/contracts` (`nft`, `quote`, `order`, `session`, `cart`, `
 | POST | `/auth/login` | não | 200 `AuthResponse` | 422 (campos vazios); 401 e-mail ou senha inválidos |
 | GET | `/auth/session` | sim | 200 `Session` | 401 |
 | POST | `/auth/logout` | não | 204 | nenhum (idempotente: token ausente, desconhecido ou expirado também dá 204) |
-| GET | `/nfts` | não | 200 `Paginated<Nft>` | 422 (parâmetros inválidos) |
-| GET | `/nfts/featured` | não | 200 `Nft[]` | nenhum |
+| GET | `/nfts` | não | 200 `Paginated<Nft>` (filtros em `NftListParams`, abaixo) | 422 (parâmetros inválidos) |
+| GET | `/nfts/featured` | não | 200 `Nft[]` (os `featured`, mais recentes primeiro) | nenhum |
+| GET | `/nfts/facets` | não | 200 `NftFacets` (`collections` e `networks` com contagem, `price` com `min`/`max`; calculadas sobre o catálogo **inteiro**, não dependem dos filtros aplicados) | nenhum |
 | GET | `/nfts/:nftId` | não | 200 `Nft` | 404 |
-| GET | `/collections` | não | 200 `string[]` (nomes das coleções do catálogo, ordenados) | nenhum |
 | GET | `/favorites` | sim | 200 `Favorite[]` | 401 |
 | PUT | `/favorites/:nftId` | sim | 200 `Favorite` (idempotente: repetir devolve o existente) | 401; 404 NFT inexistente |
 | DELETE | `/favorites/:nftId` | sim | 204 (idempotente) | 401 |
@@ -166,6 +182,16 @@ Os tipos ficam em `src/contracts` (`nft`, `quote`, `order`, `session`, `cart`, `
 | GET | `/orders/:orderId` | sim | 200 `Order` | 401; 403 de outra conta; 404 |
 
 Rotas do socket: `ws.link('<VITE_SOCKET_URL>/*')` (ver "Transporte de tempo real"), fora desta tabela.
+
+**Catálogo (M2).**
+
+- A rota separada que listava as coleções deixou de existir (MYK-1073): os nomes das coleções vêm de `GET /nfts/facets`. Chamar a rota antiga cai no fallback HTML da SPA, que o cliente trata como `transient`.
+- `/nfts/featured` e `/nfts/facets` são registrados **antes** de `/nfts/:nftId`, senão `featured` e `facets` seriam lidos como id.
+- `NftListParams`: `q` (busca em nome, coleção, criador e descrição), `collections` (repetido, `collections=a&collections=b`, ou separado por vírgula; o cliente envia repetido), `priceMin`/`priceMax` (decimais, comparados com `Big`), `network` (`ethereum`, `polygon`, `arbitrum`, `optimism`), `tab` (`all`, `new`, `trending`), `sort` (`newest`, `price_asc`, `price_desc`), `page` e `pageSize` (padrão 12, máximo 100). Valor fora do formato responde 422 com `fieldErrors`.
+- `tab=new` = NFTs criados nos 14 dias anteriores ao mais recente do catálogo (`NEW_WINDOW_DAYS`); `tab=trending` = fração vendida das edições limitadas entre 50% (inclusive) e 100% (exclusive) (`TRENDING_MIN_SOLD`). Empate de ordenação resolvido por `id`.
+- `Nft.images: string[]` é a galeria (`images[0]` é a capa e igual a `imageUrl`; nunca vazio). Hoje todo NFT tem 1 imagem, porque só existe uma arte por NFT (ver "Substituição de assets"); a galeria com miniaturas foi exercitada injetando 3 imagens no db do mock.
+- `Nft.previousPrice?` é o preço "de" riscado (promoção); está em 4 NFTs do seed (`nft-002`, `nft-009`, `nft-014`, `nft-023`).
+- Com o cenário `empty`, `GET /nfts` devolve `items: []` e `GET /nfts/facets` devolve listas vazias e `price: { min: '0', max: '0' }`. O seed normal soma 30 NFTs em 5 coleções (6 cada) e 4 redes (7, 9, 6 e 8), preço de 0.03 a 5.
 
 **`ApiErrorCode` e quando sai.**
 
@@ -197,7 +223,17 @@ Parte do mock (implementada no M1):
 - **Persistência.** As sessões vivem no `MockDb`, então sobrevivem a refresh até expirar ou o db ser resetado.
 - **Socket.** O token vai pela `query` na conexão (ver "Transporte de tempo real").
 
-> TODO (M3/M4): onde o cliente guarda o token, como o injeta no Axios e no socket, e o que acontece ao expirar (as rotas `_authenticated` ainda são vazias).
+Base do cliente (M2, MYK-1073; só a leitura da sessão, sem telas de login):
+
+- **Onde fica o token.** `localStorage`, chave `kurio:session`, valor `{ "token": string, "expiresAt": <ISO 8601> }` (`src/auth/sessionStorage.ts`: `readSession`, `writeSession`, `clearSession`, `getToken`, `clearStoredSession`). `readSession` devolve `null` para chave ausente, JSON ilegível, forma inválida ou `expiresAt` vencido, e nunca lança; storage bloqueado ou cheio só deixa a sessão sem persistir. O storage é injetável nos testes.
+- **Injeção no Axios.** O interceptor de request do `apiClient` lê `getToken()` a cada chamada e envia `Authorization: Bearer <token>` (leitura síncrona e barata do `localStorage`).
+- **401.** Numa request que **levou** token, o 401 chama `clearStoredSession()` e o callback registrado por `onUnauthorized(cb)` (`src/api/client.ts`). `src/app/start.tsx` registra o callback que invalida `['session']`. O callback existe para o `client.ts` não importar o `queryClient` (evita ciclo). 401 sem token (visitante) não limpa nada.
+- **`useSession()`** (`src/auth/useSession.ts`) devolve `{ account, isAuthenticated, isPending }`. A query `['session']` (`GET /auth/session`) fica `enabled` só com token válido e tem `retry: false`. `isAuthenticated` exige token válido **além** de dado em cache, porque o react-query mantém o dado antigo quando o refetch dá erro; sem isso o 401 não deslogaria. `isPending` é `true` só enquanto há token e a sessão está sendo confirmada (o header mostra um skeleton nesse intervalo).
+- **`?redirect=` (MYK-1061).** `login` e `signup` só aceitam `redirect` que seja caminho interno (`isInternalPath`, `src/lib/redirectSearch.ts`): precisa começar com `/`, não pode começar com `//` ou `/\`, não pode conter caracteres de controle (o parser de URL descarta TAB, LF e CR, então `/<TAB>/evil.example` viraria `https://evil.example/`) e, resolvido contra uma origem fictícia, tem de manter a origem. Qualquer outro valor vira `undefined`. `validateRedirectSearch` devolve sempre a chave `redirect`, pelo mesmo motivo do `validateSearch` do catálogo (o router mescla o search cru com o validado). O visitante que tenta favoritar e o link "Entrar" do header mandam `redirect=<href atual>`.
+- **Quem escreve a sessão.** Nenhuma tela ainda: `writeSession` será chamado pelo login. Até lá, a receita do `README.md` ("Entrar pelo console") grava a sessão na mão. Quem fizer o login deve invalidar `['session']` depois do `writeSession`, porque o `enabled` da query é avaliado a cada render.
+- **A sessão do mock vive no db do mock.** Trocar de cenário (ou `reset()`) reinicia o db e **apaga as sessões**: o token guardado em `kurio:session` passa a dar 401 e o primeiro request o limpa. Entre cenários, faça o login de novo.
+
+> TODO (MYK-1050): telas de login/cadastro, expiração com retomada (voltar ao ponto em que o usuário estava), logout, troca de usuário e o socket abrindo com o token (a conexão ainda é anônima). As rotas `_authenticated` ainda são vazias.
 
 ### Carrinho
 
@@ -213,9 +249,65 @@ Parte do mock (implementada no M1); a UI é TODO (M3/M4).
 
 > TODO (M4): limites de quantidade por usuário e a reconciliação do carrinho com eventos.
 
+### Telas do M2: Início, Detalhe e moldura
+
+**Moldura (`src/components/layout`, MYK-1074).** `__root.tsx` monta `SkipLink` > `SiteHeader` > `<main id="conteudo" tabIndex={-1}>` > `SiteFooter` > `MobileTabBar`. O **único** `<main>` do app é o do root (`MAIN_CONTENT_ID = 'conteudo'`); as rotas usam `<section>`/`<div>`. Landmarks: `header`, `nav` "Principal" (a partir de `md`), `nav` da tab bar (abaixo de `md`), `main`, `footer`. A tab bar mobile é fixa, com `h-16` mais `env(safe-area-inset-bottom)`; o wrapper `div` do root recebe `TAB_BAR_PADDING_CLASS` (e não o `<main>`), para nem o conteúdo nem o fim do footer ficarem atrás dela e sem vão entre os dois, e qualquer barra fixa nova no mobile precisa ficar acima dela. `SessionLink` concentra a regra visitante / logado / carregando (header e tab bar): visitante vê "Entrar" (`/login?redirect=<href>`), logado vê o nome e vai a `/profile`, e enquanto `isPending` há um skeleton. "Mercado" aponta para `/#catalogo`. O header tem a busca (`HeaderSearch`, `role="search"`): em mobile abre como faixa sob o header e Esc devolve o foco; enviar leva a `/?q=<texto>#catalogo`. O carrinho do header não tem badge (carrinho é M3/M4).
+
+**Início (`/`, MYK-1075).** O estado do catálogo mora na URL e só nela (`src/lib/catalogSearch.ts`):
+
+- Campos: `q`, `collections`, `priceMin`, `priceMax`, `network`, `tab` (`new` | `trending`), `sort` (`price_asc` | `price_desc`) e `page`. Os padrões (`tab=all`, `sort=newest`, página 1) **não** vão para a URL.
+- Formato: o padrão do TanStack Router, que serializa em JSON (`?collections=["Neon Atlas","Aurora Drift"]`, `priceMax="3.5"`). A forma digitada à mão (`priceMin=0.5`, `page=2`) também é aceita. Uma alternativa seria um `parseSearch`/`stringifySearch` próprio, mas ele afeta todas as rotas; não foi feito.
+- `validateCatalogSearch` descarta valor inválido, nunca lança, aceita número ou texto para `page`/preço, aceita `collections` como array ou texto separado por vírgula (sai aparado, sem duplicata e ordenado) e descarta os **dois** preços quando a faixa vem invertida. **Devolve toda chave, inclusive com `undefined`**: o router calcula `{ ...searchCru, ...searchValidado }`, então sem a chave explícita um `?page=abc` voltaria cru, a request sairia com 422 e o slider quebraria. Não "simplifique" isso (teste em `catalogSearch.test.ts`). Parâmetros desconhecidos (ex.: `scenario`) ficam na busca crua, e `toListParams` os ignora.
+- `withFilter(prev, patch)` aplica o patch, **remove `page`** (mudança de filtro volta à página 1) e normaliza; `undefined` no patch remove o filtro. Links de catálogo filtrado (como o breadcrumb do Detalhe) usam `withFilter`, nunca query string montada à mão.
+- **`CATALOG_PAGE_SIZE = 12`.** Com 9 itens a última linha do grid de 2 colunas (390 px) ficava com um card órfão; 12 fecha as linhas de 2 colunas (mobile) e de 3 (a partir de `md`). Efeito: o seed paginado tem 3 páginas, contra "1 2 3 4" no Figma desktop. `?page=` além do fim mostra "Página não existe" com link para a última.
+- Filtros: o mesmo `CatalogFilters` serve à sidebar (a partir de `lg`) e ao drawer (abaixo de `lg`, inclui 768). Coleção, rede e aba aplicam na hora; o preço só no botão "Aplicar" (o rótulo do slider muda antes, a URL não). Contagens vêm de `GET /nfts/facets`.
+- Estados: skeleton na primeira carga, grid esmaecido com `aria-busy` nos refetches (`keepPreviousData`), EmptyState "Nenhum NFT encontrado" com "Limpar filtros", ErrorState com retry no grid, e erros independentes para filtros e destaques (nenhum derruba a página).
+- Blocos estáticos: hero com carrossel (`featured`; os dots seguem a quantidade de destaques, hoje 6), card "NFT em destaque", promos (`PromoCards`, "Explorar em alta" leva a `?tab=trending`) e "Diário da Cunhagem" (`MintJournal`).
+
+**Detalhe (`/nfts/$nftId`, MYK-1076).**
+
+- `?edition=` (`1/1`, `1/10`, `1/50`, `open`) guarda a edição escolhida e é trocado com `replace: true` e `resetScroll: false` (não enche o histórico). Valor que não é edição vale como ausente. Edição inexistente ou esgotada cai na primeira edição com estoque, na ordem dos chips, e mostra o aviso "Edição indisponível. Mostrando a edição X.". A quantidade **não** vai para a URL; fica no estado do painel, e é limitada ao estoque da edição por `clampEditionQuantity` (`src/features/nft-detail/edition.ts`; nome diferente de `clampQuantity` do `@/lib/quantity`, que tem outra assinatura). `validateSearch` devolve a chave `edition` sempre, pelo mesmo motivo do catálogo.
+- Painel de compra: chips de edição, "N de M disponíveis", `QuantityStepper` (desabilitado sem edição; o `QuantityStepper` do kit **não** faz clamp sozinho), "Adicionar ao carrinho" (`OutOfScopeAction`, "Em breve"), favoritar e compartilhar (`OutOfScopeAction`). Com todas as edições esgotadas: selo "Esgotado" (ícone + texto) e botão desabilitado.
+- Galeria: miniaturas só quando há mais de 1 imagem (hoje nenhuma); `aria-pressed`, setas ←/→ trocam com volta circular e levam o foco. `PurchasePanel` e `NftGallery` remontam por `key={nft.id}`.
+- "Mais desta coleção": `nftListQuery({ collections: [coleção], pageSize: 5 })` sem o NFT atual, até 4 itens (`NftGrid size="carousel"`); a seção some se não há outros. É uma grade de 2 colunas (4 a partir de `md`), não um carrossel de rolagem.
+- Mobile: `MobileScreenHeader` com "Voltar" (`useCanGoBack`: `history.back()`, ou `/` quando a página foi aberta direto) e `MobilePurchaseBar` (preço + "Adicionar ao carrinho") **`sticky`** acima da tab bar. Sticky e não `fixed`: gruda enquanto o conteúdo rola e volta ao fluxo no fim da rota, então não cobre o fim do conteúdo nem o footer e não exige padding extra no `<main>`.
+- Estados da rota: skeleton (mesmas classes de `layout.ts`), "NFT não encontrado" (`/nfts/nao-existe`, título "NFT não encontrado · Kurio") e erro com retry. Título da página: `<nome> · Kurio`.
+
 ### Cache
 
-> TODO (M4): política por recurso e invalidação. Só vale o padrão inicial descrito acima.
+Política por recurso do M2 (as fábricas ficam em `src/api/nfts.ts`, `src/api/favorites.ts` e `src/auth/useSession.ts`; todas devolvem `queryOptions` e repassam o `signal`):
+
+| Chave | Fábrica | Política |
+| -- | -- | -- |
+| `['nfts', 'list', params]` (`nftKeys.list`) | `nftListQuery(params)` | `placeholderData: keepPreviousData`: ao trocar filtro ou página, a lista anterior fica na tela (esmaecida, `aria-busy`) até a nova chegar. O `params` é o objeto da URL, então a mesma seleção usa a mesma chave. |
+| `['nfts', 'detail', id]` (`nftKeys.detail`) | `nftDetailQuery(id)` | Sem retry em `not_found` (404 não melhora); qualquer outro erro tenta mais 1 vez. |
+| `['nfts', 'featured']` | `featuredNftsQuery()` | Padrão (30s, 1 retry). |
+| `['nfts', 'facets']` | `nftFacetsQuery()` | Padrão. As contagens não dependem dos filtros, então a chave não tem parâmetros. |
+| `['favorites', accountId]` (`favoriteKeys.list`) | `favoritesQuery(accountId)` | Isolada por conta: trocar de usuário nunca reaproveita o cache do anterior. Só roda logado. |
+| `['session']` | `sessionQuery()` | `retry: false`, `enabled` só com token (ver "Sessão"). |
+
+`nftKeys.all` (`['nfts']`) invalida tudo do catálogo de uma vez.
+
+**Resposta obsoleta.** A chave da query é a identidade do dado: uma resposta só entra no cache da chave que a pediu, então a lista de uma seleção antiga nunca aparece no lugar da atual. Complementa isso o `signal` repassado ao Axios: ao trocar de chave com a request antiga em voo, o react-query aborta a antiga. Para isso funcionar o cancelamento precisa chegar intacto ao react-query: o interceptor de resposta do `apiClient` repassa `CanceledError` como está (`isCancel`, MYK-1062) em vez de convertê-lo em `ApiError` `transient`, que viraria "erro" e dispararia retry. Verificado no cenário `jitter` (300 ms a 7 s): cinco trocas de aba a 120 ms terminam na aba clicada por último, com o grid igual à resposta daquela aba.
+
+**Loader do Início: só prefetch.** O loader de `/` chama `prefetchQuery` sem `await` (lista, destaques e facetas; troca de filtro não espera o loader) e a lista é lida por `useQuery` no componente. Não usa `ensureQueryData`: com `/?scenario=offline` o loader lançava, o TanStack substituía a rota inteira pelo erro padrão ("Something went wrong!") e sumiam header da página, hero, sidebar e o retry. Com prefetch + `useQuery` o erro fica restrito ao grid (e à sidebar/hero, cada um com o seu estado). O hover em links para `/` continua aquecendo o cache (`defaultPreload: 'intent'`).
+
+**Loader do Detalhe: `ensureQueryData`.** `/nfts/$nftId` usa `ensureQueryData(nftDetailQuery(id))` e o componente lê com `useSuspenseQuery`. `ApiError` `not_found` vira `notFound()` (página "NFT não encontrado", uma única request, sem retry); o resto é relançado e cai no `errorComponent` com "Tentar novamente" (`router.invalidate()`). `pendingMs` fica no padrão do router (1000 ms e `pendingMinMs` 500 ms): o skeleton do Detalhe aparece em `slow` (4 s) e **não** aparece no cenário `default`, nem na navegação nem no acesso direto; um valor menor arriscaria piscar com o `jitter`.
+
+**Favoritos otimistas** (`src/features/favorites/favoriteCache.ts`, `favoriteMutationOptions`; é a única mutação otimista do M2):
+
+1. `onMutate`: cancela refetch em voo de `['favorites', accountId]`, guarda o snapshot e aplica o toggle no cache (`applyFavoriteToggle`: idempotente, não muta a entrada).
+2. `onError`: restaura o snapshot (sem snapshot, desfaz o toggle, porque `setQueryData(k, undefined)` não faz nada) e mostra o toast "Não foi possível atualizar os favoritos." (`FAVORITE_FAILURE_MESSAGE`).
+3. `onSettled`: invalida `['favorites', accountId]` para reconciliar com o servidor, mas só quando `isMutating({ mutationKey }) <= 1`, isto é, no último clique a terminar.
+4. `scope: favorite:<conta>:<nft>`: os cliques seguidos no mesmo NFT saem em série, então o servidor termina no estado do último clique. O `onMutate` roda na hora mesmo com o scope.
+5. O estado exibido (`aria-pressed`) vem **sempre do cache** (`useToggleFavorite`), lido no momento do clique, não do render. O botão fica desabilitado enquanto a sessão ou a lista de favoritos carrega (sem a lista não há como saber o estado atual).
+6. Visitante: o clique leva a `/login?redirect=<href atual>`. Se o 401 chegar no meio, o cliente limpa a sessão e o botão volta a agir como visitante.
+
+Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista aparece antes da request resolver, a rejeição restaura o snapshot e chama `onFailure` uma vez, o sucesso mantém o otimista e invalida, e cliques em sequência fazem requests em série com um único invalidate.
+
+**Limitação (transitória):** com 3 ou mais cliques rápidos e falha só no primeiro, o rollback do primeiro restaura um snapshot que sobrescreve o otimista do terceiro até o invalidate final reconciliar.
+
+> TODO (M4): `staleTime`/invalidação por evento do socket (preço e estoque em tempo real), reconciliação do carrinho e a mutação do carrinho. Os eventos ainda não tocam o cache.
 
 ### Reconciliação
 
@@ -230,19 +322,85 @@ Parte do mock (implementada no M1); a UI é TODO (M3/M4).
 
 ### Desvios do Figma
 
-> TODO (M2/M6): registrar divergências entre as telas implementadas e o Figma. Nenhuma tela foi implementada ainda.
+> **Pendente de conferência visual.** O MCP do Figma (arquivo `nF8eQ49mVgxZGc8S1i36Q4`) recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter em **todas** as tasks do M2 (MYK-1059, 1074, 1075, 1076). Nenhuma tela foi comparada com o Figma por imagem: o layout seguiu as descrições e os node IDs das issues. Tudo marcado abaixo como **pendente** precisa de `get_screenshot` em 390, 768 e 1440 quando houver cota.
+
+**Desvios deliberados (por limite do contrato ou por decisão):**
+
+- **Solana não existe no contrato.** `Network` tem 4 redes (`ethereum`, `polygon`, `arbitrum`, `optimism`); o filtro de rede e as contagens (`networks` das facetas) cobrem só elas.
+- **Nomes das coleções vêm das fixtures** (5 coleções com 6 NFTs), não dos textos do Figma.
+- **Badge de avaliação omitido** no Detalhe mobile (`15:5690`): o contrato não tem nota.
+- **`pageSize` 12** em vez dos 9 (3×3) do Figma desktop: ver "Telas do M2". O seed pagina em 3 páginas, e não "1 2 3 4" como no Figma desktop.
+- **Card "NFT em destaque"** fica oculto abaixo de `lg` (`CatalogSection.tsx`, `hidden lg:flex`, na coluna da sidebar) e não entra no drawer de filtros.
+- **Dots do hero** seguem a quantidade de destaques (6), não os 3 do Figma.
+- **Drawer de filtros abaixo de `lg`** (inclui 768); a sidebar só aparece a partir de 1024. O rótulo "Ordenar por:" fica `sr-only` abaixo de `sm`.
+- **Favorito no card só no mobile** (`md:hidden`): no desktop o card não tem coração; o Detalhe tem o botão em qualquer largura.
+- **Breadcrumb do Detalhe escondido no mobile**, que usa o header de tela com "Voltar".
+- **"Mais desta coleção" é grade** (2 colunas, 4 a partir de `md`), não carrossel horizontal.
+- **Campo da newsletter do footer** é um `OutOfScopeAction` estilizado como input (não é `<input>`), para nada aparentar funcionar.
+- **Galeria com 1 imagem** por NFT até haver artes reais (sem miniaturas).
+- **Ações sem fluxo** ("Adicionar ao carrinho", Compartilhar, Criadores, Aprenda, links do footer, "Ler mais") usam `OutOfScopeAction` ("Em breve"); ver "Decisões de UX".
+
+**Escolhas minhas, pendentes de conferência contra o Figma:**
+
+- **Itens da tab bar mobile** (`14:5226`): Início, Mercado, Carrinho, Criadores (fora de escopo) e Conta, sem botão central destacado.
+- **Footer** (`2:2`): textos dos 3 destaques institucionais, e-mail e telefone de contato (`contato@kurio.example`, `+55 (11) 4000-0000`), nomes das 4 colunas de links e o slogan são placeholders; o logo é o texto "KURIO", sem SVG.
+- **Hero:** eyebrow "Bem-vindo à Kurio", título "Seja dono do futuro da arte digital" (uppercase por CSS) e botão EXPLORAR seguem o Figma `2:2` (conferido por screenshot na MYK-1049); o texto de apoio abaixo do título continua pendente de conferência.
+- **Promos e "Diário da Cunhagem":** os textos foram escritos na implementação (títulos, chamadas, as 3 matérias e as datas) e a escolha das artes de cada post. O card "NFT em destaque" reaproveita o `NftCard` com o badge "Oferta limitada".
+- **Logos de MetaMask, WalletConnect e Coinbase:** não exportados; o `WalletOption` usa monograma (letra sobre a cor da marca).
+- **Artes dos NFTs:** continuam as SVGs placeholder; AVIF/WebP e a troca pelas ilustrações do Figma estão pendentes (ver "Substituição de assets").
+- **Conferência de `/dev/kit`, Início (`14:5226`), Detalhe desktop (`10:244`) e mobile (`15:5536`):** só contra descrições.
 
 ### Decisões de UX
 
-> TODO (M2/M6): consolidar as decisões de UX tomadas durante a implementação das telas. Nenhuma tela implementada ainda (só placeholders). Decisões já definidas no planejamento (não implementadas):
->
-> - Ações fora do escopo do desafio ficam **desabilitadas com tooltip "Em breve"** (planejado; ainda a confirmar na MYK-1059).
-> - O app é **dark-only**, conforme o Figma. Esta decisão já está aplicada no tema (ver "Tema").
+- O app é **dark-only**, conforme o Figma. Aplicado no tema (ver "Tema").
+
+**Ações fora de escopo: `OutOfScopeAction` ("Em breve"), confirmada no M2.** Valeu para Criadores, Aprenda, o footer, "Ler mais" do Diário, Compartilhar e "Adicionar ao carrinho" do Detalhe. Detalhes e motivo no parágrafo seguinte (MYK-1059).
+
+**"Adicionar ao carrinho" fica "Em breve" até a MYK-1051** (carrinho, checkout e confirmação). No Detalhe ele só aparece no painel a partir de `md`; no mobile fica na barra de compra. Com tudo esgotado vira um botão desabilitado "Esgotado".
+
+**Favoritar é funcional (contraria a tabela da MYK-1059).** A tabela da MYK-1059 listava o favorito como fora de escopo; o enunciado (§3) exige favoritos, então o `NftCard` ganhou `favorited` + `onFavoriteToggle` (botão irmão do link) e o Detalhe usa o `FavoriteButton`. Ver "Cache" para o comportamento otimista.
+
+**Rótulo do favorito: fixo "Favoritar <nome>" + `aria-pressed` (a confirmar).** A issue MYK-1076 pede o rótulo alternado ("Favoritar" / "Remover dos favoritos") **junto** com `aria-pressed`. Isso não foi aplicado, de propósito: no padrão de botão de alternância do APG (WAI-ARIA Authoring Practices, *Button*), o rótulo **não muda** com o estado, porque o estado já é comunicado por `aria-pressed`; trocar o nome e manter `aria-pressed` faria o leitor de tela anunciar o estado duas vezes, e de forma contraditória ("Remover dos favoritos, pressionado"). O resultado da ação é anunciado numa região `aria-live="polite"` ("Adicionado aos favoritos." / "Removido dos favoritos."), e a falha só pelo toast, que o sonner já anuncia. Mesma escolha do kit na MYK-1059. **Precisa de aprovação do humano.** Se preferir o rótulo alternado, a mudança é pequena no kit (`FavoriteButton`: o nome passaria a ser "Remover dos favoritos" quando ativo, e `aria-pressed` sairia). Custo conhecido: existe um `<span aria-live>` por card favoritável (12 por página), vazios até a ação.
+
+**Catálogo:**
+
+- **Contagens das facetas não dependem dos filtros** (vêm do catálogo inteiro). Escolha simples e estável: o número ao lado da coleção não muda enquanto o usuário filtra. O custo é que "Neon Atlas (6)" pode resultar em menos de 6 NFTs com outro filtro ativo.
+- **Preço aplicado só no "Aplicar".** O rótulo do slider acompanha o arrasto, a URL e a request não: evita uma request por passo de 0,01 ETH.
+- **Mudança de filtro, ordenação, busca ou aba zera a página** (`withFilter` remove `page`). Paginar mantém os filtros.
+- **A URL é a fonte do estado:** refresh, voltar/avançar e link compartilhado reproduzem a mesma tela (verificado). "Limpar filtros" não volta a `/`: o da sidebar (`CLEAR_SIDEBAR_FILTERS`) limpa coleções, rede e preço e mantém `q`, `tab` e `sort`; o do estado vazio do grid limpa também `q` e mantém `tab` e `sort`. Ambos voltam à página 1.
+- **"Diário da Cunhagem" é estático**, com "Ler mais" fora de escopo (§3); os textos são de layout, não dados de negócio.
+
+**Detalhe:**
+
+- **Edição na URL (`?edition=`) com `replace`:** link compartilhável sem poluir o histórico; edição inválida ou esgotada cai no padrão com aviso (texto + ícone).
+- **Quantidade fora da URL** e limitada ao estoque da edição.
+- **Barra de compra do mobile `sticky`** acima da tab bar (ver "Telas do M2").
+- **"Voltar" do header mobile** usa o histórico quando existe e vai para `/` quando a página foi aberta direto.
+- **Estados nunca só por cor:** esgotado, indisponível e erro têm texto e/ou ícone.
+
+**Ações fora de escopo: desabilitado + tooltip "Em breve" (MYK-1059).** Escolhido em vez de uma página "em breve": não cria rota sem conteúdo nem dá impressão de sucesso funcional. `OutOfScopeAction` (`src/components/kurio/OutOfScopeAction.tsx`) é o único jeito de renderizar essas ações (Criadores/Aprenda, footer, itens da sidebar da conta, "Esqueceu a senha?", login social, Compartilhar, Etherscan). Usa `aria-disabled` em vez de `disabled`, para continuar focável por Tab: o tooltip abre com foco e com hover, o clique é ignorado e o nome acessível ganha o sufixo "(em breve)". Em menus (`WalletCard`) a mesma regra vira item desabilitado com "Em breve" ao lado. **Favoritar não é fora de escopo** (decisão 3 da MYK-1049): `FavoriteButton` é um toggle real com `aria-pressed`, e no `NftCard` fica fora do link do card (irmão posicionado sobre a arte) para não aninhar interativos.
+
+**Cupom no Pagamento: o link expande o próprio `CouponInput` (MYK-1059, revisável).** No Figma do Pagamento desktop o cupom é só o link "Tem um código promocional? Aplique aqui" (`I70522:3321;70504:3154`), sem o que acontece ao clicar. O `CouponInput` com `collapsible` começa como esse link e, ao clicar, mostra o campo no lugar (foco no input), sem componente novo; fora do estado vazio ele já abre expandido. Se o cupom já foi aplicado no Carrinho, o Pagamento mostra só a linha de desconto no `PriceSummary`. No Carrinho (desktop e mobile) o campo aparece direto (input + botão).
 
 ### Substituição de assets
 
-> TODO (M2/M6): registrar assets do Figma que foram substituídos (imagens, ícones, fontes) e o motivo. Até o M0 só a fonte Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
+Registro dos assets do Figma substituídos (imagens, ícones, fontes) e o motivo. Fonte: só a Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
+
+**Artes dos NFTs (MYK-1059).** O plano era exportar as ilustrações do Figma (nodes do Início `4:137`, `4:162`, `4:164`, `4:280`–`4:291`, destaque `70410:3798`, promos `4:428`/`4:423`, Detalhe `11:1161` e miniaturas `11:1181`–`11:1190`) e convertê-las para AVIF + WebP em dois tamanhos (~300px card, ~800px detalhe). Em 31/10 o MCP do Figma recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter, então **as artes continuam sendo as 30 SVGs placeholder geradas no M1** (`public/nfts/<slug>.svg`, gradiente + formas, `viewBox` 120×120, ~530 bytes cada; nenhum asset de terceiros). O manifest `src/lib/nftArt.ts` (`NFT_ART_MANIFEST`, `nftArtSize`) registra as dimensões reais de cada arquivo; o `NftCard` passa `width`/`height` ao `<img>` (CLS) e `priority` liga `fetchpriority="high"` na arte acima da dobra. `src/lib/nftArt.test.ts` confere o manifest contra os arquivos do disco e contra as `imageUrl` das fixtures. Os logos de MetaMask, WalletConnect e Coinbase também não foram exportados: o `WalletOption` usa monograma (letra sobre a cor da marca).
+
+> **Pendente (precisa de cota no Figma):** exportar as artes reais, gerar AVIF/WebP nos dois tamanhos, atualizar o manifest e as `imageUrl` das fixtures, trocar os monogramas pelos logos e fazer a conferência visual de `/dev/kit` contra o Figma em 390, 768 e 1440 com `get_screenshot` (não feita: a página foi conferida só contra as descrições e node IDs da MYK-1059).
 
 ### Ajustes de acessibilidade
 
-> TODO (M2/M5/M6): registrar ajustes de acessibilidade feitos em relação ao Figma (contraste, foco, rótulos). Ainda não auditado.
+Ajustes feitos no M2, verificados em browser (Tab, Esc, foco) e **não** auditados com leitor de tela nem com Lighthouse (M5). Contraste não foi medido.
+
+- **Skip link e landmarks.** "Pular para o conteúdo" é o primeiro item do Tab e foca `main#conteudo` (o `SkipLink` intercepta o clique, porque o hash puro não move o foco de forma confiável com o router; o `<main>` tem `tabIndex={-1}`). Landmarks em "Telas do M2".
+- **Ações fora de escopo continuam focáveis.** `OutOfScopeAction` usa `aria-disabled` (não `disabled`), o tooltip "Em breve" abre com foco e hover, o clique é ignorado e o nome acessível ganha "(em breve)".
+- **Rótulos onde o Figma não tem.** A busca do header e o campo de busca têm nome ("Buscar NFTs"); os polos do slider de preço se chamam "Preço mínimo" e "Preço máximo" com `aria-valuetext` em ETH (prop `getThumbProps` do `ui/slider`); o botão do sheet diz "Fechar" (era "Close"); o carrinho do header tem `aria-label="Carrinho"`; o stepper de quantidade e os chips de edição têm nome e estado (`aria-disabled`, "Máximo: N").
+- **Estados com texto, não só cor.** "Esgotado"/"Esgotada" (selo com ícone, `role="status"`), aviso de edição indisponível (ícone + texto), erros com `role="alert"` e botão "Tentar novamente".
+- **`aria-live` no catálogo e nos favoritos.** O catálogo tem um `role="status"` "N NFTs encontrados" e `aria-busy` durante o refetch; o carrossel do hero tem uma região `aria-live` "Destaque n de N: nome" e dots com `aria-current`; o favorito anuncia "Adicionado aos favoritos." / "Removido dos favoritos." (ver "Decisões de UX"). O erro dos filtros **não** usa `role="alert"`, para não duplicar o anúncio do erro do grid.
+- **Foco preso no drawer de filtros** (abaixo de `lg`): 30 Tabs seguidos nunca saem do dialog, Esc fecha e devolve o foco ao botão "Filtros (n)".
+- **Navegação por teclado.** Paginação com `aria-label="Página n"` e `aria-current="page"`; busca do header com Esc devolvendo o foco; miniaturas da galeria com `aria-pressed` e setas ←/→; o chip esgotado é pulado no Tab (`disabled`); o título do header de tela mobile é `aria-hidden` porque o `h1` já está no conteúdo.
+- **Hierarquia de títulos.** `h1` do hero (Início) ou do NFT (Detalhe), `h2` das seções (o "Catálogo" é `sr-only`), `h3` nos cards (o `NftCard` tem `<h3>` fixo).
+- **Movimento.** Skeletons usam `motion-reduce:animate-none`.
+- **Pendências:** foco visível e contraste contra o Figma não foram conferidos (sem cota).

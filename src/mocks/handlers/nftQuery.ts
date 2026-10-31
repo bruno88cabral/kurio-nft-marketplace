@@ -1,5 +1,5 @@
 import Big from 'big.js'
-import type { Nft, NftListParams, NftListSort, Paginated } from '@/contracts'
+import type { Network, Nft, NftFacets, NftListParams, NftListSort, Paginated } from '@/contracts'
 
 const DAY_MS = 86_400_000
 /** Janela da aba `new`, contada a partir do NFT mais recente do catálogo (o seed tem data fixa). */
@@ -64,4 +64,25 @@ export function sortNfts(nfts: readonly Nft[], sort: NftListSort = 'newest'): Nf
 export function paginate<T>(items: readonly T[], page: number, pageSize: number): Paginated<T> {
   const start = (page - 1) * pageSize
   return { items: items.slice(start, start + pageSize), page, pageSize, total: items.length }
+}
+
+/** Contagens sobre o catálogo inteiro. Coleções e redes ordenadas por nome; min/max com big.js. */
+export function computeFacets(nfts: readonly Nft[]): NftFacets {
+  const byCollection = new Map<string, number>()
+  const byNetwork = new Map<Network, number>()
+  let min: Big | null = null
+  let max: Big | null = null
+  for (const nft of nfts) {
+    byCollection.set(nft.collection, (byCollection.get(nft.collection) ?? 0) + 1)
+    byNetwork.set(nft.network, (byNetwork.get(nft.network) ?? 0) + 1)
+    const price = new Big(nft.price)
+    if (min === null || price.lt(min)) min = price
+    if (max === null || price.gt(max)) max = price
+  }
+  const byName = (a: string, b: string) => a.localeCompare(b)
+  return {
+    collections: [...byCollection].map(([name, count]) => ({ name, count })).sort((a, b) => byName(a.name, b.name)),
+    networks: [...byNetwork].map(([network, count]) => ({ network, count })).sort((a, b) => byName(a.network, b.network)),
+    price: { min: (min?.toFixed() ?? '0') as NftFacets['price']['min'], max: (max?.toFixed() ?? '0') as NftFacets['price']['max'] },
+  }
 }
