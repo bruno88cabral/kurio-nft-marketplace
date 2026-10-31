@@ -3,6 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { OutOfScopeAction } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
 import { BrandLogo } from './BrandLogo'
+import { HeaderSearch } from './HeaderSearch'
 import { SessionLink } from './SessionLink'
 
 const navLink =
@@ -33,6 +34,7 @@ export function SiteHeader() {
           </OutOfScopeAction>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <HeaderSearch />
           <Link
             to="/cart"
             aria-label="Carrinho"

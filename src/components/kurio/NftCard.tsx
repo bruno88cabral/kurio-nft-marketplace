@@ -133,11 +133,21 @@ export function NftCardSkeleton({ size = 'grid', className }: NftCardSkeletonPro
       )}
     >
       <Skeleton className="aspect-square w-full rounded-lg motion-reduce:animate-none" />
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-3 w-1/3 motion-reduce:animate-none" />
-        <Skeleton className="h-4 w-2/3 motion-reduce:animate-none" />
-        <Skeleton className="h-4 w-1/2 motion-reduce:animate-none" />
+      {/* Mesmas caixas de linha do card (coleção text-tiny, nome e preço text-body/caption, gap-1),
+          para a troca skeleton → card não deslocar o layout (CLS) */}
+      <div className="flex flex-col gap-1">
+        <SkeletonLine className="h-3.5" bar="h-2.5 w-1/3" />
+        <SkeletonLine className={size === 'carousel' ? 'h-4.5' : 'h-5.25'} bar="h-3.5 w-2/3" />
+        <SkeletonLine className={size === 'carousel' ? 'h-4.5' : 'h-5.25'} bar="h-3.5 w-1/2" />
       </div>
+    </div>
+  )
+}
+
+function SkeletonLine({ className, bar }: { className: string; bar: string }) {
+  return (
+    <div className={cn('flex items-center', className)}>
+      <Skeleton className={cn(bar, 'motion-reduce:animate-none')} />
     </div>
   )
 }
