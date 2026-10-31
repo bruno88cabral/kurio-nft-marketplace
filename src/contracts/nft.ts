@@ -15,11 +15,15 @@ export interface Nft {
   id: Id
   name: string
   imageUrl: string
+  /** Galeria; `images[0]` é a capa (mesmo valor de `imageUrl`). Nunca vazio. */
+  images: string[]
   collection: string // TODO M3: virar entidade própria se a UI precisar
   description: string
   creator: string
   network: Network
   price: EthAmount
+  /** Preço "de" exibido riscado no card (promoção). Ausente na maioria. */
+  previousPrice?: EthAmount
   editions: NftEdition[]
   createdAt: IsoDateTime
   featured: boolean
@@ -40,4 +44,11 @@ export interface NftListParams {
   sort?: NftListSort
   page?: number
   pageSize?: number
+}
+
+/** `GET /nfts/facets`: contagens sobre o catálogo inteiro (não dependem dos filtros aplicados). */
+export interface NftFacets {
+  collections: Array<{ name: string; count: Quantity }>
+  networks: Array<{ network: Network; count: Quantity }>
+  price: { min: EthAmount; max: EthAmount }
 }

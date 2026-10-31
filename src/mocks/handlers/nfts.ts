@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw'
 import { API_URL } from '@/app/env'
-import type { Network, Nft, NftListParams, NftListSort, NftListTab, Paginated } from '@/contracts'
+import type { Network, Nft, NftFacets, NftListParams, NftListSort, NftListTab, Paginated } from '@/contracts'
 import { store } from '../runtime'
 import { notFound, validationError, raise } from './errors'
-import { filterNfts, paginate, sortNfts } from './nftQuery'
+import { computeFacets, filterNfts, paginate, sortNfts } from './nftQuery'
 import { withScenario } from './withScenario'
 
 const NETWORKS: readonly Network[] = ['ethereum', 'polygon', 'arbitrum', 'optimism']
@@ -80,6 +80,12 @@ export const nftHandlers = [
     ),
   ),
 
+  // Contagens por coleção/rede e faixa de preço do catálogo inteiro. Antes de `/nfts/:nftId` pela mesma razão
+  http.get(
+    `${API_URL}/nfts/facets`,
+    withScenario('GET', '/nfts/facets', () => HttpResponse.json<NftFacets>(computeFacets(catalog()))),
+  ),
+
   http.get(
     `${API_URL}/nfts/:nftId`,
     withScenario('GET', '/nfts/:nftId', ({ params }) => {
@@ -87,13 +93,5 @@ export const nftHandlers = [
       if (!nft) raise(notFound('NFT não encontrado.'))
       return HttpResponse.json<Nft>(nft)
     }),
-  ),
-
-  // Nomes das coleções presentes no catálogo (não há entidade própria ainda; ver `Nft.collection`)
-  http.get(
-    `${API_URL}/collections`,
-    withScenario('GET', '/collections', () =>
-      HttpResponse.json<string[]>([...new Set(catalog().map((n) => n.collection))].sort()),
-    ),
   ),
 ]
