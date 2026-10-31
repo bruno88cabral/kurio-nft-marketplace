@@ -9,6 +9,7 @@ src/
   api/          cliente HTTP (Axios) e normalização de erros em ApiError
   app/          bootstrap (start.tsx), router e QueryClient
   components/ui componentes shadcn/ui (estilo radix-vega)
+  components/kurio kit de componentes de produto (MYK-1059), só props; conferência em /dev/kit (só DEV)
   contracts/    contratos tipados de REST e eventos (fonte única)
   lib/          utilitários puros (cn, eth, redirectSearch)
   mocks/        MSW (ver "Mock"):
@@ -236,12 +237,19 @@ Parte do mock (implementada no M1); a UI é TODO (M3/M4).
 
 > TODO (M2/M6): consolidar as decisões de UX tomadas durante a implementação das telas. Nenhuma tela implementada ainda (só placeholders). Decisões já definidas no planejamento (não implementadas):
 >
-> - Ações fora do escopo do desafio ficam **desabilitadas com tooltip "Em breve"** (planejado; ainda a confirmar na MYK-1059).
 > - O app é **dark-only**, conforme o Figma. Esta decisão já está aplicada no tema (ver "Tema").
+
+**Ações fora de escopo: desabilitado + tooltip "Em breve" (MYK-1059).** Escolhido em vez de uma página "em breve": não cria rota sem conteúdo nem dá impressão de sucesso funcional. `OutOfScopeAction` (`src/components/kurio/OutOfScopeAction.tsx`) é o único jeito de renderizar essas ações (Criadores/Aprenda, footer, itens da sidebar da conta, "Esqueceu a senha?", login social, Compartilhar, Etherscan). Usa `aria-disabled` em vez de `disabled`, para continuar focável por Tab: o tooltip abre com foco e com hover, o clique é ignorado e o nome acessível ganha o sufixo "(em breve)". Em menus (`WalletCard`) a mesma regra vira item desabilitado com "Em breve" ao lado. **Favoritar não é fora de escopo** (decisão 3 da MYK-1049): `FavoriteButton` é um toggle real com `aria-pressed`, e no `NftCard` fica fora do link do card (irmão posicionado sobre a arte) para não aninhar interativos.
+
+**Cupom no Pagamento: o link expande o próprio `CouponInput` (MYK-1059, revisável).** No Figma do Pagamento desktop o cupom é só o link "Tem um código promocional? Aplique aqui" (`I70522:3321;70504:3154`), sem o que acontece ao clicar. O `CouponInput` com `collapsible` começa como esse link e, ao clicar, mostra o campo no lugar (foco no input), sem componente novo; fora do estado vazio ele já abre expandido. Se o cupom já foi aplicado no Carrinho, o Pagamento mostra só a linha de desconto no `PriceSummary`. No Carrinho (desktop e mobile) o campo aparece direto (input + botão).
 
 ### Substituição de assets
 
 > TODO (M2/M6): registrar assets do Figma que foram substituídos (imagens, ícones, fontes) e o motivo. Até o M0 só a fonte Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
+
+**Artes dos NFTs (MYK-1059).** O plano era exportar as ilustrações do Figma (nodes do Início `4:137`, `4:162`, `4:164`, `4:280`–`4:291`, destaque `70410:3798`, promos `4:428`/`4:423`, Detalhe `11:1161` e miniaturas `11:1181`–`11:1190`) e convertê-las para AVIF + WebP em dois tamanhos (~300px card, ~800px detalhe). Em 31/10 o MCP do Figma recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter, então **as artes continuam sendo as 30 SVGs placeholder geradas no M1** (`public/nfts/<slug>.svg`, gradiente + formas, `viewBox` 120×120, ~530 bytes cada; nenhum asset de terceiros). O manifest `src/lib/nftArt.ts` (`NFT_ART_MANIFEST`, `nftArtSize`) registra as dimensões reais de cada arquivo; o `NftCard` passa `width`/`height` ao `<img>` (CLS) e `priority` liga `fetchpriority="high"` na arte acima da dobra. `src/lib/nftArt.test.ts` confere o manifest contra os arquivos do disco e contra as `imageUrl` das fixtures. Os logos de MetaMask, WalletConnect e Coinbase também não foram exportados: o `WalletOption` usa monograma (letra sobre a cor da marca).
+
+> **Pendente (precisa de cota no Figma):** exportar as artes reais, gerar AVIF/WebP nos dois tamanhos, atualizar o manifest e as `imageUrl` das fixtures, trocar os monogramas pelos logos e fazer a conferência visual de `/dev/kit` contra o Figma em 390, 768 e 1440 com `get_screenshot` (não feita: a página foi conferida só contra as descrições e node IDs da MYK-1059).
 
 ### Ajustes de acessibilidade
 

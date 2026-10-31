@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { addEth, eqEth, formatEth, mulEth, parseEth, percentEth, subEth } from './eth'
+import {
+  addEth,
+  cmpEth,
+  eqEth,
+  formatEth,
+  formatEthLabel,
+  mulEth,
+  parseEth,
+  percentEth,
+  subEth,
+} from './eth'
 
 describe('eth', () => {
   it('compara valores por número, não por texto', () => {
@@ -45,5 +55,16 @@ describe('eth', () => {
     expect(formatEth(parseEth('0.12345'), { maxDecimals: 2 })).toBe('0.12')
     expect(formatEth(parseEth('1.5'), { minDecimals: 3 })).toBe('1.500')
     expect(formatEth(parseEth('2'))).toBe('2')
+  })
+
+  it('formata o rótulo com a unidade', () => {
+    expect(formatEthLabel(parseEth('0.12345'))).toBe('0.1235 ETH')
+    expect(formatEthLabel(parseEth('2'), { minDecimals: 2 })).toBe('2.00 ETH')
+  })
+
+  it('compara por valor numérico', () => {
+    expect(cmpEth(parseEth('0.1'), parseEth('0.10'))).toBe(0)
+    expect(cmpEth(parseEth('0.09'), parseEth('0.1'))).toBe(-1)
+    expect(cmpEth(parseEth('10'), parseEth('9.99'))).toBe(1)
   })
 })
