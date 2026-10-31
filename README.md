@@ -4,7 +4,7 @@ Front-end do marketplace Kurio (desafio Jungle Gaming). Stack: React 19, Vite, T
 
 > Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. Login, cadastro, perfil, carteiras, carrinho, checkout e o cache ligado ao tempo real (M3 em diante) ainda **não** existem; por enquanto a sessão se obtém pelo console ([receita](#entrar-pelo-console-até-as-telas-de-login)). As telas do M2 **não foram conferidas contra o Figma** (sem cota no MCP); ver "Desvios do Figma" no `ARCHITECTURE.md`. Tudo o que falta está marcado com `TODO`.
 
-> TODO: a URL pública da Vercel ainda não existe. O deploy está pendente (ação manual, ver [Deploy](#deploy-vercel)) e esta seção deve receber o link depois dele.
+> TODO: a URL pública da Vercel ainda não existe. O projeto já faz deploy a cada push (ver [Deploy](#deploy-vercel)), mas os domínios da Vercel pedem login. Esta seção deve receber o link quando houver um domínio público.
 
 ## Requisitos
 
@@ -46,14 +46,30 @@ Definidas em `.env.example` e tipadas em `src/vite-env.d.ts`.
 | `pnpm lint` | `eslint .`. |
 | `pnpm test` | `vitest run` (ambiente node, sem jsdom: `EthAmount`/`big.js`, interceptor do Axios e sessão, camada de mocks, estado do catálogo na URL, faixa de preço, edição e cache de favoritos). |
 
+## Fluxo de branches e CI
+
+PRs de feature têm como base `develop`. Depois de validada em `develop`, uma PR `develop` -> `main` leva a entrega para a `main`.
+
+O workflow `.github/workflows/ci.yml` roda em toda PR para `develop`/`main` e em todo push nelas, com dois checks:
+
+| Check | O que roda |
+| -- | -- |
+| `lint` | `pnpm lint` e `pnpm typecheck` |
+| `test` | `pnpm test` |
+
+O build não roda no CI: o check **Vercel** (abaixo) já executa o `pnpm build` (que inclui o `tsc -b`) e fica vermelho se ele falhar.
+
 ## Deploy (Vercel)
 
-> TODO: deploy **pendente**. Nenhum deploy foi feito até aqui. O spike do R1 foi validado apenas em `pnpm build && pnpm preview` local (ver `ARCHITECTURE.md`). Passos para o humano:
+O repositório está ligado à Vercel pela integração com o GitHub (projeto `kurio-nft-marketplace`). Todo push gera um deploy e o check **Vercel** no commit. Cada PR recebe um comentário do bot com a URL do preview, e a produção sai da branch padrão do repo (`main`), salvo outra escolha em Settings -> Git na Vercel. Não há Action de deploy, de propósito: ela duplicaria os deploys da integração e exigiria um token da Vercel nos secrets.
 
-1. Na Vercel: **Add New -> Project** e importar o repositório do GitHub.
-2. Framework preset **Vite**, build command `pnpm build`, output directory `dist`. O `vercel.json` já tem o rewrite de SPA e o `pnpm-workspace.yaml` evita o erro de postinstall do `msw` no install.
-3. Em Settings -> Environment Variables (Production e Preview): `VITE_ENABLE_MOCKS=true`, `VITE_API_URL=/api`, `VITE_SOCKET_URL=wss://realtime.kurio.mock`.
-4. Fazer o deploy e conferir em aba anônima: o Início carregando o catálogo (30 NFTs, "Filtros" e paginação); refresh direto em `/nfts/nft-001` e `/cart` carregando a SPA; `/nfts/nao-existe` mostrando "NFT não encontrado"; `/mockServiceWorker.js` respondendo JavaScript. **A checagem do socket mudou:** o painel que mostrava `socket: connected` e o `nft.updated` saiu na MYK-1075 e nenhuma tela escuta o socket ainda; por isso o R1 segue só parcialmente mitigado. Em produção, verificar no console do navegador que não há erro de WebSocket (`wss://realtime.kurio.mock`) e deixar a prova de `nft.updated` para o M4, quando o cache passar a consumir os eventos.
+> TODO: os domínios do projeto (`*-bruno88cabrals-projects.vercel.app`) estão atrás da Deployment Protection da Vercel e respondem 302 para o login. O domínio `kurio-nft-marketplace.vercel.app` **não** é deste projeto (serve outro código). Para ter uma URL pública, desligar a proteção ou adicionar um domínio em Settings -> Domains. O spike do R1 continua validado só em `pnpm build && pnpm preview` local (ver `ARCHITECTURE.md`).
+
+Configuração esperada do projeto na Vercel:
+
+1. Framework preset **Vite**, build command `pnpm build`, output directory `dist`. O `vercel.json` já tem o rewrite de SPA e o `pnpm-workspace.yaml` evita o erro de postinstall do `msw` no install.
+2. Em Settings -> Environment Variables (Production e Preview): `VITE_ENABLE_MOCKS=true`, `VITE_API_URL=/api`, `VITE_SOCKET_URL=wss://realtime.kurio.mock`.
+3. Com o domínio público, conferir em aba anônima: o Início carregando o catálogo (30 NFTs, "Filtros" e paginação); refresh direto em `/nfts/nft-001` e `/cart` carregando a SPA; `/nfts/nao-existe` mostrando "NFT não encontrado"; `/mockServiceWorker.js` respondendo JavaScript. **A checagem do socket mudou:** o painel que mostrava `socket: connected` e o `nft.updated` saiu na MYK-1075 e nenhuma tela escuta o socket ainda; por isso o R1 segue só parcialmente mitigado. Em produção, verificar no console do navegador que não há erro de WebSocket (`wss://realtime.kurio.mock`) e deixar a prova de `nft.updated` para o M4, quando o cache passar a consumir os eventos.
 
 ## Documentação
 
