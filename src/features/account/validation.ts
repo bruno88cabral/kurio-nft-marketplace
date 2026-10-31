@@ -1,4 +1,5 @@
-import { ApiError } from '@/contracts'
+import { ApiError, type Network } from '@/contracts'
+import { NETWORKS } from '@/lib/wallets'
 
 // Validadores puros dos formulários da conta (MYK-1083). Mesmas regras do mock
 // (`src/mocks/handlers/auth.ts`): o cliente avisa antes, o servidor continua sendo a fonte da verdade.
@@ -12,6 +13,10 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const MIN_PASSWORD_LENGTH = 8
 /** Mesmo máximo do mock para o nome de exibição (contado depois do trim). */
 export const MAX_DISPLAY_NAME = 60
+/** Mesma regra do mock para o endereço da carteira (`src/mocks/handlers/wallets.ts`). */
+export const WALLET_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
+/** Mesmo máximo do mock para o apelido da carteira (contado depois do trim). */
+export const MAX_WALLET_LABEL = 40
 
 export const INVALID_CREDENTIALS_MESSAGE = 'E-mail ou senha inválidos.'
 export const SIGNUP_CONFLICT_MESSAGE = 'Já existe uma conta com este e-mail.'
@@ -30,10 +35,21 @@ export const FIELD_MESSAGES = {
   displayNameTooLong: `Use até ${MAX_DISPLAY_NAME} caracteres.`,
   currentPasswordRequired: 'Informe a senha atual.',
   newPasswordSameAsCurrent: 'A nova senha deve ser diferente da atual.',
+  walletAddressRequired: 'Informe o endereço da carteira.',
+  walletAddressInvalid: 'Endereço inválido. Use 0x seguido de 40 hexadecimais.',
+  walletNetworkRequired: 'Selecione a rede.',
+  walletLabelRequired: 'Informe um apelido.',
+  walletLabelTooLong: `Use até ${MAX_WALLET_LABEL} caracteres.`,
 } as const
 
 export const PROFILE_UPDATED_MESSAGE = 'Perfil atualizado.'
 export const PASSWORD_CHANGED_MESSAGE = 'Senha alterada.'
+export const WALLET_MESSAGES = {
+  added: 'Carteira adicionada.',
+  promoted: 'Carteira definida como principal.',
+  renamed: 'Carteira renomeada.',
+  removed: 'Carteira removida.',
+} as const
 
 export interface LoginValues {
   email: string
@@ -139,6 +155,59 @@ export function validatePassword({
   })
 }
 
+export interface WalletValues {
+  address: string
+  /** `''` enquanto nenhuma rede foi escolhida. */
+  network: Network | ''
+  /** Opcional no cadastro: vazio não é enviado (o mock dá o apelido "Carteira N"). */
+  label: string
+}
+
+export interface WalletLabelValues {
+  label: string
+}
+
+export function isNetwork(value: string): value is Network {
+  return (NETWORKS as readonly string[]).includes(value)
+}
+
+/** Endereço: obrigatório, `0x` + 40 hexadecimais depois do trim (como o mock). */
+export function validateWalletAddress(address: string): string | undefined {
+  const value = address.trim()
+  if (!value) return FIELD_MESSAGES.walletAddressRequired
+  if (!WALLET_ADDRESS_PATTERN.test(value)) return FIELD_MESSAGES.walletAddressInvalid
+  return undefined
+}
+
+/** Apelido: até 40 depois do trim; `required` no renomear (o mock recusa apelido vazio quando enviado). */
+export function validateWalletLabel(label: string, { required = false } = {}): string | undefined {
+  const value = label.trim()
+  if (!value) return required ? FIELD_MESSAGES.walletLabelRequired : undefined
+  if (value.length > MAX_WALLET_LABEL) return FIELD_MESSAGES.walletLabelTooLong
+  return undefined
+}
+
+export function validateWallet({ address, network, label }: WalletValues): FieldErrors<keyof WalletValues> {
+  return compact({
+    address: validateWalletAddress(address),
+    network: isNetwork(network) ? undefined : FIELD_MESSAGES.walletNetworkRequired,
+    label: validateWalletLabel(label),
+  })
+}
+
+export function validateRenameWallet({ label }: WalletLabelValues): FieldErrors<keyof WalletLabelValues> {
+  return compact({ label: validateWalletLabel(label, { required: true }) })
+}
+
+/**
+ * Mensagem de uma ação sem formulário (promover, remover carteira) para o toast. `undefined` no 401:
+ * o ciclo de vida já avisa "Sua sessão expirou." e leva ao login.
+ */
+export function actionErrorMessage(error: unknown): string | undefined {
+  if (error instanceof ApiError && error.code === 'unauthorized') return undefined
+  return toFormErrors(error, []).formError
+}
+
 export function hasErrors(errors: FieldErrors<string>): boolean {
   return Object.values(errors).some((message) => message !== undefined)
 }
@@ -168,13 +237,23 @@ export interface ToFormErrorsOptions {
    * expirada: o ciclo de vida já avisa e leva ao login, então passe `SESSION_EXPIRED_MESSAGE`.
    */
   unauthorizedMessage?: string
+  /**
+   * Campo que recebe o 409 com a mensagem do servidor (Carteiras: `address`, "Esta carteira já está
+   * conectada."). Sem ele vale a regra do cadastro: o 409 vai para `email` com "Já existe uma conta…".
+   */
+  conflictField?: string
 }
 
 export function toFormErrors<K extends string>(
   error: unknown,
   fields: readonly K[],
-  { unauthorizedMessage = INVALID_CREDENTIALS_MESSAGE }: ToFormErrorsOptions = {},
+  { unauthorizedMessage = INVALID_CREDENTIALS_MESSAGE, conflictField }: ToFormErrorsOptions = {},
 ): FormErrorState<K> {
+  if (error instanceof ApiError && error.code === 'conflict' && conflictField !== undefined) {
+    return (fields as readonly string[]).includes(conflictField)
+      ? { fieldErrors: { [conflictField]: error.message } as FieldErrors<K> }
+      : { formError: error.message, fieldErrors: {} }
+  }
   if (error instanceof ApiError) {
     if (error.code === 'validation') {
       const fieldErrors: FieldErrors<K> = {}

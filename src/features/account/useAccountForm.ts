@@ -29,12 +29,14 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
   onSuccess,
   busyAfterSuccess = false,
   unauthorizedMessage,
+  conflictField,
 }: UseAccountFormOptions<K, V, R>) {
   const [values, setValues] = useState(initial)
   const [errors, setErrors] = useState<FieldErrors<K>>({})
   const [apiErrors, setApiErrors] = useState<FieldErrors<K>>({})
   const [formError, setFormError] = useState<string>()
-  const inputs = useRef<Partial<Record<K, HTMLInputElement | null>>>({})
+  // `HTMLElement`: o controle pode ser um `<input>` ou o botão de um `Select` (rede da carteira)
+  const inputs = useRef<Partial<Record<K, HTMLElement | null>>>({})
 
   const focusFirstInvalid = (fieldErrors: FieldErrors<K>) => {
     const key = firstInvalidField(fields, fieldErrors)
@@ -45,7 +47,7 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
     mutationFn: request,
     onSuccess: (result, submitted) => onSuccess?.(result, submitted),
     onError: (error) => {
-      const next = toFormErrors(error, fields, { unauthorizedMessage })
+      const next = toFormErrors(error, fields, { unauthorizedMessage, conflictField })
       setApiErrors(next.fieldErrors)
       setFormError(next.formError)
       focusFirstInvalid(next.fieldErrors)
@@ -80,7 +82,7 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
   const field = (key: K) => ({
     name: key,
     value: values[key],
-    ref: (el: HTMLInputElement | null) => {
+    ref: (el: HTMLElement | null) => {
       inputs.current[key] = el
     },
     onChange: (event: { target: { value: string } }) => {

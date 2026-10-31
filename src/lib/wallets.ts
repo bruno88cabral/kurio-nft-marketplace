@@ -1,4 +1,4 @@
-import type { Network, WalletRole } from '@/contracts'
+import type { Network, Wallet, WalletRole } from '@/contracts'
 
 /**
  * Provedores de carteira oferecidos na conexão (Carteiras e Pagamento). É um conceito só de UI:
@@ -14,6 +14,9 @@ const PROVIDER_LABEL: Record<WalletProvider, string> = {
   walletconnect: 'WalletConnect',
   coinbase: 'Coinbase Wallet',
 }
+
+/** Redes do contrato `Network`, na ordem em que aparecem nos seletores. */
+export const NETWORKS: readonly Network[] = ['ethereum', 'polygon', 'arbitrum', 'optimism']
 
 const NETWORK_LABEL: Record<Network, string> = {
   ethereum: 'Ethereum',
@@ -37,6 +40,11 @@ export function networkLabel(network: Network): string {
 
 export function walletRoleLabel(role: WalletRole): string {
   return ROLE_LABEL[role]
+}
+
+/** Principal primeiro; o resto na ordem da API (ordem de cadastro). Não muta a entrada. */
+export function sortWallets(wallets: readonly Wallet[]): Wallet[] {
+  return [...wallets].sort((a, b) => Number(b.role === 'primary') - Number(a.role === 'primary'))
 }
 
 /** `0x1234567890…abcd` → `0x1234…abcd`. Endereço curto volta inalterado. */
