@@ -39,6 +39,13 @@ export const createWallet = (body: CreateWalletRequest) =>
 export const updateWallet = (walletId: Id, body: UpdateWalletRequest) =>
   apiClient.patch<Wallet>(`/wallets/${encodeURIComponent(walletId)}`, body).then((r) => r.data)
 
+/**
+ * `POST /wallets/:id/connect` (200 `Wallet`): simula a conexão antes de pagar. 409 `conflict` = a carteira recusou.
+ * Não altera o estado no servidor, então não invalida `['wallets', id]` nem o perfil.
+ */
+export const connectWallet = (walletId: Id) =>
+  apiClient.post<Wallet>(`/wallets/${encodeURIComponent(walletId)}/connect`).then((r) => r.data)
+
 /** `DELETE /wallets/:id` (204). Se era a principal, a primeira restante assume. */
 export const deleteWallet = (walletId: Id) =>
   apiClient.delete<void>(`/wallets/${encodeURIComponent(walletId)}`).then(() => undefined)
