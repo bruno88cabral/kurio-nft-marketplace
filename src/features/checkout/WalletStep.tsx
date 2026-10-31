@@ -20,7 +20,10 @@ export interface WalletStepProps {
   onSelect: (walletId: Id) => void
   connection: WalletConnection
   onConnect: () => void
-  /** Envio sem resposta final: a carteira não pode mudar (o pedido pode existir com a escolhida). */
+  /**
+   * Envio sem resposta final: a carteira não pode mudar (o pedido pode existir com a escolhida). Sem conexão, o
+   * "Conectar" e o status somem: "Tentar de novo" reenvia o mesmo pedido sem precisar dela.
+   */
   locked: boolean
 }
 
@@ -87,7 +90,8 @@ export function WalletStep({
           A carteira fica fixa até o pedido anterior ser resolvido.
         </p>
       )}
-      {selected && (
+      {/* Travada (tentativa pendente): o reenvio não exige conexão, então não há "Conectar" a oferecer */}
+      {selected && !(locked && connection.status !== 'connected') && (
         <div className="flex flex-wrap items-center gap-3" aria-live="polite">
           <ConnectionStatus connection={connection} label={selected.label} />
           {connection.status !== 'connected' && (
