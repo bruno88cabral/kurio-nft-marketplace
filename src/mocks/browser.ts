@@ -40,13 +40,23 @@ function installDevtools(): void {
         // storage bloqueado: o cenário só vale via ?scenario=
       }
     },
-    reload: () => location.reload(),
+    // `?scenario=` vence o persistido na carga: sem tirá-lo da URL, o reload desfaria a troca
+    reload: () => {
+      const url = new URL(location.href)
+      url.searchParams.delete('scenario')
+      location.replace(url)
+    },
   })
 }
 
 /** Sobe o worker e re-arma os pedidos `pending` persistidos (um refresh não pode deixá-los parados). */
 export async function startMocks(options: StartOptions = { onUnhandledRequest: 'bypass' }): Promise<void> {
   await worker.start(options)
-  resumePendingOrders()
+  // Antes do resume: se o storage tiver um pedido corrompido, `reset` ainda precisa existir
   installDevtools()
+  try {
+    resumePendingOrders()
+  } catch (error) {
+    console.error('[mocks] não foi possível retomar os pedidos pendentes; use window.__kurioMock.reset()', error)
+  }
 }

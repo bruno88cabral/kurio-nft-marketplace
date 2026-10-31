@@ -54,7 +54,7 @@ O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nf
 
 ### Resultado do spike R1 (MYK-1057)
 
-- **Validado em `pnpm build && pnpm preview` local** (Chrome headless via CDP): `GET /api/health` mockado, `socket: connected`, `nft.updated` a cada 5s, uma única conexão estável por 62s (12 eventos, sem reconexão).
+- **Validado em `pnpm build && pnpm preview` local** (Chrome headless via CDP): `GET /api/health` mockado, `socket: connected`, `nft.updated` a cada 5s (emissor removido no M1), uma única conexão estável por 62s (12 eventos, sem reconexão).
 - **Vercel: PENDENTE.** Não houve deploy. Por isso o R1 está **parcialmente mitigado**, não mitigado. Os passos do deploy estão no `README.md`.
 
 ### Correções necessárias no spike
@@ -87,8 +87,8 @@ O mock é a "API" do app: tudo passa pelos handlers do MSW, nada é respondido n
   | Membro | O que faz |
   | -- | -- |
   | `scenario` | Nome do cenário ativo nesta página. |
-  | `setScenario(nome)` | Valida, persiste o cenário e recarrega (o db recomeça do seed). |
-  | `reset(nome?)` | Valida o nome, `store.reset()` (volta ao seed e zera `versions`), persiste o cenário se vier um e recarrega. |
+  | `setScenario(nome)` | Valida, persiste o cenário e recarrega, já sem `?scenario=` na URL (senão a query venceria o cenário novo). O db recomeça do seed quando o cenário muda. |
+  | `reset(nome?)` | Valida o nome, `store.reset()` (volta ao seed e zera `versions`), persiste o cenário se vier um e recarrega sem `?scenario=` na URL. |
   | `emit.nftUpdated(nftId, { price?, editions? })` | Altera o NFT via `mutate` (o `price` é validado com `parseEth`); o bus publica `nft.updated` com `version` maior. |
   | `emit.orderUpdated(orderId)` | Re-publica o status atual do pedido com `version` + 1. |
   | `duplicateLast()` | Re-publica o último evento com o **mesmo** `eventId` e `version` (entrega duplicada). |
@@ -129,7 +129,7 @@ Base aplicada: fonte self-hosted com preload, code splitting por rota (`autoCode
 
 Os tipos ficam em `src/contracts` (`nft`, `quote`, `order`, `session`, `cart`, `favorite`, `profile`, `wallet`, `errors`, `events`, `health`, `common`, `money`); o endpoint e o verbo de cada request estão em comentário acima do tipo. Base: `API_URL` (`/api` por padrão). Toda resposta de erro tem o formato `ApiErrorBody` (`{ code, message, fieldErrors? }`).
 
-**Convenções comuns.** "Auth: sim" = `Authorization: Bearer <token>`; sem token, token desconhecido ou expirado responde 401 `unauthorized`. Todas as rotas podem, além dos erros listados, responder a falha do cenário ativo (`offline`, 503 `transient`; ver README) e 422 `validation` quando o corpo não é um JSON objeto. Rota sem handler não é respondida pelo mock (`onUnhandledRequest: 'bypass'`).
+**Convenções comuns.** "Auth: sim" = `Authorization: Bearer <token>`; sem token, token desconhecido ou expirado responde 401 `unauthorized`. As rotas podem, além dos erros listados, responder a falha do cenário ativo (`offline`, 503 `transient`; ver README) e, nas rotas que leem corpo, 422 `validation` quando o corpo não é um JSON objeto. Rota sem handler não é respondida pelo mock (`onUnhandledRequest: 'bypass'`).
 
 | Método | Rota | Auth | Sucesso | Erros |
 | -- | -- | -- | -- | -- |
@@ -222,6 +222,9 @@ Parte do mock (implementada no M1); a UI é TODO (M3/M4).
 > TODO (M4): descarte por `version`, dedupe por `eventId` e `invalidateQueries` na reconexão. Ainda não implementado.
 
 ### Limitações conhecidas
+
+- **Mock: uma aba por vez.** Cada aba tem o próprio store em memória sobre o mesmo `localStorage` e grava o db inteiro a cada `mutate`; a última gravação vence, então uma aba pode apagar sessões e pedidos criados em outra. O socket do mock também é por aba (o bus não cruza abas). Verificações entre contas (ex.: `order.updated` só para o dono) devem ser feitas na mesma aba, trocando o token. Sincronizar via evento `storage` é decisão de produto e fica como follow-up.
+- **Mock: quota do `localStorage`.** Se a gravação falhar (cheio ou bloqueado), o mock emite um `console.warn` (uma vez por store) e o estado passa a viver só em memória.
 
 > TODO (M6): consolidar. Por enquanto valem as limitações do transporte de tempo real acima e o deploy na Vercel pendente.
 

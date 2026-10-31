@@ -41,9 +41,12 @@ export const orderHandlers = [
         const body: CreateOrderRequest = { quoteId, walletId }
 
         // A mudança "depois da cotação" fica fora do mutate que valida: o rollback do 409 não a desfaz
-        store.mutate((db, touch) => {
-          applyQuoteDrift(db, touch, { accountId, idempotencyKey, body, rules: scenario.rules })
-        })
+        const rules = scenario.rules
+        if (rules?.priceChangeAfterQuote || rules?.soldOutAfterQuote) {
+          store.mutate((db, touch) => {
+            applyQuoteDrift(db, touch, { accountId, idempotencyKey, body, rules })
+          })
+        }
         const { order, created } = domainGuard(() =>
           store.mutate((db, touch) => createOrder(db, touch, { accountId, idempotencyKey, body, now: new Date() })),
         )

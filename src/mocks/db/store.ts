@@ -68,12 +68,17 @@ function load(storage: MockStorage, catalog: Persisted['catalog']): MockDb | nul
 export function createStore({ storage, scenario, bus = createBus(), now = () => new Date() }: StoreOptions): Store {
   const catalog: Persisted['catalog'] = scenario.rules?.emptyCatalog ? 'empty' : 'full'
 
+  let warned = false
   const persist = (db: MockDb) => {
     const payload: Persisted = { schema: DB_SCHEMA_VERSION, catalog, db }
     try {
       storage.setItem(DB_STORAGE_KEY, JSON.stringify(payload))
     } catch {
       // storage cheio ou bloqueado: o mock segue só em memória
+      if (!warned) {
+        warned = true
+        console.warn('[mocks] não foi possível gravar no localStorage (cheio ou bloqueado): o estado passa a viver só em memória.')
+      }
     }
   }
 

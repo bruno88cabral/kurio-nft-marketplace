@@ -12,6 +12,7 @@ import { conflict, invalid, missing } from './domainError'
 import type { MockDb } from './schema'
 import type { Touch } from './store'
 
+/** Cria o carrinho: só dentro de `mutate` (a leitura usa `getCart`). */
 function cartOf(db: MockDb, accountId: Id): Cart {
   return (db.carts[accountId] ??= { items: [] })
 }
@@ -41,7 +42,7 @@ function assertStock(name: string, edition: NftEdition, wanted: number): void {
 const same = (item: CartItem, nftId: Id, edition: NftEditionKind) => item.nftId === nftId && item.edition === edition
 
 export function getCart(db: MockDb, accountId: Id): Cart {
-  return cartOf(db, accountId)
+  return db.carts[accountId] ?? { items: [] }
 }
 
 /** Soma à linha existente; acima do estoque da edição vira 409 `conflict`. */

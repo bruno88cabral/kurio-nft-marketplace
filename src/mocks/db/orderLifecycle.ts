@@ -1,8 +1,7 @@
 import type { Id, Network } from '@/contracts'
+import { DEFAULT_ORDER_SETTLE_MS } from '../scenarios/catalog'
 import type { Scenario } from '../scenarios'
 import type { Store } from './store'
-
-export const DEFAULT_SETTLE_MS = 3_000
 
 const EXPLORERS: Record<Network, string> = {
   ethereum: 'https://etherscan.io/tx/',
@@ -30,7 +29,7 @@ const fakeTxHash = () => `0x${(crypto.randomUUID() + crypto.randomUUID()).replac
 
 export function createOrderLifecycle({ store, scenario, now = () => new Date() }: OrderLifecycleOptions): OrderLifecycle {
   const timers = new Map<Id, ReturnType<typeof setTimeout>>()
-  const settleMs = scenario.rules?.orderSettleMs ?? DEFAULT_SETTLE_MS
+  const settleMs = scenario.rules?.orderSettleMs ?? DEFAULT_ORDER_SETTLE_MS
 
   const settleOrder: OrderLifecycle['settleOrder'] = (orderId) => {
     timers.delete(orderId)

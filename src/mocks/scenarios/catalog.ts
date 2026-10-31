@@ -71,9 +71,12 @@ export interface Scenario {
 
 const transient = (message: string): ApiErrorBody => ({ code: 'transient', message })
 
+/** Fonte única do tempo entre `pending` e o estado final (cenário sem `orderSettleMs` próprio). */
+export const DEFAULT_ORDER_SETTLE_MS = 2_500
+
 const BASE: Omit<Scenario, 'name'> = {
   latency: { kind: 'fixed', ms: 150 },
-  rules: { orderSettleMs: 2_500 },
+  rules: { orderSettleMs: DEFAULT_ORDER_SETTLE_MS },
 }
 
 function define(name: ScenarioName, overrides: Partial<Omit<Scenario, 'name'>> = {}): Scenario {

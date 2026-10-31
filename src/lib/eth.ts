@@ -30,6 +30,11 @@ export function formatEth(value: EthAmount, opts: FormatEthOptions = {}): string
   return padded ? `${int}.${padded}` : int
 }
 
+/** Igualdade numérica: `'3'` e `'3.0'` são o mesmo valor. */
+export function eqEth(a: EthAmount, b: EthAmount): boolean {
+  return new Big(a).eq(b)
+}
+
 export function addEth(...values: EthAmount[]): EthAmount {
   return toEth(values.reduce((acc, v) => acc.plus(v), new Big(0)))
 }

@@ -1,5 +1,5 @@
 import type { CreateOrderRequest, Id, Order, OrderItem, Wallet } from '@/contracts'
-import { addEth, parseEth } from '@/lib/eth'
+import { addEth, eqEth, parseEth } from '@/lib/eth'
 import type { ScenarioRules } from '../scenarios'
 import { conflict, forbidden, missing } from './domainError'
 import { newId } from './ids'
@@ -94,7 +94,7 @@ function revalidate(db: MockDb, quote: StoredQuote, now: Date): void {
     const edition = nft?.editions.find((e) => e.kind === item.edition)
     const key = `${item.nftId}:${item.edition}`
     if (!nft || !edition) fieldErrors[key] = 'Item indisponível.'
-    else if (nft.price !== item.unitPrice) fieldErrors[key] = `Preço alterado de ${item.unitPrice} para ${nft.price} ETH.`
+    else if (!eqEth(nft.price, item.unitPrice)) fieldErrors[key] = `Preço alterado de ${item.unitPrice} para ${nft.price} ETH.`
     else {
       const free = Math.max(0, edition.available - (reserved.get(key) ?? 0))
       if (free < item.quantity) fieldErrors[key] = `Estoque insuficiente (restam ${free}).`

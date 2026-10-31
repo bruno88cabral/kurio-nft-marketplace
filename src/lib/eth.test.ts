@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { addEth, formatEth, mulEth, parseEth, percentEth, subEth } from './eth'
+import { addEth, eqEth, formatEth, mulEth, parseEth, percentEth, subEth } from './eth'
 
 describe('eth', () => {
+  it('compara valores por número, não por texto', () => {
+    expect(eqEth(parseEth('3'), parseEth('3.0'))).toBe(true)
+    expect(eqEth(parseEth('0.10'), parseEth('0.1'))).toBe(true)
+    expect(eqEth(parseEth('0.1'), parseEth('0.11'))).toBe(false)
+  })
+
   it('soma sem erro de ponto flutuante', () => {
     expect(addEth(parseEth('0.1'), parseEth('0.2'))).toBe('0.3')
   })

@@ -91,16 +91,18 @@ O mock é a API do app (REST via MSW e Socket.IO mockado) e guarda o estado no `
 | `favorite-fail` | `PUT` e `DELETE /favorites/:nftId` respondem 503 `transient`. |
 | `wallet-rejected` | `POST /wallets/:walletId/connect` responde 409 (a carteira recusa a conexão). |
 
-**Selecionar.** Abra o app com `?scenario=<nome>`, por exemplo `http://localhost:5173/?scenario=server-error`. O `?scenario=` vale se o nome existir, fica salvo em `kurio:mock-scenario` e vale nas próximas cargas sem a query. Trocar de cenário reinicia o banco do mock a partir do seed.
+**Selecionar.** Abra o app com `?scenario=<nome>`, por exemplo `http://localhost:5173/?scenario=server-error`. O `?scenario=` vale se o nome existir, fica salvo em `kurio:mock-scenario` e vale nas próximas cargas sem a query. Trocar de cenário reinicia o banco do mock a partir do seed. Os métodos do hook recarregam a página já sem `?scenario=` na URL.
 
 **Trocar e resetar pelo console** (`window.__kurioMock` só existe com mocks ligados; todos recarregam a página):
 
 ```js
 __kurioMock.scenario                  // cenário ativo
-__kurioMock.setScenario('sold-out')   // troca o cenário (o banco recomeça do seed)
+__kurioMock.setScenario('sold-out')   // troca o cenário (o banco recomeça do seed se o cenário mudar)
 __kurioMock.reset()                   // volta o banco ao seed, mesmo cenário
 __kurioMock.reset('default')          // volta ao seed e troca para o default
 ```
+
+**Limitação atual: uma aba por vez.** Cada aba tem o próprio estado sobre o mesmo `localStorage` e a última gravação vence; abrir duas abas do app pode apagar sessões e pedidos de uma delas, e o socket do mock também é por aba. Teste entre contas na mesma aba, trocando o token.
 
 Nome de cenário inválido lança `Error` e não altera nada. Para zerar tudo na mão: apague `kurio:mock-db:v1` e `kurio:mock-scenario` do `localStorage` e recarregue.
 
