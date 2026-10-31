@@ -1,26 +1,22 @@
-import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
+import { useQueries } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LoaderCircle, ShoppingCart } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
-import { quoteQuery } from '@/api/quotes'
 import { useSession } from '@/auth/useSession'
-import { useQueryInvalidated } from '@/realtime/useQueryInvalidated'
 import type { Cart } from '@/contracts'
 import { CouponInput, EmptyState, ErrorState, PriceSummary } from '@/components/kurio'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CartLine } from './CartLine'
-import { canCheckout as checkoutAllowed, couponStatus, issuesByLine, lineKey } from './cartView'
+import { couponStatus, lineKey } from './cartView'
+import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from './layout'
+import { QuoteErrorState } from './QuoteErrorState'
+import { QUOTE_ISSUES_MESSAGE, useCartQuote } from './useCartQuote'
 import { useCart } from './useCart'
 
 export const COUPON_FAILURE_MESSAGE = 'Não foi possível atualizar o cupom.'
-const PAGE_CLASS = 'mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-4 pb-8 md:px-6 md:py-8'
-/** `ui/button` só estiliza `disabled:`; o CTA bloqueado usa `aria-disabled` (foco preservado), então estiliza aqui. */
-const BLOCKED_CTA_CLASS =
-  'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-primary aria-disabled:active:translate-y-0'
-const GRID_CLASS = 'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-10'
 
 /**
  * Carrinho (`/cart`, rota pública). Visitante: linhas com o preço do catálogo, sem total nem cupom, com o
@@ -102,18 +98,8 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
   const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
 
   const cartForQuote: Cart = { items: [...cart.items], couponCode: cart.couponCode }
-  const quoteOptions = quoteQuery(accountId ?? '', cartForQuote)
-  const quote = useQuery({
-    ...quoteOptions,
-    enabled: accountId !== undefined && cart.items.length > 0,
-    // Recotando (chave nova): segue mostrando a cotação anterior, marcada como desatualizada
-    placeholderData: keepPreviousData,
-  })
-  // Mesma chave invalidada (ex.: `nft.updated` de um item do carrinho, MYK-1091): também é recotar
-  const invalidated = useQueryInvalidated(quoteOptions.queryKey)
-  const quoteData = quote.data
-  const issues = issuesByLine(quoteData?.issues)
-  const recalculating = quote.isPlaceholderData || (invalidated && quote.isFetching)
+  const quote = useCartQuote(accountId, cartForQuote)
+  const { quote: quoteData, recalculating, staleAfterError } = quote
 
   const applyCoupon = async (code: string) => {
     setCouponSubmitting(true)
@@ -136,9 +122,6 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
     }
   }
 
-  const canCheckout = checkoutAllowed({ quote: quoteData, recalculating, quoteError: quote.isError })
-  // Recotação falhou mas há cotação antiga (que vai vencer): mostra-a como desatualizada, com retry
-  const staleAfterError = quote.isError && quoteData !== undefined
 
   return (
     <div className={GRID_CLASS}>
@@ -150,15 +133,14 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
           {cart.items.map((item, index) => {
             const detail = details[index]
             const nft = detail?.data
-            const quoted = quoteData?.items.find((q) => q.nftId === item.nftId && q.edition === item.edition)
             return (
               <CartLine
                 key={lineKey(item)}
                 item={item}
                 nft={nft}
                 nftFailed={detail?.isError ?? false}
-                unitPrice={quoted?.unitPrice ?? nft?.price}
-                issue={issues.get(lineKey(item))}
+                unitPrice={quote.unitPriceOf(item) ?? nft?.price}
+                issue={quote.issues.get(lineKey(item))}
                 onQuantityChange={(quantity) => cart.setQuantity(item.nftId, item.edition, quantity)}
                 onRemove={async () => {
                   await cart.remove(item.nftId, item.edition)
@@ -185,12 +167,7 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
               onRemove={() => void removeCoupon()}
             />
             {quote.isError && !quoteData ? (
-              <ErrorState
-                title="Não foi possível calcular o total."
-                onRetry={() => void quote.refetch()}
-                retrying={quote.isFetching}
-                className="px-3 py-6"
-              />
+              <QuoteErrorState quote={quote} />
             ) : (
               <PriceSummary
                 title="Resumo"
@@ -210,12 +187,12 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
                 }
               />
             )}
-            {(quoteData?.issues?.length ?? 0) > 0 && (
+            {quote.hasIssues && (
               <p role="alert" className="text-destructive text-caption">
-                Há itens indisponíveis ou com preço alterado. Ajuste o carrinho para continuar.
+                {QUOTE_ISSUES_MESSAGE}
               </p>
             )}
-            {canCheckout ? (
+            {quote.canCheckout ? (
               <Link to="/checkout" className={buttonVariants({ size: 'lg' })}>
                 Ir para o pagamento
               </Link>

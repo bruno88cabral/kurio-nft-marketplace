@@ -71,6 +71,8 @@ describe('confirmPurchase', () => {
     expect(t.calls).toHaveLength(1)
     expect(t.drafts.get().idempotencyKey).toBe(t.calls[0]?.key)
     expect(t.queryClient.getQueryData(orderKeys.detail(ANA, outcome.order.id))).toEqual(outcome.order)
+    // O pedido existe: o rascunho guarda o id (o checkout consulta o estado; o order.updated final limpa)
+    expect(t.drafts.get().orderId).toBe(outcome.order.id)
   })
 
   it('revalidação com diferença não envia e devolve o snapshot novo', async () => {
@@ -119,6 +121,8 @@ describe('confirmPurchase', () => {
     expect(outcome.kind).toBe('transient')
     expect(t.orders()).toHaveLength(1) // o servidor criou; a resposta é que não chegou
     expect(pendingAttempt(t.drafts.get())).toEqual({ key: 'key-1', body: t.calls[0]?.body })
+    // Sem resposta não há orderId: a tela segue em "Tentar de novo" com a mesma chave (R4)
+    expect(t.drafts.get().orderId).toBeUndefined()
 
     const retry = await resendPendingOrder(t.deps)
     expect(retry?.kind).toBe('created')
@@ -126,6 +130,8 @@ describe('confirmPurchase', () => {
     expect(t.calls[1]?.body).toEqual(t.calls[0]?.body)
     expect(t.orders()).toHaveLength(1)
     if (retry?.kind === 'created') expect(retry.order.id).toBe(t.orders()[0]?.id)
+    // O 200 do reenvio também grava o orderId
+    expect(t.drafts.get().orderId).toBe(t.orders()[0]?.id)
   })
 
   it('com uma tentativa pendente, "Confirmar" também só reenvia (não recota nem gera outra chave)', async () => {

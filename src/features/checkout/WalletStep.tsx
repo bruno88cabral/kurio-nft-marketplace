@@ -84,7 +84,7 @@ export function WalletStep({
       </WalletCardGroup>
       {locked && (
         <p className="text-muted-foreground text-caption">
-          A carteira fica fixa até sabermos se o envio anterior foi recebido.
+          A carteira fica fixa até o pedido anterior ser resolvido.
         </p>
       )}
       {selected && (

@@ -3,9 +3,13 @@ import type { SessionStorageLike } from '@/auth/sessionStorage'
 import {
   checkoutDraftKey,
   createDraftStore,
+  draftOwnsOrder,
   parseCheckoutDraft,
   pendingAttempt,
   readCheckoutDraft,
+  settleCheckoutDraft,
+  withConnectedWallet,
+  withOrderId,
   withOrderKey,
   withoutOrderKey,
   writeCheckoutDraft,
@@ -101,5 +105,72 @@ describe('rascunho em sessionStorage', () => {
     expect(
       pendingAttempt({ idempotencyKey: 'k', keyFingerprint: 'q2:w1', attempt: { quoteId: 'q1', walletId: 'w1' } }),
     ).toBeUndefined()
+  })
+})
+
+const attemptDraft = (key = 'k1', orderId?: string) => ({
+  walletId: 'w1',
+  connectedWalletId: 'w1',
+  idempotencyKey: key,
+  keyFingerprint: 'q1:w1',
+  attempt: { quoteId: 'q1', walletId: 'w1' },
+  ...(orderId ? { orderId } : {}),
+})
+
+describe('orderId da tentativa (pedido já criado)', () => {
+  it('withOrderId grava só na tentativa da mesma chave', () => {
+    expect(withOrderId(attemptDraft('k1'), 'k1', 'o1')).toEqual(attemptDraft('k1', 'o1'))
+    expect(withOrderId(attemptDraft('k2'), 'k1', 'o1')).toEqual(attemptDraft('k2'))
+    expect(withOrderId({ walletId: 'w1' }, 'k1', 'o1')).toEqual({ walletId: 'w1' })
+  })
+
+  it('persiste com a tentativa e é descartado sem ela', () => {
+    expect(parseCheckoutDraft(JSON.stringify(attemptDraft('k1', 'o1')))).toEqual(attemptDraft('k1', 'o1'))
+    expect(parseCheckoutDraft(JSON.stringify({ walletId: 'w1', orderId: 'o1' }))).toEqual({ walletId: 'w1' })
+  })
+
+  it('chave nova (withOrderKey) e withoutOrderKey tiram o orderId; a mesma chave o mantém', () => {
+    const draft = attemptDraft('k1', 'o1')
+    expect(withOrderKey(draft, { quoteId: 'q1', walletId: 'w1' }, () => 'k9').draft.orderId).toBe('o1')
+    expect(withOrderKey(draft, { quoteId: 'q2', walletId: 'w1' }, () => 'k9').draft.orderId).toBeUndefined()
+    expect(withoutOrderKey(draft)).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+  })
+
+  it('a tentativa com orderId continua pendente (nenhuma chave nova enquanto o pedido pode terminar)', () => {
+    expect(pendingAttempt(attemptDraft('k1', 'o1'))).toEqual({ key: 'k1', body: { quoteId: 'q1', walletId: 'w1' } })
+  })
+})
+
+describe('settleCheckoutDraft', () => {
+  it('pelo orderId (order.updated) ou pela chave (pedido completo); nunca de outra tentativa', () => {
+    expect(draftOwnsOrder(attemptDraft('k1', 'o1'), { id: 'o1' })).toBe(true)
+    expect(draftOwnsOrder(attemptDraft('k1', 'o1'), { id: 'o2' })).toBe(false)
+    expect(draftOwnsOrder(attemptDraft('k1'), { id: 'o1' })).toBe(false)
+    expect(draftOwnsOrder(attemptDraft('k1'), { id: 'o1', idempotencyKey: 'k1' })).toBe(true)
+    expect(draftOwnsOrder({ walletId: 'w1', orderId: 'o1' }, { id: 'o1' })).toBe(false)
+  })
+
+  it('confirmed limpa; declined tira só a tentativa; pending e outro pedido não mexem', () => {
+    const store = createDraftStore('user-ana', null)
+    store.set(attemptDraft('k1', 'o1'))
+    settleCheckoutDraft(store, { id: 'o1', status: 'pending' })
+    settleCheckoutDraft(store, { id: 'o2', status: 'confirmed' })
+    expect(store.get()).toEqual(attemptDraft('k1', 'o1'))
+    settleCheckoutDraft(store, { id: 'o1', status: 'declined' })
+    expect(store.get()).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+    store.set(attemptDraft('k1', 'o1'))
+    settleCheckoutDraft(store, { id: 'o1', status: 'confirmed' })
+    expect(store.get()).toEqual({})
+  })
+})
+
+describe('withConnectedWallet (resposta do connect)', () => {
+  it('marca a carteira conectada se ela ainda é a escolhida (ou a principal, sem escolha)', () => {
+    expect(withConnectedWallet({ walletId: 'w1' }, 'w1')).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+    expect(withConnectedWallet({}, 'w1')).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+  })
+
+  it('a pessoa trocou de carteira durante a conexão: a resposta atrasada não desfaz a troca', () => {
+    expect(withConnectedWallet({ walletId: 'w2' }, 'w1')).toBeUndefined()
   })
 })

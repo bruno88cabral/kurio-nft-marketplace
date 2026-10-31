@@ -4,6 +4,7 @@ import { nftKeys } from '@/api/nfts'
 import { orderKeys } from '@/api/orders'
 import { SESSION_QUERY_KEY } from '@/auth/useSession'
 import type { Id, Nft, NftUpdatedEvent, Order, OrderUpdatedEvent, Paginated, Quote, Session } from '@/contracts'
+import { checkoutDraftStore, settleCheckoutDraft, type CheckoutDraftStore } from '@/features/checkout/checkoutDraft'
 import { eqEth } from '@/lib/eth'
 
 /** Prefixo de todas as listas do catálogo (`nftKeys.list(params)`), qualquer filtro ou página. */
@@ -72,9 +73,16 @@ export function applyNftUpdated(queryClient: QueryClient, event: NftUpdatedEvent
  * termina; sem isso a Confirmação ficaria `pending` para sempre com o socket conectado (sem polling).
  * Não usa `cancelQueries`: sem dado, rejeitaria o `ensureQueryData` do loader.
  * No `confirmed` o servidor tirou o comprado do carrinho: invalida `['cart', id]` (inclui as cotações).
- * Os efeitos de rascunho e de detalhe do NFT ficam com `applyOrderOutcome`, na Confirmação.
+ * **Rascunho do checkout**: no `confirmed`/`declined`, se a tentativa guardada da conta da sessão é este pedido
+ * (`draft.orderId === payload.id`), aplica `settleCheckoutDraft` (limpa, ou tira só a tentativa). Vale com a
+ * Confirmação fechada: sem isso a próxima compra abriria o checkout preso em "Tentar de novo" do pedido antigo.
+ * O detalhe do NFT comprado fica com `applyOrderOutcome` (Confirmação ou checkout), que lê os itens do pedido.
  */
-export function applyOrderUpdated(queryClient: QueryClient, event: OrderUpdatedEvent): void {
+export function applyOrderUpdated(
+  queryClient: QueryClient,
+  event: OrderUpdatedEvent,
+  draftsOf: (accountId: Id) => CheckoutDraftStore = checkoutDraftStore,
+): void {
   const accountId = sessionAccountId(queryClient)
   if (accountId === undefined) return
   const { id, status } = event.payload
@@ -92,6 +100,7 @@ export function applyOrderUpdated(queryClient: QueryClient, event: OrderUpdatedE
     }
   }
   if (status === 'confirmed') void queryClient.invalidateQueries({ queryKey: cartKeys.detail(accountId) })
+  settleCheckoutDraft(draftsOf(accountId), { id, status })
 }
 
 /** Reconexão por queda: refaz catálogo, carrinho e pedidos ativos (os inativos só ficam marcados). */

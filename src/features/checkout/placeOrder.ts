@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { orderKeys } from '@/api/orders'
 import { ApiError, type CreateOrderRequest, type Id, type Order, type Quote } from '@/contracts'
-import { pendingAttempt, withOrderKey, withoutOrderKey, type CheckoutDraftStore } from './checkoutDraft'
+import { pendingAttempt, withOrderId, withOrderKey, withoutOrderKey, type CheckoutDraftStore } from './checkoutDraft'
 import { diffSnapshots, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 
 export const TRANSIENT_ORDER_MESSAGE = 'Não confirmamos o envio.'
@@ -62,7 +62,9 @@ export interface PlaceOrderDeps {
 
 /**
  * Envia a tentativa: grava a chave no rascunho **antes** do POST (um refresh no meio não perde a chave) e
- * trata a resposta. Sucesso vai para `orderKeys.detail`; `transient` mantém a tentativa; 409 a descarta.
+ * trata a resposta. Sucesso vai para `orderKeys.detail` e grava o `orderId` na tentativa (o pedido existe: o
+ * checkout passa a consultá-lo, e o `order.updated` final limpa o rascunho mesmo com a Confirmação fechada);
+ * `transient` mantém a tentativa; 409 e `fatal` a descartam.
  */
 async function send(deps: PlaceOrderDeps, key: string, body: CreateOrderRequest): Promise<PlaceOrderOutcome> {
   const same = deps.sameSession ?? (() => true)
@@ -70,6 +72,7 @@ async function send(deps: PlaceOrderDeps, key: string, body: CreateOrderRequest)
     const order = await deps.createOrder(body, key)
     if (!same()) return { kind: 'stale-session' }
     deps.queryClient.setQueryData(orderKeys.detail(deps.accountId, order.id), order)
+    deps.drafts.set(withOrderId(deps.drafts.get(), key, order.id))
     return { kind: 'created', order }
   } catch (error) {
     if (!same()) return { kind: 'stale-session' }
@@ -120,7 +123,7 @@ export async function confirmPurchase(deps: PlaceOrderDeps, input: ConfirmPurcha
   if ((quote.issues?.length ?? 0) > 0) return { kind: 'blocked', quote, snapshot }
 
   const body: CreateOrderRequest = { quoteId: quote.quoteId, walletId: input.walletId }
-  const { key, draft } = withOrderKey({ ...deps.drafts.get(), reviewedQuoteId: quote.quoteId }, body, deps.newKey)
+  const { key, draft } = withOrderKey(deps.drafts.get(), body, deps.newKey)
   deps.drafts.set(draft)
   return send(deps, key, body)
 }

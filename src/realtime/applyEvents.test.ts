@@ -5,6 +5,7 @@ import { nftKeys } from '@/api/nfts'
 import { orderKeys } from '@/api/orders'
 import { SESSION_QUERY_KEY } from '@/auth/useSession'
 import type { Nft, NftEdition, NftUpdatedEvent, Order, OrderUpdatedEvent, Paginated, Quote, Session } from '@/contracts'
+import { createDraftStore, type CheckoutDraft } from '@/features/checkout/checkoutDraft'
 import { parseEth } from '@/lib/eth'
 import { applyNftUpdated, applyOrderUpdated, invalidateAfterReconnect, quoteDivergesFrom } from './applyEvents'
 
@@ -277,6 +278,46 @@ describe('applyOrderUpdated', () => {
     // O pedido em cache de outra conta continua como estava
     expect(queryClient.getQueryData<Order>(orderKeys.detail(BRUNO, 'o-bruno'))?.status).toBe('pending')
     expect(keys().filter((k) => k[0] === 'orders')).toEqual([orderKeys.detail(BRUNO, 'o-bruno')])
+  })
+
+  it('rascunho do checkout: confirmed limpa e declined tira a tentativa, só da conta da sessão e do pedido certo', () => {
+    const { queryClient } = setup({ accountId: ANA })
+    const attempt = (orderId: string): CheckoutDraft => ({
+      walletId: 'w1',
+      connectedWalletId: 'w1',
+      idempotencyKey: 'k1',
+      keyFingerprint: 'q1:w1',
+      attempt: { quoteId: 'q1', walletId: 'w1' },
+      orderId,
+    })
+    const ana = createDraftStore(ANA, null)
+    const bruno = createDraftStore(BRUNO, null)
+    const draftsOf = (accountId: string) => (accountId === ANA ? ana : bruno)
+    ana.set(attempt('o1'))
+    bruno.set(attempt('o1'))
+
+    // Outro pedido, ou o mesmo ainda pending: nada muda (sem o pedido no cache, com a Confirmação fechada)
+    applyOrderUpdated(queryClient, orderEvent('o2', 'confirmed'), draftsOf)
+    applyOrderUpdated(queryClient, orderEvent('o1', 'pending'), draftsOf)
+    expect(ana.get()).toEqual(attempt('o1'))
+
+    applyOrderUpdated(queryClient, orderEvent('o1', 'declined'), draftsOf)
+    expect(ana.get()).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+
+    ana.set(attempt('o1'))
+    applyOrderUpdated(queryClient, orderEvent('o1', 'confirmed'), draftsOf)
+    expect(ana.get()).toEqual({})
+    // O rascunho de outra conta (mesmo id de pedido) não é tocado
+    expect(bruno.get()).toEqual(attempt('o1'))
+  })
+
+  it('rascunho sem orderId (timeout): o evento não o toca e o R4 segue com a mesma chave', () => {
+    const { queryClient } = setup({ accountId: ANA })
+    const ana = createDraftStore(ANA, null)
+    const draft: CheckoutDraft = { idempotencyKey: 'k1', keyFingerprint: 'q1:w1', attempt: { quoteId: 'q1', walletId: 'w1' } }
+    ana.set(draft)
+    applyOrderUpdated(queryClient, orderEvent('o1', 'confirmed'), () => ana)
+    expect(ana.get()).toEqual(draft)
   })
 
   it('sem sessão: ignorado', () => {

@@ -1,5 +1,5 @@
 import type { SessionStorageLike } from '@/auth/sessionStorage'
-import type { CreateOrderRequest, Id } from '@/contracts'
+import type { CreateOrderRequest, Id, Order } from '@/contracts'
 
 /** Rascunho do checkout em `sessionStorage` (morre com a aba; não vaza para outra aba nem outro login). */
 export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
@@ -9,8 +9,6 @@ export interface CheckoutDraft {
   walletId?: Id
   /** Carteira cuja conexão (`POST /wallets/:id/connect`) deu certo. Só vale se for a escolhida. */
   connectedWalletId?: Id
-  /** Última cotação revisada (a que estava na tela quando o snapshot foi tirado). */
-  reviewedQuoteId?: Id
   /** Chave da tentativa de pedido ainda sem resposta final (`Idempotency-Key`). */
   idempotencyKey?: string
   /** `quoteId:walletId` da tentativa: a chave só é reaproveitada com o mesmo par. */
@@ -20,6 +18,12 @@ export interface CheckoutDraft {
    * depois de um refresh: com o corpo diferente a mesma chave daria 409.
    */
   attempt?: CreateOrderRequest
+  /**
+   * Id do pedido que a tentativa criou (201, ou 200 ao reenviar a mesma chave). Com ele o checkout sabe que o
+   * pedido existe e consulta o estado em vez de pedir "Tentar de novo"; o `order.updated` final limpa o
+   * rascunho mesmo com a Confirmação fechada. Só vale junto da tentativa.
+   */
+  orderId?: Id
 }
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== ''
@@ -40,12 +44,12 @@ export function parseCheckoutDraft(raw: string | null): CheckoutDraft {
     const draft: CheckoutDraft = {}
     if (isString(value.walletId)) draft.walletId = value.walletId
     if (isString(value.connectedWalletId)) draft.connectedWalletId = value.connectedWalletId
-    if (isString(value.reviewedQuoteId)) draft.reviewedQuoteId = value.reviewedQuoteId
     // A chave só serve com o corpo e o fingerprint dela: metade de uma tentativa é descartada
     if (isString(value.idempotencyKey) && isString(value.keyFingerprint) && isAttempt(value.attempt)) {
       draft.idempotencyKey = value.idempotencyKey
       draft.keyFingerprint = value.keyFingerprint
       draft.attempt = { quoteId: value.attempt.quoteId, walletId: value.attempt.walletId }
+      if (isString(value.orderId)) draft.orderId = value.orderId
     }
     return draft
   } catch {
@@ -103,8 +107,27 @@ export function withOrderKey(
   newKey: () => string = () => crypto.randomUUID(),
 ): { key: string; draft: CheckoutDraft } {
   const fingerprint = keyFingerprint(attempt)
-  const key = draft.idempotencyKey && draft.keyFingerprint === fingerprint ? draft.idempotencyKey : newKey()
-  return { key, draft: { ...draft, idempotencyKey: key, keyFingerprint: fingerprint, attempt: { ...attempt } } }
+  const reused = draft.idempotencyKey && draft.keyFingerprint === fingerprint ? draft.idempotencyKey : undefined
+  const key = reused ?? newKey()
+  const next: CheckoutDraft = { ...draft, idempotencyKey: key, keyFingerprint: fingerprint, attempt: { ...attempt } }
+  // Chave nova é outra tentativa: o pedido da anterior não é dela
+  if (!reused) delete next.orderId
+  return { key, draft: next }
+}
+
+/**
+ * Resposta do `POST /wallets/:id/connect` da carteira `walletId`: marca como conectada **só** se ela ainda é a
+ * escolhida. Se a pessoa trocou de carteira durante a conexão, devolve `undefined` (a resposta atrasada não
+ * desfaz a troca). Sem `walletId` no rascunho a escolhida é a principal, que é a que foi conectada.
+ */
+export function withConnectedWallet(draft: CheckoutDraft, walletId: Id): CheckoutDraft | undefined {
+  if (draft.walletId !== undefined && draft.walletId !== walletId) return undefined
+  return { ...draft, walletId, connectedWalletId: walletId }
+}
+
+/** Grava o pedido criado na tentativa da chave `key`; outra tentativa (ou nenhuma) fica como está. */
+export function withOrderId(draft: CheckoutDraft, key: string, orderId: Id): CheckoutDraft {
+  return draft.idempotencyKey === key && draft.attempt ? { ...draft, orderId } : draft
 }
 
 /** Sem a tentativa (409 de revalidação, pedido recusado): a próxima confirmação usa uma chave nova. */
@@ -113,7 +136,33 @@ export function withoutOrderKey(draft: CheckoutDraft): CheckoutDraft {
   delete next.idempotencyKey
   delete next.keyFingerprint
   delete next.attempt
+  delete next.orderId
   return next
+}
+
+/** O pedido é o da tentativa guardada? Pelo `orderId` gravado no 201, ou pela chave (quando o pedido a traz). */
+export function draftOwnsOrder(draft: CheckoutDraft, order: Pick<Order, 'id'> & { idempotencyKey?: string }): boolean {
+  if (!pendingAttempt(draft)) return false
+  if (draft.orderId !== undefined && draft.orderId === order.id) return true
+  return order.idempotencyKey !== undefined && draft.idempotencyKey === order.idempotencyKey
+}
+
+/**
+ * Efeito do estado final de um pedido no rascunho, idempotente. Só age se o pedido é o da tentativa guardada
+ * (abrir um pedido antigo não apaga a atual):
+ * - `confirmed`: limpa o rascunho inteiro;
+ * - `declined`: tira só a tentativa (a cotação pode ser reusada, a chave não; a carteira fica).
+ * `pending` não faz nada. Usado pela Confirmação (`applyOrderOutcome`), pelo `order.updated` e pelo checkout.
+ */
+export function settleCheckoutDraft(
+  drafts: CheckoutDraftStore,
+  order: Pick<Order, 'id' | 'status'> & { idempotencyKey?: string },
+): void {
+  if (order.status === 'pending') return
+  const draft = drafts.get()
+  if (!draftOwnsOrder(draft, order)) return
+  if (order.status === 'confirmed') drafts.clear()
+  else drafts.set(withoutOrderKey(draft))
 }
 
 /** Tentativa ainda sem resposta final, para "Tentar de novo" com a mesma chave (inclusive depois de refresh). */
