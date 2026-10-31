@@ -34,7 +34,7 @@ Alias `@/` aponta para `src/` (via `paths`, sem `baseUrl`, que é obsoleto no Ty
 
 Decisão: `@mswjs/socket.io-binding` sobre `ws.link` do MSW, com `socket.io-client` configurado com `transports: ['websocket']` e `autoConnect: false` (`src/realtime/socket.ts`). O socket é tipado com `Socket<ServerToClientEvents, ClientToServerEvents>`; `ClientToServerEvents` é `Record<string, never>` (o cliente não emite nada) e foi confirmado que compila com o `socket.io-client`.
 
-O mock (`src/mocks/socket.ts`) emite um `nft.updated` logo após o handshake e outro a cada 5s (payload provisório do spike).
+O mock (`src/mocks/socket.ts`) assina o bus do estado e entrega `nft.updated` a todas as conexões e `order.updated` só ao dono do pedido (token em `?token=` da URL do socket). O emissor periódico do spike saiu; `window.__kurioMock` dispara eventos pelo estado. Doc completa na MYK-1068.
 
 ### Resultado do spike R1 (MYK-1057)
 

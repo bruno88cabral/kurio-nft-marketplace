@@ -9,3 +9,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  /** Hook de teste do mock; só existe com `VITE_ENABLE_MOCKS=true`. */
+  __kurioMock?: import('./mocks/devtools').KurioMock
+}

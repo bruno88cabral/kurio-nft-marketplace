@@ -1,12 +1,12 @@
 import { toSocketIo } from '@mswjs/socket.io-binding'
 import { ws } from 'msw'
-import type { NftUpdatedEvent } from '@/contracts'
 import { SOCKET_URL } from '@/app/env'
-import { parseEth } from '@/lib/eth'
+import { shouldDeliver } from './db/delivery'
+import { findSession } from './handlers/session'
+import { store } from './runtime'
 
-const EMIT_INTERVAL_MS = 5_000
 // O handshake falso do binding anuncia pingInterval 25s + pingTimeout 5s, mas o binding não pinga.
-// Sem ping, o engine.io-client derruba a conexão aos ~30s e reconecta. O mock faz o papel do servidor.
+// Sem ping, o engine.io-client derrubava a conexão aos ~30s e reconectava. O mock faz o papel do servidor.
 const PING_INTERVAL_MS = 25_000
 const ENGINE_IO_PING = '2'
 
@@ -18,33 +18,30 @@ const realtime = ws.link(`${SOCKET_URL.replace(/\/+$/, '')}/*`)
 export const socketHandlers = [
   realtime.addEventListener('connection', (connection) => {
     const io = toSocketIo(connection)
-    let version = 0
 
-    // Payload provisório do spike; as fixtures reais chegam com o banco em memória (MYK-1048)
-    const emitNftUpdated = () => {
-      version += 1
-      const event: NftUpdatedEvent = {
-        eventId: crypto.randomUUID(),
-        resource: { type: 'nft', id: 'spike-nft' },
-        version,
-        occurredAt: new Date().toISOString(),
-        payload: {
-          id: 'spike-nft',
-          price: parseEth('0.1'),
-          editions: [{ kind: '1/10', available: 10 - (version % 10), total: 10 }],
-        },
+    // Token: o cliente abre com `io(url, { query: { token } })` e ele chega em `connection.client.url`
+    // (`...?token=<t>&EIO=4&transport=websocket`), validado no browser. Via `auth` o token só vai no pacote
+    // CONNECT (`40{"token":"..."}`), depois do handshake; sem token o CONNECT é `40` puro. Conexão sem token
+    // ou com token inválido/expirado é anônima.
+    const token = new URL(connection.client.url).searchParams.get('token')
+    const accountId = findSession(store.getDb(), token)?.accountId ?? null
+
+    // Sem rooms no binding: cada conexão assina o bus e filtra por conta (nft.updated vai a todas)
+    const unsubscribe = store.bus.subscribe((busEvent) => {
+      // `reset` não sai pelo socket (ver `shouldDeliver`)
+      if (busEvent.name === 'reset' || !shouldDeliver(busEvent, accountId, store.getDb().orders)) return
+      try {
+        if (busEvent.name === 'nft.updated') io.client.emit('nft.updated', busEvent.event)
+        else io.client.emit('order.updated', busEvent.event)
+      } catch (e) {
+        // Conexão já fechada ou em estado ruim: não pode quebrar a mutação nem as outras conexões
+        console.error('[mocks] falha ao entregar evento ao socket', e)
       }
-      io.client.emit('nft.updated', event)
-    }
-
-    // O binding manda o handshake do Engine.IO/Socket.IO numa microtask; o primeiro evento sai depois dele
-    const first = setTimeout(emitNftUpdated, 0)
-    const interval = setInterval(emitNftUpdated, EMIT_INTERVAL_MS)
+    })
     const heartbeat = setInterval(() => connection.client.send(ENGINE_IO_PING), PING_INTERVAL_MS)
 
     connection.client.addEventListener('close', () => {
-      clearTimeout(first)
-      clearInterval(interval)
+      unsubscribe()
       clearInterval(heartbeat)
     })
   }),
