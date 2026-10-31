@@ -10,6 +10,7 @@ import { router } from '@/app/router'
 import { isSessionStorageEvent, sessionLifecycle } from '@/auth/sessionLifecycle'
 import { clearAnonymousCart, readAnonymousCart } from '@/features/cart/anonymousCart'
 import { mergeAnonymousCartOnLogin } from '@/features/cart/mergeOnLogin'
+import { dropWalletConnections } from '@/features/checkout/checkoutDraft'
 import { bindRealtime } from '@/realtime/bindRealtime'
 import { createReconciler } from '@/realtime/reconcile'
 import { socket } from '@/realtime/socket'
@@ -41,6 +42,10 @@ sessionLifecycle.onSessionEstablished((auth) =>
     sameSession: sessionLifecycle.captureSession(),
   }),
 )
+
+// A conexão da carteira no checkout é da sessão: cai em todo reset privado (logout incluído). A tentativa de pedido
+// pendente (chave + corpo) fica no rascunho: apagá-la abriria caminho para um pedido duplicado (R4, MYK-1103)
+sessionLifecycle.onPrivateReset(() => dropWalletConnections())
 
 // Tempo real no cache (MYK-1091): `nft.updated`/`order.updated` passam pelo reconciliador (dedupe por `eventId`,
 // descarte por `version`); a reconexão por queda refaz `nfts`, `cart` e `orders`. Ligado antes do primeiro connect

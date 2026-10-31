@@ -125,6 +125,16 @@ export function withConnectedWallet(draft: CheckoutDraft, walletId: Id): Checkou
   return { ...draft, walletId, connectedWalletId: walletId }
 }
 
+/**
+ * Sem a conexão da carteira, e só ela. `walletId` e a tentativa pendente (`idempotencyKey`, `keyFingerprint`,
+ * `attempt`, `orderId`) ficam: apagar a tentativa abriria caminho para um pedido duplicado depois de um timeout (R4).
+ */
+export function withoutConnection(draft: CheckoutDraft): CheckoutDraft {
+  const next = { ...draft }
+  delete next.connectedWalletId
+  return next
+}
+
 /** Grava o pedido criado na tentativa da chave `key`; outra tentativa (ou nenhuma) fica como está. */
 export function withOrderId(draft: CheckoutDraft, key: string, orderId: Id): CheckoutDraft {
   return draft.idempotencyKey === key && draft.attempt ? { ...draft, orderId } : draft
@@ -219,4 +229,46 @@ export function checkoutDraftStore(accountId: Id): ObservableDraftStore {
     stores.set(accountId, store)
   }
   return store
+}
+
+const DRAFT_KEY_PREFIX = checkoutDraftKey('')
+
+/** Chaves `kurio:checkout:*` do storage; storage que não lista (ou lança) devolve só o que se sabe. */
+function draftStorageKeys(storage: SessionStorageLike): string[] {
+  const listable = storage as Partial<Storage>
+  if (typeof listable.length !== 'number' || typeof listable.key !== 'function') return []
+  const found: string[] = []
+  try {
+    for (let i = 0; i < listable.length; i++) {
+      const key = listable.key(i)
+      if (key?.startsWith(DRAFT_KEY_PREFIX)) found.push(key)
+    }
+  } catch {
+    // storage ilegível
+  }
+  return found
+}
+
+/**
+ * Reset da sessão (login, troca de conta, logout, expiração): a conexão da carteira é da sessão e cai, a
+ * tentativa pendente fica. O reset privado não diz de qual conta, então vale para todos os rascunhos
+ * `kurio:checkout:*` da aba, no storage e nas cópias em memória (a tela abre com a cópia em memória).
+ * Só reescreve o que tem conexão; não lança.
+ */
+export function dropWalletConnections(storage: SessionStorageLike | null = browserSessionStorage()): void {
+  for (const store of stores.values()) {
+    const draft = store.get()
+    if (draft.connectedWalletId !== undefined) store.set(withoutConnection(draft))
+  }
+  if (!storage) return
+  for (const key of draftStorageKeys(storage)) {
+    try {
+      const raw = storage.getItem(key)
+      const draft = parseCheckoutDraft(raw)
+      if (draft.connectedWalletId === undefined) continue
+      storage.setItem(key, JSON.stringify(withoutConnection(draft)))
+    } catch {
+      // sem persistência
+    }
+  }
 }

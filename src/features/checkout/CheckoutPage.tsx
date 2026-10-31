@@ -20,7 +20,7 @@ import { useCart } from '@/features/cart/useCart'
 import { QUOTE_ISSUES_MESSAGE, useCartQuote } from '@/features/cart/useCartQuote'
 import { sortWallets } from '@/lib/wallets'
 import { cn } from '@/lib/utils'
-import { pendingAttempt, withConnectedWallet } from './checkoutDraft'
+import { pendingAttempt, withConnectedWallet, withoutConnection } from './checkoutDraft'
 import {
   confirmPurchase,
   ORDER_FAILED_MESSAGE,
@@ -224,9 +224,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     if (pending || walletId === selectedId) return
     setWalletError(undefined)
     // Trocar de carteira desconecta a anterior
-    const next = { ...drafts.get(), walletId }
-    delete next.connectedWalletId
-    drafts.set(next)
+    drafts.set({ ...withoutConnection(drafts.get()), walletId })
   }
 
   const connect = async () => {
