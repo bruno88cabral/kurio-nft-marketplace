@@ -1,5 +1,6 @@
 import type { Nft } from '@/contracts'
 import { NftCard, NftCardSkeleton, type NftCardSize } from '@/components/kurio'
+import { FavoritableNftCard } from '@/features/favorites/FavoriteButton'
 import { cn } from '@/lib/utils'
 
 /** Colunas do catálogo: 2 no mobile, 3 a partir de `md` (Figma `2:2`: 3×3). */
@@ -12,11 +13,20 @@ export interface NftGridProps {
   size?: NftCardSize
   /** Rótulo da lista para leitores de tela. */
   label?: string
+  /** Liga o favorito funcional no card, só no mobile (catálogo do Início, MYK-1076). */
+  favoritable?: boolean
   className?: string
 }
 
 /** Grade de `NftCard` (presentacional; reaproveitável fora do Início, ex.: "Mais desta coleção"). */
-export function NftGrid({ items, stale = false, size = 'grid', label = 'NFTs', className }: NftGridProps) {
+export function NftGrid({
+  items,
+  stale = false,
+  size = 'grid',
+  label = 'NFTs',
+  favoritable = false,
+  className,
+}: NftGridProps) {
   return (
     <ul
       aria-label={label}
@@ -25,7 +35,11 @@ export function NftGrid({ items, stale = false, size = 'grid', label = 'NFTs', c
     >
       {items.map((nft) => (
         <li key={nft.id} className="min-w-0">
-          <NftCard nft={nft} previousPrice={nft.previousPrice} size={size} className="h-full" />
+          {favoritable ? (
+            <FavoritableNftCard nft={nft} previousPrice={nft.previousPrice} size={size} className="h-full" />
+          ) : (
+            <NftCard nft={nft} previousPrice={nft.previousPrice} size={size} className="h-full" />
+          )}
         </li>
       ))}
     </ul>

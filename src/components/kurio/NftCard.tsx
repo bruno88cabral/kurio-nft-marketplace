@@ -24,6 +24,10 @@ export interface NftCardProps {
    */
   favorited?: boolean
   onFavoriteToggle?: () => void
+  /** Desabilita o favorito (ex.: sessão ainda sendo confirmada). */
+  favoriteDisabled?: boolean
+  /** Classes extras do botão de favorito (ex.: `md:hidden` para mostrá-lo só no mobile). */
+  favoriteClassName?: string
   /** `grid` = Início (258×356 no desktop), `carousel` = "Mais desta coleção" (219×303). A largura vem do container. */
   size?: NftCardSize
   /** Arte acima da dobra (primeira linha / destaque): carrega `eager` com `fetchpriority="high"` (LCP). */
@@ -42,6 +46,8 @@ export function NftCard({
   badge,
   favorited = false,
   onFavoriteToggle,
+  favoriteDisabled,
+  favoriteClassName,
   size = 'grid',
   priority = false,
   className,
@@ -108,7 +114,8 @@ export function NftCard({
           favorited={favorited}
           onToggle={onFavoriteToggle}
           nftName={nft.name}
-          className={cn('absolute z-10', size === 'carousel' ? 'top-4 right-4' : 'top-5 right-5')}
+          disabled={favoriteDisabled}
+          className={cn('absolute z-10', size === 'carousel' ? 'top-4 right-4' : 'top-5 right-5', favoriteClassName)}
         />
       )}
     </article>

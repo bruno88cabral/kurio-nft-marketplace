@@ -75,7 +75,7 @@ export function CatalogGrid() {
   } else {
     body = (
       <div className="flex flex-col gap-8">
-        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" />
+        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" favoritable />
         <CatalogPagination page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     )
