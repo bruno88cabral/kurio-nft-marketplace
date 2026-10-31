@@ -2,11 +2,12 @@ import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstac
 import { Link, Navigate, useNavigate } from '@tanstack/react-router'
 import { LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
 import { createOrder } from '@/api/orders'
 import { profileQuery } from '@/api/profile'
 import { quoteQuery } from '@/api/quotes'
-import { connectWallet, walletsQuery } from '@/api/wallets'
+import { connectWallet, walletKeys, walletsQuery } from '@/api/wallets'
 import { captureSession } from '@/auth/sessionGuard'
 import { useSession } from '@/auth/useSession'
 import { ApiError, type Account, type Cart, type Id, type Quote } from '@/contracts'
@@ -98,30 +99,29 @@ function RecoverPendingOrder({ accountId }: { accountId: Id }) {
   const navigate = useNavigate()
   const { store: drafts } = useCheckoutDraft(accountId)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string>()
   const lock = useRef(false)
 
   const resend = async () => {
     if (lock.current) return
     lock.current = true
     setSubmitting(true)
-    setError(undefined)
     const outcome = await resendPendingOrder({ queryClient, accountId, drafts, createOrder, sameSession: captureSession() })
     if (outcome?.kind === 'created') {
       await navigate({ to: '/orders/$orderId', params: { orderId: outcome.order.id }, replace: true })
       return
     }
     // 409 descarta a tentativa (a tela volta ao /cart); `transient` mantém o aviso
-    if (outcome?.kind === 'fatal') setError(outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE)
+    // `fatal` descarta a tentativa: sem ela e com o carrinho vazio a página volta ao /cart, então o motivo vai no toast
+    if (outcome?.kind === 'fatal') toast.error(outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE)
     lock.current = false
     setSubmitting(false)
   }
 
-  return <PendingOrderAlert submitting={submitting} onResend={() => void resend()} error={error} />
+  return <PendingOrderAlert submitting={submitting} onResend={() => void resend()} />
 }
 
 /** O botão "Confirmar compra" sai e este entra no lugar: o foco vai para "Tentar de novo" (não cai no `<body>`). */
-function PendingOrderAlert({ submitting, onResend, error }: { submitting: boolean; onResend: () => void; error?: string }) {
+function PendingOrderAlert({ submitting, onResend }: { submitting: boolean; onResend: () => void }) {
   const buttonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     buttonRef.current?.focus()
@@ -135,7 +135,6 @@ function PendingOrderAlert({ submitting, onResend, error }: { submitting: boolea
       <p className="text-muted-foreground text-caption">
         O pedido pode ter sido recebido. Tentar de novo reenvia o mesmo pedido e não cobra duas vezes.
       </p>
-      {error && <p className="text-destructive text-caption">{error}</p>}
       <Button
         ref={buttonRef}
         type="button"
@@ -251,6 +250,9 @@ function CheckoutContent({ account, cart }: { account: Account; cart: Cart }) {
         setNotice(undefined)
         return
       case 'fatal':
+        // A tentativa já saiu do rascunho: o CTA volta e a carteira destrava. A lista pode ter mudado
+        // (carteira removida em outra aba): recarrega para o usuário escolher outra
+        void queryClient.invalidateQueries({ queryKey: walletKeys.list(accountId) })
         setNotice({
           kind: 'fatal',
           message: outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE,

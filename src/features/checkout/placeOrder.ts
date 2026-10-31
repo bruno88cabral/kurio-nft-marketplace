@@ -17,7 +17,7 @@ export type OrderErrorKind =
   | 'items'
   /** 409 sem `fieldErrors` (cotação vencida ou usada, chave com outro corpo): recotar e confirmar de novo. */
   | 'quote'
-  /** 401/403/404/422: não adianta repetir. */
+  /** 401/403/404/422: não adianta repetir (a tentativa é descartada). */
   | 'fatal'
 
 export function classifyOrderError(error: unknown): OrderErrorKind {
@@ -44,6 +44,7 @@ export type PlaceOrderOutcome =
   | { kind: 'items'; fieldErrors: Record<string, string>; message: string }
   /** 409 da cotação: a chave foi descartada; a tela recota. */
   | { kind: 'quote'; message: string }
+  /** 403/404/422 (ex.: carteira removida): a chave foi descartada; a tela mostra a mensagem e libera a carteira. */
   | { kind: 'fatal'; error: unknown }
   /** Login, logout ou expiração no meio: nada é gravado nem mostrado. */
   | { kind: 'stale-session' }
@@ -74,9 +75,11 @@ async function send(deps: PlaceOrderDeps, key: string, body: CreateOrderRequest)
     if (!same()) return { kind: 'stale-session' }
     const kind = classifyOrderError(error)
     if (kind === 'transient') return { kind: 'transient', error }
-    if (kind === 'fatal') return { kind: 'fatal', error }
-    // 409: a tentativa não criou pedido; a próxima confirmação é outra tentativa, com outra chave
+    // 409 e `fatal` (403/404/422): a tentativa não criou pedido (o servidor confere a idempotência antes da
+    // cotação e da carteira; `src/mocks/db/orders.ts`). Repetir não adianta: a próxima confirmação é outra
+    // tentativa, com outra chave. Sem isso a tela ficaria presa em "Tentar de novo"
     deps.drafts.set(withoutOrderKey(deps.drafts.get()))
+    if (kind === 'fatal') return { kind: 'fatal', error }
     const apiError = error as ApiError
     return kind === 'items'
       ? { kind: 'items', fieldErrors: apiError.fieldErrors ?? {}, message: apiError.message }

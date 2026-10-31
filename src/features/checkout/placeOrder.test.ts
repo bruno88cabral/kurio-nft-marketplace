@@ -183,6 +183,23 @@ describe('confirmPurchase', () => {
     expect(fresh.issues).toEqual([{ nftId: 'nft-002', edition: '1/10', kind: 'unavailable' }])
   })
 
+  it('fatal (carteira inexistente) descarta a tentativa e a próxima confirmação usa chave nova', async () => {
+    const t = setup()
+    const reviewed = snapshotOf(await t.requote())
+    // A carteira foi removida em outra aba entre conectar e confirmar
+    const outcome = await confirmPurchase(t.deps, { reviewed, walletId: 'wallet-removida', requote: t.requote })
+    expect(outcome.kind).toBe('fatal')
+    if (outcome.kind === 'fatal') expect((outcome.error as ApiError).status).toBe(404)
+    expect(pendingAttempt(t.drafts.get())).toBeUndefined()
+    expect(t.orders()).toHaveLength(0)
+    expect(await resendPendingOrder(t.deps)).toBeUndefined()
+
+    const again = await confirmPurchase(t.deps, { reviewed, walletId: WALLET, requote: t.requote })
+    expect(again.kind).toBe('created')
+    expect(t.calls.map((c) => c.key)).toEqual(['key-1', 'key-2'])
+    expect(t.orders()).toHaveLength(1)
+  })
+
   it('troca de sessão no meio não grava o pedido no cache', async () => {
     const t = setup()
     const reviewed = snapshotOf(await t.requote())
