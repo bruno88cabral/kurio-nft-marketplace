@@ -1,22 +1,23 @@
 # Arquitetura
 
-Documento vivo. Hoje cobre o **M0 (Fundação)**, a **camada de mocks do M1** (estado, handlers REST, socket e cenários) e o **M2 (Início, Detalhe do NFT, favoritos, layout e a base da sessão no cliente)**: as decisões já tomadas e implementadas estão preenchidas; o que depende de login, perfil, carteiras, carrinho, checkout e tempo real no cache (M3 em diante) está como `TODO` e **não** deve ser lido como funcionando. As telas do M2 **não foram conferidas contra o Figma** (o MCP estava sem cota): ver "Desvios do Figma".
+Documento vivo. Hoje cobre o **M0 (Fundação)**, a **camada de mocks do M1** (estado, handlers REST, socket e cenários), o **M2 (Início, Detalhe do NFT, favoritos, layout e a base da sessão no cliente)** e o **M3 (Conta e sessão: ciclo de vida da sessão, login e cadastro em modal, menu da conta, rotas protegidas, Perfil e Carteiras)**: as decisões já tomadas e implementadas estão preenchidas; o que depende de carrinho, checkout e tempo real no cache (M4 em diante) está como `TODO` e **não** deve ser lido como funcionando. As telas do M2 e do M3 **não foram conferidas contra o Figma** (o MCP estava sem cota): ver "Desvios do Figma".
 
 ## Estrutura de pastas
 
 ```
 src/
-  api/          cliente HTTP (Axios), normalização de erros em ApiError e fábricas de query (nfts, favorites)
+  api/          cliente HTTP (Axios), normalização de erros em ApiError, fábricas de query (nfts, favorites) e as chamadas da conta: auth.ts (login, signup, logout), profile.ts, wallets.ts
   app/          bootstrap (start.tsx), router e QueryClient
-  auth/         sessão no cliente: sessionStorage.ts (chave kurio:session) e useSession.ts
+  auth/         sessão no cliente: sessionStorage.ts (chave kurio:session), useSession.ts e sessionLifecycle.ts (entrar, sair, expirar, isolar o cache por conta)
   components/ui componentes shadcn/ui (estilo radix-vega)
   components/kurio kit de componentes de produto (MYK-1059), só props; conferência em /dev/kit (só DEV)
-  components/layout moldura do app: SkipLink, SiteHeader (+ HeaderSearch), SiteFooter, MobileTabBar, SessionLink, BrandLogo
+  components/layout moldura do app: SkipLink, SiteHeader (+ HeaderSearch), SiteFooter, MobileTabBar, SessionLink, AccountMenu, BrandLogo
   contracts/    contratos tipados de REST e eventos (fonte única)
   features/     telas do M2, por assunto:
     catalog/      Início: hero, catálogo (filtros, toolbar, grid, paginação), promos, Diário da Cunhagem
     nft-detail/   Detalhe: galeria, info, painel de compra (edição e quantidade), "Mais desta coleção", chrome mobile
     favorites/    favoritos otimistas: favoriteCache, useToggleFavorite, FavoriteButton
+    account/      M3: modal de login e cadastro (AuthDialog, LoginForm, SignupForm), validação pura (validation.ts), guardas e redirects, AccountLayout, Perfil (ProfileForm, AvatarField, PasswordForm) e Carteiras (WalletList, WalletForm, WalletDialogs)
   lib/          utilitários puros (cn, eth, catalogSearch, priceRange, redirectSearch, editions, quantity, nftArt)
   mocks/        MSW (ver "Mock"):
     browser.ts    setupWorker, startMocks() e instalação do window.__kurioMock
@@ -28,7 +29,7 @@ src/
     lifecycle.ts  timers do pedido pending -> confirmed/declined
     socket.ts     ws.link do Socket.IO assinando o bus
     devtools.ts   window.__kurioMock
-  realtime/     instância do socket.io-client
+  realtime/     instância do socket.io-client e reconnectSocket(token)
   routes/       rotas do TanStack Router (file-based; routeTree.gen.ts é gerado)
 public/
   fonts/        Roboto Mono self-hosted (.woff2 de 400/500/700)
@@ -53,8 +54,8 @@ Decisão: `@mswjs/socket.io-binding` sobre `ws.link` do MSW, com `socket.io-clie
 
 O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nft.updated` a todas as conexões e `order.updated` só ao dono do pedido. O emissor periódico do spike saiu; `window.__kurioMock` dispara eventos pelo estado.
 
-- **Token da conexão: pela `query`.** O cliente deve abrir com `io(SOCKET_URL, { transports: ['websocket'], query: { token } })`; o token chega em `connection.client.url` (`...?token=<t>&EIO=4&transport=websocket`), validado no browser. O `auth` do Socket.IO só chega no pacote CONNECT (`40{"token":...}`), depois do handshake, e **não** é lido pelo mock. Sem token, ou com token inválido/expirado, a conexão é **anônima** e recebe só `nft.updated`.
-- **A conta é resolvida uma vez, no connect.** Uma sessão que expira depois continua recebendo `order.updated`; quem faz login depois de conectar precisa reconectar o socket (nota para o M3/M4: reconectar no login e no logout).
+- **Token da conexão: pela `query`.** O cliente abre com `query: { token }`; o token chega em `connection.client.url` (`...?token=<t>&EIO=4&transport=websocket`), validado no browser. O `auth` do Socket.IO só chega no pacote CONNECT (`40{"token":...}`), depois do handshake, e **não** é lido pelo mock. Sem token, ou com token inválido/expirado, a conexão é **anônima** e recebe só `nft.updated`. O `token=` **não aparece** no log do MSW (ele tira a query da URL); para conferir, leia `socket.io.engine.transport.ws.url`.
+- **A conta é resolvida uma vez, no connect, e o cliente reconecta nos pontos certos (M3, MYK-1082).** `reconnectSocket(token | null)` (`src/realtime/socket.ts`) desconecta, troca `socket.io.opts.query` (`{ token }` ou `{}`) e conecta de novo. É chamado no boot (`resumeSession()`, para um refresh logado não ficar anônimo), no login/cadastro (`establishSession`), no logout e na expiração (`endSession`). Uma sessão que expira **sem** o cliente perceber continuaria recebendo `order.updated` até a reconexão; o timer de expiração e o 401 fecham essa janela (ver "Sessão").
 - **Filtro por conta.** O evento do bus não carrega `accountId`; `shouldDeliver` (`src/mocks/db/delivery.ts`) consulta o dono em `db.orders[id].accountId`. O evento `reset` do bus não sai pelo socket.
 - **Formato do evento** (`src/contracts/events.ts`): `{ eventId, resource: { type, id }, version, occurredAt, payload }`. `eventId` é UUID; `version` vem de `db.versions['<tipo>:<id>']`, é monotônica por recurso e persiste junto com o db; `reset()` zera as versões (por isso o hook recarrega a página). Payloads: `nft.updated` `{ id, price, editions }`, `order.updated` `{ id, status }`.
 - Ao fechar a conexão o mock cancela a assinatura do bus e o heartbeat de 25s.
@@ -76,7 +77,7 @@ O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nf
 - Sem **rooms, namespaces ou broadcast** (limitação do binding). O mock contorna: cada conexão assina o bus e filtra por conta (`nft.updated` para todas; `order.updated` só para o dono do pedido, identificado pelo token da `query`).
 - Sem **long-polling**: o binding intercepta o `WebSocket`, não HTTP. Por isso `transports: ['websocket']` é obrigatório.
 - Um evento publicado logo após o handshake pode chegar antes de a rota registrar o `socket.on` (a rota é carregada sob demanda) e se perde. É semântica normal de tempo real e fica para a reconciliação (ver seção própria).
-- O painel de debug do spike saiu de `src/routes/index.tsx` na MYK-1075. Hoje nenhuma tela escuta o socket: `src/app/start.tsx` só chama `socket.connect()` (mantido) e nenhum evento atualiza o cache (M4). Por isso a checagem do R1 no deploy não tem mais o painel como evidência (ver `README.md`).
+- O painel de debug do spike saiu de `src/routes/index.tsx` na MYK-1075. Hoje nenhuma tela escuta o socket: `src/app/start.tsx` só abre a conexão, via `sessionLifecycle.resumeSession()` (que também arma o timer de expiração), e nenhum evento atualiza o cache (M4). Por isso a checagem do R1 no deploy não tem mais o painel como evidência (ver `README.md`).
 
 ## Mock (camada do M1)
 
@@ -114,7 +115,7 @@ O mock é a "API" do app: tudo passa pelos handlers do MSW, nada é respondido n
 
 `src/app/queryClient.ts`: `staleTime: 30_000` e `retry: 1` para queries. A intenção é evitar refetch a cada navegação e deixar o tempo real atualizar preço e estoque. São os valores padrão; o M2 acrescentou as exceções por recurso descritas em "Cache" (chaves, `keepPreviousData`, sem retry no 404, favoritos otimistas). O router usa `defaultPreload: 'intent'` (`src/app/router.tsx`).
 
-TODO (M4): a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache. `withCredentials` no Axios entra com a sessão no M3.
+TODO (M4): a ligação dos eventos do socket ao cache. Hoje nenhum evento atualiza o cache. O Axios **não** usa `withCredentials`: a sessão é um Bearer lido do `localStorage`, não um cookie (ver o trade-off em "Sessão"). Ele só voltaria com o cookie `httpOnly` de uma API real.
 
 ## Tema
 
@@ -139,7 +140,7 @@ Pendente: AVIF/WebP (as artes ainda são SVG, ver "Substituição de assets"), L
 
 ## Seções do enunciado (§12) a preencher
 
-> Os títulos abaixo seguem o que o enunciado exige no ARCHITECTURE.md. **Contratos**, **Sessão** (mock e base do cliente), **Telas do M2**, **Cache**, **Desvios do Figma**, **Decisões de UX** e **Ajustes de acessibilidade** estão documentados até o M2; **Carrinho** documenta só o mock (M1); **Reconciliação** e o restante ainda são `TODO` e não estão implementados.
+> Os títulos abaixo seguem o que o enunciado exige no ARCHITECTURE.md. **Contratos**, **Sessão** (mock e base do cliente), **Telas do M2**, **Cache**, **Desvios do Figma**, **Decisões de UX** e **Ajustes de acessibilidade** estão documentados até o M3 (a **Sessão** e as telas de conta); **Carrinho** documenta só o mock (M1); **Reconciliação** e o restante ainda são `TODO` e não estão implementados.
 
 ### Contratos
 
@@ -227,13 +228,30 @@ Base do cliente (M2, MYK-1073; só a leitura da sessão, sem telas de login):
 
 - **Onde fica o token.** `localStorage`, chave `kurio:session`, valor `{ "token": string, "expiresAt": <ISO 8601> }` (`src/auth/sessionStorage.ts`: `readSession`, `writeSession`, `clearSession`, `getToken`, `clearStoredSession`). `readSession` devolve `null` para chave ausente, JSON ilegível, forma inválida ou `expiresAt` vencido, e nunca lança; storage bloqueado ou cheio só deixa a sessão sem persistir. O storage é injetável nos testes.
 - **Injeção no Axios.** O interceptor de request do `apiClient` lê `getToken()` a cada chamada e envia `Authorization: Bearer <token>` (leitura síncrona e barata do `localStorage`).
-- **401.** Numa request que **levou** token, o 401 chama `clearStoredSession()` e o callback registrado por `onUnauthorized(cb)` (`src/api/client.ts`). `src/app/start.tsx` registra o callback que invalida `['session']`. O callback existe para o `client.ts` não importar o `queryClient` (evita ciclo). 401 sem token (visitante) não limpa nada.
+- **401 (revisto no M3, MYK-1078).** O 401 só derruba a sessão se a request **levou o token que ainda é o atual**: o interceptor guarda o token de cada request num `WeakMap` e compara com `getToken()` na resposta. Nesse caso chama `clearStoredSession()` e o callback `onUnauthorized(token)` (`src/api/client.ts`); `src/app/start.tsx` o liga a `sessionLifecycle.notifyExpired(token)`. O callback existe para o `client.ts` não importar o `queryClient` (evita ciclo). Não derrubam a sessão: o 401 de visitante (sem token), o de uma request em voo com o token **antigo** depois de uma troca de conta, e o de `/auth/login` e `/auth/signup` (`AUTH_ENTRY_PATHS`), que **não levam Bearer** e cujo 401 significa só "E-mail ou senha inválidos.".
 - **`useSession()`** (`src/auth/useSession.ts`) devolve `{ account, isAuthenticated, isPending }`. A query `['session']` (`GET /auth/session`) fica `enabled` só com token válido e tem `retry: false`. `isAuthenticated` exige token válido **além** de dado em cache, porque o react-query mantém o dado antigo quando o refetch dá erro; sem isso o 401 não deslogaria. `isPending` é `true` só enquanto há token e a sessão está sendo confirmada (o header mostra um skeleton nesse intervalo).
 - **`?redirect=` (MYK-1061).** `login` e `signup` só aceitam `redirect` que seja caminho interno (`isInternalPath`, `src/lib/redirectSearch.ts`): precisa começar com `/`, não pode começar com `//` ou `/\`, não pode conter caracteres de controle (o parser de URL descarta TAB, LF e CR, então `/<TAB>/evil.example` viraria `https://evil.example/`) e, resolvido contra uma origem fictícia, tem de manter a origem. Qualquer outro valor vira `undefined`. `validateRedirectSearch` devolve sempre a chave `redirect`, pelo mesmo motivo do `validateSearch` do catálogo (o router mescla o search cru com o validado). O visitante que tenta favoritar e o link "Entrar" do header mandam `redirect=<href atual>`.
-- **Quem escreve a sessão.** Só o ciclo de vida (`sessionLifecycle.establishSession` / `endSession`), chamado pelo login/cadastro (`/login` e `/signup`, modal sobre o Início) e pelo "Sair" do menu da conta (MYK-1083). Nenhuma tela grava `kurio:session` à mão.
+- **Quem escreve a sessão.** Só o ciclo de vida (`sessionLifecycle.establishSession` / `endSession`), chamado pelo login/cadastro (`/login` e `/signup`, modal sobre o Início) e pelo "Sair" (menu da conta e `AccountLayout`). Nenhuma tela grava `kurio:session` nem invalida `['session']` à mão.
 - **A sessão do mock vive no db do mock.** Trocar de cenário (ou `reset()`) reinicia o db e **apaga as sessões**: o token guardado em `kurio:session` passa a dar 401 e o primeiro request o limpa. Entre cenários, faça o login de novo.
 
-> TODO (MYK-1050, subtask 5): documentar aqui o M3 completo (ciclo de vida da sessão, modal de login/cadastro, menu da conta, guarda das rotas `_authenticated`, perfil e carteiras).
+M3 (MYK-1050; MYK-1082 ciclo de vida, MYK-1083 telas de entrada e rotas protegidas):
+
+- **Ciclo de vida (`src/auth/sessionLifecycle.ts`).** Fábrica `createSessionLifecycle(deps)` (deps injetadas, para testar em node) e a instância `sessionLifecycle`.
+  - `establishSession(auth)`: cancela as queries privadas e, num bloco síncrono, faz o reset privado, grava `kurio:session`, põe a conta em `['session']`, chama `reconnectSocket(token)` e arma o timer de expiração. Só depois roda os hooks de `onSessionEstablished` (ponto de extensão; o merge do carrinho anônimo, `POST /cart/merge`, entra aí no M4). Falha de hook é logada e não desfaz o login. As telas chamam `await login(body); await establishSession(auth)` e só então navegam.
+  - `endSession('logout' | 'expired')`: no logout marca o token atual como encerrado (o 401 do próprio logout não vira "expirou"), chama `POST /auth/logout` ignorando a falha, limpa o storage, faz o reset privado e `reconnectSocket(null)`. O toast "Você saiu da conta." e a navegação são da tela (`useSignOut`).
+  - `resumeSession()`: chamado no boot por `start.tsx`; reconecta o socket com o token guardado e arma o timer.
+- **Isolamento entre usuários (`PRIVATE_QUERY_ROOTS`).** `['session', 'favorites', 'profile', 'wallets', 'cart', 'orders']` são as raízes de cache privadas; `isPrivateQueryKey` decide. Em todo login, logout, expiração ou troca de conta o reset cancela essas queries, esvazia o `MutationCache` e zera o cache privado. As chaves também carregam o `accountId` (`['profile', id]`, `['wallets', id]`, `['favorites', id]`), então mesmo um observer que ainda exista não mostra dado da conta anterior. Queries privadas **observadas** são **resetadas** (`query.reset()`) e ficam no cache, sem dados; só as **sem observer** são removidas. Motivo: `removeQueries` não notifica os observers montados, então o header ficaria preso à conta antiga (ou, no login do visitante, a uma query que saiu do cache e o "Entrar" não mudaria até recarregar). Há testes cobrindo os dois casos; não troque por `removeQueries` puro. Limite conhecido: o `MutationCache.clear()` não aborta uma mutation em voo, cujo `onError`/`onSettled` (rollback de favorito) ainda pode escrever na chave da conta **antiga**; nada vaza para a conta nova, mas a entrada fica até o gc.
+- **Expiração, reativa e proativa.** Reativa: o 401 com o token atual chama `notifyExpired(token)`. Proativa: `scheduleExpiry` arma um timer em `expiresAt` (não arma data passada ou inválida; delays acima de 2^31-1 ms rearmam em etapas; ao disparar confere o relógio de novo). `notifyExpired` deduplica **por token** (vários 401 juntos, ou 401 + timer, viram uma expiração) e ignora token que já não é o atual. O fluxo é `endSession('expired')`, um toast "Sua sessão expirou. Entre novamente." e `/login?redirect=<href atual>`, exceto se a pessoa já estiver em `/login` ou `/signup`. A navegação é injetada por `setExpiredNavigation` (em `start.tsx`), porque importar o router no lifecycle criaria o ciclo router -> rotas -> lifecycle. Os favoritos não mostram o toast genérico de falha no 401 (`shouldToastFavoriteFailure`), só o de sessão expirada.
+- **Várias abas (MYK-1069).** O mock continua "uma aba por vez" (ver "Limitações conhecidas"). Para a aba não ficar com a conta errada, `start.tsx` ouve o evento `storage`: se a chave `kurio:session` mudar (ou o storage for limpo, `key === null`), faz o reset privado e `location.reload()`. Isso não torna o mock multi-aba; só evita mostrar a conta antiga.
+- **Login e cadastro (`/login`, `/signup`).** Rotas que renderizam um `Dialog` sempre aberto (`AuthDialog`) sobre o Início. Quem já tem sessão sai da rota no `beforeLoad` para `redirect ?? '/'`. Todo `redirect` passa por `validateRedirectSearch`/`isInternalPath`. X, Esc e clique fora navegam com `replace` para o destino de fechamento (`dialogCloseTarget`): o `redirect`, ou `/` quando um visitante fecha um login aberto a partir de rota protegida (senão a guarda o mandaria de volta ao modal). Login e cadastro se linkam preservando o `redirect` (`visitorLoginRedirect` não encadeia `/login?redirect=/login?...`). O fundo do modal é o Início **sem o catálogo** (`AuthBackdrop`: hero, promos e Diário da Cunhagem), porque `CatalogSection` e afins usam `getRouteApi('/').useSearch()`, que não funciona fora da rota `/`. Abaixo de `md` o modal ocupa a tela inteira (`h-dvh`) e o fundo não aparece; a partir de `md` é um card de `max-w-md`.
+- **Validação e erros.** Validadores puros em `src/features/account/validation.ts` (sem react-hook-form/zod) e `toFormErrors(error, fields, { unauthorizedMessage?, conflictField? })`: 401 vira "E-mail ou senha inválidos." (nas telas logadas, a mensagem de sessão expirada), 409 vai para o campo (e-mail no cadastro, `conflictField` nas Carteiras), 422 usa `fieldErrors` dos campos conhecidos (sem nenhum conhecido, vira erro do formulário) e o resto vira "Não foi possível concluir agora. Tente novamente.". O **login não exige 8 caracteres**, só o cadastro e a troca de senha. `useAccountForm` é o hook genérico (o `useAuthForm` delega a ele): valida no cliente, sem request se houver erro, foca o primeiro campo inválido, limpa o erro do campo ao editar e mantém o botão ocupado até a navegação.
+- **Rotas protegidas (`_authenticated`).** `/profile`, `/wallets` e os placeholders `/checkout` e `/orders/$orderId` (M4) ficam sob `_authenticated`. O `beforeLoad` manda para `/login?redirect=<href>` quem não tem token e confirma a sessão com `ensureQueryData(sessionQuery())`; 401 também vira `/login?redirect=` (junto com o `notifyExpired`, que dá o toast). Falha transitória (rede, 5xx) cai no `errorComponent` "Não foi possível confirmar sua sessão." com "Tentar novamente", sem deslogar. Observação: no 401 o `beforeLoad` pode receber `CancelledError` (a query privada é cancelada pelo reset) em vez de `ApiError`; o destino é o mesmo.
+- **Menu da conta e logout.** `AccountMenu` (header): visitante e carregamento delegam ao `SessionLink`; logado abre um `DropdownMenu` com nome, e-mail, "Perfil", "Carteiras" e "Sair" ("Saindo…" desabilitado enquanto roda). Na tab bar mobile o item da conta continua um link para `/profile`; o "Sair" no mobile está no topo do `AccountLayout`. `useSignOut` = `endSession('logout')` + toast + `/`.
+- **O nome do header é `Account.name`.** Independente de `Profile.displayName`: o cadastro cria o `displayName` como o primeiro nome, e depois os dois não se sincronizam (contrato do mock). Mudar o nome de exibição no Perfil **não** muda o header.
+- **Perfil.** `profileKeys.detail(id) = ['profile', id]`. `PATCH /profile` com `displayName` e `avatarUrl`; `PUT /profile/password` devolve 204. O e-mail vem da `Account` e é só leitura. Avatar: PNG, JPEG, WebP ou GIF até **140 KB** no cliente (o base64 cabe nos 200.000 caracteres do mock), enviado como data URL, **sem redimensionar**; "Remover avatar" envia `avatarUrl: ''`. A troca de senha **não invalida** as sessões existentes (nem a atual nem as de outras abas), como no mock.
+- **Carteiras.** `walletKeys.list(id) = ['wallets', id]`. Toda mutation (cadastrar, definir principal, renomear, remover) chama `invalidateWallets`, que invalida **`['wallets', id]` e `['profile', id]`** (o perfil embute as carteiras) e só então libera o card (`aria-busy`) e o toast. Promover rebaixa a principal anterior e remover a principal faz a primeira restante assumir (regras do mock). A conexão e a recusa de carteira (`POST /wallets/:id/connect`) são do Pagamento (M4).
+- **Token no `localStorage`: trade-off.** O token fica em `localStorage` e é lido a cada request, então qualquer XSS o lê. Para o mock isso é aceitável e deixa a sessão sobreviver a refresh; numa API real o token iria num cookie `httpOnly` + `Secure` + `SameSite` (o Axios passaria a usar `withCredentials`) e a proteção contra CSRF passaria a ser necessária (MYK-1078).
+- **Contrato com o M4.** O rascunho do checkout ficará em `sessionStorage` (não em `localStorage`) e o retorno ao fluxo depois do login usa o `redirect` (ex.: `/login?redirect=/checkout`); o carrinho anônimo é mesclado no `onSessionEstablished`. Nada disso existe ainda.
 
 ### Carrinho
 
@@ -285,8 +303,12 @@ Política por recurso do M2 (as fábricas ficam em `src/api/nfts.ts`, `src/api/f
 | `['nfts', 'facets']` | `nftFacetsQuery()` | Padrão. As contagens não dependem dos filtros, então a chave não tem parâmetros. |
 | `['favorites', accountId]` (`favoriteKeys.list`) | `favoritesQuery(accountId)` | Isolada por conta: trocar de usuário nunca reaproveita o cache do anterior. Só roda logado. |
 | `['session']` | `sessionQuery()` | `retry: false`, `enabled` só com token (ver "Sessão"). |
+| `['profile', accountId]` (`profileKeys.detail`) | `profileQuery(accountId)` (`src/api/profile.ts`) | Padrão. Isolada por conta. `PATCH /profile` atualiza com `setQueryData`; as mutations de carteira a invalidam. |
+| `['wallets', accountId]` (`walletKeys.list`) | `walletsQuery(accountId)` (`src/api/wallets.ts`) | Padrão. Isolada por conta. Toda mutation de carteira invalida esta chave **e** `['profile', accountId]` (`invalidateWallets`), sem update otimista: o card fica `aria-busy` até a lista nova chegar. |
 
 `nftKeys.all` (`['nfts']`) invalida tudo do catálogo de uma vez.
+
+**Reset privado (M3).** As chaves de raiz `session`, `favorites`, `profile`, `wallets`, `cart` e `orders` (`PRIVATE_QUERY_ROOTS`) são zeradas a cada login, logout, expiração e troca de conta; o catálogo (`nfts`) é público e fica. Regras e o motivo do `reset()` antes do `remove` estão em "Sessão".
 
 **Resposta obsoleta.** A chave da query é a identidade do dado: uma resposta só entra no cache da chave que a pediu, então a lista de uma seleção antiga nunca aparece no lugar da atual. Complementa isso o `signal` repassado ao Axios: ao trocar de chave com a request antiga em voo, o react-query aborta a antiga. Para isso funcionar o cancelamento precisa chegar intacto ao react-query: o interceptor de resposta do `apiClient` repassa `CanceledError` como está (`isCancel`, MYK-1062) em vez de convertê-lo em `ApiError` `transient`, que viraria "erro" e dispararia retry. Verificado no cenário `jitter` (300 ms a 7 s): cinco trocas de aba a 120 ms terminam na aba clicada por último, com o grid igual à resposta daquela aba.
 
@@ -301,7 +323,7 @@ Política por recurso do M2 (as fábricas ficam em `src/api/nfts.ts`, `src/api/f
 3. `onSettled`: invalida `['favorites', accountId]` para reconciliar com o servidor, mas só quando `isMutating({ mutationKey }) <= 1`, isto é, no último clique a terminar.
 4. `scope: favorite:<conta>:<nft>`: os cliques seguidos no mesmo NFT saem em série, então o servidor termina no estado do último clique. O `onMutate` roda na hora mesmo com o scope.
 5. O estado exibido (`aria-pressed`) vem **sempre do cache** (`useToggleFavorite`), lido no momento do clique, não do render. O botão fica desabilitado enquanto a sessão ou a lista de favoritos carrega (sem a lista não há como saber o estado atual).
-6. Visitante: o clique leva a `/login?redirect=<href atual>`. Se o 401 chegar no meio, o cliente limpa a sessão e o botão volta a agir como visitante.
+6. Visitante: o clique leva a `/login?redirect=<href atual>`. Se o 401 chegar no meio, o cliente limpa a sessão (a expiração mostra o toast "Sua sessão expirou. Entre novamente." e **não** o toast genérico de falha, ver `shouldToastFavoriteFailure`) e o botão volta a agir como visitante.
 
 Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista aparece antes da request resolver, a rejeição restaura o snapshot e chama `onFailure` uma vez, o sucesso mantém o otimista e invalida, e cliques em sequência fazem requests em série com um único invalidate.
 
@@ -315,14 +337,14 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 
 ### Limitações conhecidas
 
-- **Mock: uma aba por vez.** Cada aba tem o próprio store em memória sobre o mesmo `localStorage` e grava o db inteiro a cada `mutate`; a última gravação vence, então uma aba pode apagar sessões e pedidos criados em outra. O socket do mock também é por aba (o bus não cruza abas). Verificações entre contas (ex.: `order.updated` só para o dono) devem ser feitas na mesma aba, trocando o token. Sincronizar via evento `storage` é decisão de produto e fica como follow-up.
+- **Mock: uma aba por vez.** Cada aba tem o próprio store em memória sobre o mesmo `localStorage` e grava o db inteiro a cada `mutate`; a última gravação vence, então uma aba pode apagar sessões e pedidos criados em outra. O socket do mock também é por aba (o bus não cruza abas). Verificações entre contas (ex.: `order.updated` só para o dono) devem ser feitas na mesma aba, trocando o token. Desde o M3 o app ouve o evento `storage` de `kurio:session` e **recarrega** a aba ao detectar entrada, saída ou troca de conta em outra (ver "Sessão"); isso evita mostrar a conta errada, mas não faz o mock multi-aba.
 - **Mock: quota do `localStorage`.** Se a gravação falhar (cheio ou bloqueado), o mock emite um `console.warn` (uma vez por store) e o estado passa a viver só em memória.
 
 > TODO (M6): consolidar. Por enquanto valem as limitações do transporte de tempo real acima e o deploy na Vercel pendente.
 
 ### Desvios do Figma
 
-> **Pendente de conferência visual.** O MCP do Figma (arquivo `nF8eQ49mVgxZGc8S1i36Q4`) recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter em **todas** as tasks do M2 (MYK-1059, 1074, 1075, 1076). Nenhuma tela foi comparada com o Figma por imagem: o layout seguiu as descrições e os node IDs das issues. Tudo marcado abaixo como **pendente** precisa de `get_screenshot` em 390, 768 e 1440 quando houver cota.
+> **Pendente de conferência visual.** O MCP do Figma (arquivo `nF8eQ49mVgxZGc8S1i36Q4`) recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter em **todas** as tasks do M2 (MYK-1059, 1074, 1075, 1076) e do M3 (MYK-1050). Nenhuma tela foi comparada com o Figma por imagem: o layout seguiu as descrições e os node IDs das issues. Tudo marcado abaixo como **pendente** precisa de `get_screenshot` em 390, 768 e 1440 quando houver cota.
 
 **Desvios deliberados (por limite do contrato ou por decisão):**
 
@@ -339,6 +361,22 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 - **Campo da newsletter do footer** é um `OutOfScopeAction` estilizado como input (não é `<input>`), para nada aparentar funcionar.
 - **Galeria com 1 imagem** por NFT até haver artes reais (sem miniaturas).
 - **Ações sem fluxo** ("Adicionar ao carrinho", Compartilhar, Criadores, Aprenda, links do footer, "Ler mais") usam `OutOfScopeAction` ("Em breve"); ver "Decisões de UX".
+
+**M3 (Conta e sessão), desvios deliberados por falta de contrato:**
+
+- **ENS e tipo de carteira omitidos.** `Wallet` (`id`, `address`, `network`, `role`, `label`) e o mock não têm esses campos; o `WalletCard` aceita `ens`, mas a tela de Carteiras não o preenche. Os campos do Figma `70390:244/247/251/253/260` ficaram fora.
+- **Perfil só com nome de exibição, e-mail (somente leitura) e avatar.** Qualquer outro campo desenhado no Figma (bio, links, redes, banner etc.) está omitido porque `Profile`/`UpdateProfileRequest` não o têm. A lista exata sai do frame `9:1238` quando houver cota.
+- **Nomes das ações de carteira** seguem a spec ("Definir como principal", "Renomear", "Remover"), não os do kit/dev ("Tornar principal", "Desconectar"). "Ver no Etherscan" é `OutOfScopeAction` ("Em breve").
+- **Texto do estado vazio das Carteiras:** sem nenhuma carteira, "Você ainda não adicionou uma carteira."; só com a principal, o texto registrado do Figma `9:1865` ("Você ainda não adicionou uma carteira secundária.").
+- **Sem rádio de seleção na tela Carteiras.** Num `RadioGroup` as setas promoveriam a principal sem querer; aqui promover é uma ação explícita do menu (o rádio fica para o Pagamento, M4). Para isso o `WalletCard` ganhou `selectable` e `busy` (opcionais; o padrão do Pagamento não muda).
+
+**M3, escolhas minhas, pendentes de conferência contra o Figma (não conferidas por falta de cota):**
+
+- **Telas e frames não conferidos:** login `9:115`, cadastro `9:1022`, `16:1022` e `16:1228`, Perfil `9:1238` (sidebar `70420:4594`) e Carteiras `9:1670` (campos `70390:*`). O layout seguiu as descrições das issues.
+- **Perfil e Carteiras abaixo de `lg` (390 e 768) foram inferidos**, pois o Figma só desenha o desktop: abas segmentadas "Perfil" / "Carteiras" (`aria-current`) mais um "Sair" visível no topo, no lugar da `AccountSidebar`; os itens fora de escopo da sidebar não aparecem. O formulário de carteira fica abaixo da lista e só vira cartão lateral em `xl` (1440), porque ao lado, em 768 e 1024, o endereço de 42 caracteres não cabe.
+- **Login social ("Continuar com Google/Apple") e "Esqueceu a senha?"** são `OutOfScopeAction` ("Em breve"). Os **provedores sociais, os textos de descrição do modal e o layout do "Esqueceu a senha?" foram chutados**; no cadastro os rótulos são visíveis (no login, o Figma não tem rótulo).
+- **Textos de apoio:** "Acesse sua conta para favoritar e comprar NFTs." e "Ambiente de demonstração: não use uma senha real." (este, pedido no MYK-1070) são escolhas minhas.
+- **Fundo do modal:** Início sem o catálogo, ver "Sessão". É uma aproximação do "Início desfocado" do Figma.
 
 **Escolhas minhas, pendentes de conferência contra o Figma:**
 
@@ -382,6 +420,20 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 
 **Cupom no Pagamento: o link expande o próprio `CouponInput` (MYK-1059, revisável).** No Figma do Pagamento desktop o cupom é só o link "Tem um código promocional? Aplique aqui" (`I70522:3321;70504:3154`), sem o que acontece ao clicar. O `CouponInput` com `collapsible` começa como esse link e, ao clicar, mostra o campo no lugar (foco no input), sem componente novo; fora do estado vazio ele já abre expandido. Se o cupom já foi aplicado no Carrinho, o Pagamento mostra só a linha de desconto no `PriceSummary`. No Carrinho (desktop e mobile) o campo aparece direto (input + botão).
 
+**Conta e sessão (M3).**
+
+- **Login e cadastro são modais com rota** (`/login`, `/signup`), não páginas: o link é compartilhável, o Voltar do navegador funciona e a guarda de `_authenticated` só precisa redirecionar. Fundo = Início sem o catálogo; tela cheia abaixo de `md`. Fechar volta ao `redirect`, ou a `/` se o login foi aberto a partir de uma rota protegida (ver "Sessão").
+- **`redirect` preservado entre login e cadastro**, sem encadear; sempre validado como caminho interno.
+- **Aviso de senha (MYK-1070).** O cadastro e a troca de senha mostram "Ambiente de demonstração: não use uma senha real.": a senha vai a um mock e o token fica em `localStorage`.
+- **E-mail não editável.** Não há rota para trocar o e-mail; o campo é `readOnly` com "O e-mail não pode ser alterado.".
+- **"Salvar" só habilita com mudança**, e o avatar é salvo na hora ao escolher o arquivo ("Perfil atualizado."), sem botão. Validação no cliente: PNG, JPEG, WebP ou GIF até 140 KB, sem request se inválido, **sem redimensionamento** (um redimensionador no cliente fica como melhoria).
+- **Nome do header ≠ nome de exibição.** O header e o menu mostram `Account.name`; o campo editável do Perfil é `Profile.displayName` (ver "Sessão"). Pode surpreender, mas é o contrato do mock.
+- **Senha:** trocar a senha não derruba nenhuma sessão, inclusive as de outras abas.
+- **Renomear carteira em `Dialog`**, não inline: o card já tem apelido, selo, endereço e menu a 390 px; o diálogo reaproveita foco preso e Esc.
+- **Confirmação ao remover carteira.** `Dialog` sem X, foco inicial em "Cancelar", aviso "Outra carteira passa a ser a principal." quando for a principal; não fecha durante a remoção. Apelido vazio no cadastro vira "Carteira N" (regra do mock).
+- **Menu da conta e logout no mobile.** Header: `DropdownMenu` (Perfil, Carteiras, Sair). Tab bar: continua um link para `/profile`; o "Sair" fica no topo do `AccountLayout` abaixo de `lg`, para não esconder o logout num menu extra.
+- **Erros da API no campo.** `ApiError.fieldErrors` e o 409 (e-mail no cadastro, endereço nas Carteiras) aparecem no próprio campo; o 401 numa tela logada não vira "E-mail ou senha inválidos.", e sim a mensagem de sessão expirada.
+
 ### Substituição de assets
 
 Registro dos assets do Figma substituídos (imagens, ícones, fontes) e o motivo. Fonte: só a Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
@@ -404,3 +456,13 @@ Ajustes feitos no M2, verificados em browser (Tab, Esc, foco) e **não** auditad
 - **Hierarquia de títulos.** `h1` do hero (Início) ou do NFT (Detalhe), `h2` das seções (o "Catálogo" é `sr-only`), `h3` nos cards (o `NftCard` tem `<h3>` fixo).
 - **Movimento.** Skeletons usam `motion-reduce:animate-none`.
 - **Pendências:** foco visível e contraste contra o Figma não foram conferidos (sem cota).
+
+M3 (verificado em browser com Playwright, não com leitor de tela):
+
+- **Formulários.** O login usa `hideLabel` com placeholder (o Figma não tem rótulo), mas o `<label>` continua no DOM; o cadastro tem rótulos visíveis. Erros ligados ao campo por `aria-describedby` e `aria-invalid` (inclusive o `input type=file` do avatar), ícone + texto, e `FormAlert` com `role="alert"` para erro do formulário inteiro. Ao falhar a validação ou a API, o foco vai para o **primeiro campo com erro** (na Rede das Carteiras, para o `SelectTrigger`).
+- **"Mostrar senha"** é um toggle com `aria-pressed` e nome fixo, mais `aria-controls`.
+- **Foco preso nos modais.** O Radix prende o foco e põe `aria-hidden` no resto (20 Tabs seguidos não saem do login; 11 no diálogo de remoção); Esc fecha. Botão de fechar do `Dialog` em pt-BR ("Fechar"). O título do modal é o `h1` da página; o único `<main>` continua o do root.
+- **Contraste da borda dos inputs.** O token `--input` (`--kurio-border`) tem pouco contraste sobre o `popover`; nos formulários de auth os inputs têm **fundo sólido** (`bg-background`) para o campo se destacar. O token não mudou e o resto do app tem o mesmo risco (WCAG 1.4.11, não medido).
+- **Anúncios e foco nas Carteiras.** Região `aria-live` + toast para o resultado de cada ação; `aria-busy` no card durante a ação; depois de renomear o foco volta ao gatilho "Ações da carteira X", e depois de remover vai para o contêiner da lista (`tabIndex=-1`). Menus de ação funcionam por teclado.
+- **Perfil.** Avatar com `alt` "Avatar de <nome>" (fallback com `role="img"` e iniciais `aria-hidden`), "Alterar avatar" é um `<label>` de um `input` `sr-only` com foco visível (`peer-focus-visible`), e o foco volta ao input depois de "Remover avatar". A navegação por abas abaixo de `lg` usa `nav aria-label="Conta"` e `aria-current="page"`. Um `<h1>` por página.
+- **Limitações conhecidas de acessibilidade:** o `aria-live` das Carteiras não repete a mesma mensagem duas vezes seguidas (o toast cobre); o contêiner focado após remover não tem nome acessível; promoções concorrentes em cards diferentes deixam o `aria-busy` impreciso; os componentes de formulário não têm teste automatizado (ambiente node, sem jsdom).

@@ -2,7 +2,7 @@
 
 Front-end do marketplace Kurio (desafio Jungle Gaming). Stack: React 19, Vite, TypeScript, TanStack Router/Query, Tailwind v4 + shadcn/ui, Axios, Socket.IO, MSW.
 
-> Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. Login, cadastro, perfil, carteiras, carrinho, checkout e o cache ligado ao tempo real (M3 em diante) ainda **não** existem; por enquanto a sessão se obtém pelo console ([receita](#entrar-pelo-console-até-as-telas-de-login)). As telas do M2 **não foram conferidas contra o Figma** (sem cota no MCP); ver "Desvios do Figma" no `ARCHITECTURE.md`. Tudo o que falta está marcado com `TODO`.
+> Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT) + M3 (Conta e sessão)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. O M3 trouxe **login e cadastro** (modais em `/login` e `/signup`), o menu da conta com **sair**, rotas protegidas que voltam ao lugar de origem, o **Perfil** (nome, avatar e troca de senha), as **Carteiras** (cadastrar, definir principal, renomear e remover) e o ciclo de vida da sessão (expiração, troca de conta, várias abas). Carrinho, checkout e o cache ligado ao tempo real (M4 em diante) ainda **não** existem; para entrar, use o [login pela interface](#entrar-e-sair). As telas do M2 e do M3 **não foram conferidas contra o Figma** (sem cota no MCP); ver "Desvios do Figma" no `ARCHITECTURE.md`. Tudo o que falta está marcado com `TODO`.
 
 > TODO: a URL pública da Vercel ainda não existe. O projeto já faz deploy a cada push (ver [Deploy](#deploy-vercel)), mas os domínios da Vercel pedem login. Esta seção deve receber o link quando houver um domínio público.
 
@@ -44,7 +44,7 @@ Definidas em `.env.example` e tipadas em `src/vite-env.d.ts`.
 | `pnpm preview` | Serve o build de produção localmente. |
 | `pnpm typecheck` | `tsc -b`. |
 | `pnpm lint` | `eslint .`. |
-| `pnpm test` | `vitest run` (ambiente node, sem jsdom: `EthAmount`/`big.js`, interceptor do Axios e sessão, camada de mocks, estado do catálogo na URL, faixa de preço, edição e cache de favoritos). |
+| `pnpm test` | `vitest run` (ambiente node, sem jsdom: `EthAmount`/`big.js`, interceptor do Axios e sessão, ciclo de vida da sessão, camada de mocks, estado do catálogo na URL, faixa de preço, edição, cache de favoritos e validação de contas, avatar e carteiras). |
 
 ## Fluxo de branches e CI
 
@@ -73,7 +73,7 @@ Configuração esperada do projeto na Vercel:
 
 ## Documentação
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md): estrutura, decisões do M0, a camada de mocks (contratos de cada endpoint, sessão, carrinho, socket), o M2 (catálogo na URL, Detalhe, cache e favoritos otimistas, base da sessão no cliente, desvios do Figma, decisões de UX e acessibilidade) e o esqueleto das seções que serão preenchidas.
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md): estrutura, decisões do M0, a camada de mocks (contratos de cada endpoint, sessão, carrinho, socket), o M2 (catálogo na URL, Detalhe, cache e favoritos otimistas, base da sessão no cliente), o M3 (ciclo de vida da sessão, login e cadastro em modal, rotas protegidas, Perfil e Carteiras, isolamento do cache por conta), os desvios do Figma, as decisões de UX e acessibilidade e o esqueleto das seções que serão preenchidas.
 
 ## Credenciais fictícias
 
@@ -86,9 +86,19 @@ Com os mocks ligados (`VITE_ENABLE_MOCKS=true`) existem dois usuários, ambos co
 
 Os dois começam com carrinho vazio e nenhum pedido. Cupons: `KURIO10` (válido, 10%), `EXPIRED5` (expirado); qualquer outro código é inválido. Os dados são fictícios e a senha é só de mock.
 
-### Entrar pelo console (até as telas de login)
+### Entrar e sair
 
-As telas de login e cadastro são da MYK-1050; até lá, a sessão se obtém colando isto no console do navegador, com o app aberto na raiz (`http://localhost:5173/`, ou a porta que você usou) e os mocks ligados:
+1. Com o app aberto (mocks ligados), clique em **Entrar** no header (ou abra `/login`) e use `ana@kurio.test` / `Kurio#2026` (ou `bruno@kurio.test`). O modal abre sobre o Início; ao entrar você volta para onde estava (`?redirect=`), e o header mostra o nome ("Ana Souza"). **Criar conta** abre o cadastro (`/signup`).
+2. Abrir uma rota protegida sem sessão (`/profile`, `/wallets`) leva a `/login?redirect=<rota>` e volta para ela depois de entrar. Fechar esse modal (X ou Esc) leva ao Início.
+3. **Sair:** menu da conta no header (nome > "Sair"). No celular e no tablet (abaixo de 1024 px), o botão **Sair** fica no topo de Perfil e Carteiras. O toast é "Você saiu da conta.".
+4. **Trocar de usuário (Ana → Bruno):** saia e entre com o outro e-mail, na **mesma aba**. O cache de favoritos, perfil e carteiras é zerado a cada troca; o Bruno vê as 2 carteiras dele e nenhuma da Ana.
+5. Perfil (`/profile`) e Carteiras (`/wallets`): ver o roteiro em [Falhas de conta e sessão (M3)](#falhas-de-conta-e-sessão-m3).
+
+**A sessão do mock vive no banco do mock:** trocar de cenário ou chamar `__kurioMock.reset()` reinicia o banco e **apaga as sessões**. Depois de trocar de cenário, entre de novo pela interface. O cenário também fica salvo: depois de abrir `?scenario=slow`, as próximas cargas sem a query continuam em `slow`; volte com `?scenario=default`.
+
+#### Atalho pelo console (opcional)
+
+Ainda funciona e é útil para scripts. Cole no console, com o app aberto na raiz e os mocks ligados:
 
 ```js
 const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'ana@kurio.test', password: 'Kurio#2026' }) }).then((r) => r.json())
@@ -96,9 +106,9 @@ localStorage.setItem('kurio:session', JSON.stringify({ token: r.token, expiresAt
 location.reload()
 ```
 
-Depois do reload o header mostra "Ana Souza" (no lugar de "Entrar") e os favoritos da Ana (`nft-002` e `nft-009`) aparecem marcados. O formato guardado é `{ "token": string, "expiresAt": <ISO 8601> }` na chave `kurio:session` (`src/auth/sessionStorage.ts`); sessão vencida, JSON ilegível ou fora desse formato conta como visitante. Para o Bruno, troque o e-mail por `bruno@kurio.test`. Para sair: `localStorage.removeItem('kurio:session'); location.reload()`.
+Depois do reload o app lê a sessão e reconecta o socket com o token (`resumeSession`). O formato guardado é `{ "token": string, "expiresAt": <ISO 8601> }` na chave `kurio:session`; sessão vencida, JSON ilegível ou fora desse formato conta como visitante. Para sair pelo console: `localStorage.removeItem('kurio:session'); location.reload()`. O `token=` da conexão do socket **não aparece** no log do MSW (ele remove a query da URL).
 
-**A sessão do mock vive no banco do mock:** trocar de cenário ou chamar `__kurioMock.reset()` reinicia o banco e **apaga as sessões**. Depois de trocar de cenário, rode a receita de novo (é o caso do `favorite-fail` abaixo). O cenário também fica salvo: depois de abrir `?scenario=slow`, as próximas cargas sem a query continuam em `slow`; volte com `?scenario=default`.
+> O token fica em `localStorage` (legível por XSS). É um trade-off do mock; numa API real seria um cookie `httpOnly`. Trocar a senha **não** encerra as outras sessões. Detalhes no `ARCHITECTURE.md`, seção "Sessão".
 
 ## Cenários de mock e reset
 
@@ -134,7 +144,7 @@ __kurioMock.reset()                   // volta o banco ao seed, mesmo cenário
 __kurioMock.reset('default')          // volta ao seed e troca para o default
 ```
 
-**Limitação atual: uma aba por vez.** Cada aba tem o próprio estado sobre o mesmo `localStorage` e a última gravação vence; abrir duas abas do app pode apagar sessões e pedidos de uma delas, e o socket do mock também é por aba. Teste entre contas na mesma aba, trocando o token.
+**Limitação atual: uma aba por vez.** Cada aba tem o próprio estado sobre o mesmo `localStorage` e a última gravação vence; abrir duas abas do app pode apagar sessões e pedidos de uma delas, e o socket do mock também é por aba. Teste entre contas na mesma aba, saindo e entrando de novo. O app ouve mudanças em `kurio:session` e **recarrega** a aba quando outra entra, sai ou troca de conta, para não mostrar a conta errada, mas isso não torna o mock multi-aba.
 
 Nome de cenário inválido lança `Error` e não altera nada. Para zerar tudo na mão: apague `kurio:mock-db:v1` e `kurio:mock-scenario` do `localStorage` e recarregue.
 
@@ -186,7 +196,7 @@ const order = (n = 'k1') => api('POST', '/orders', { token, key: n, body: { quot
 2. **Erro 5xx.** Abra `/?scenario=server-error`. `await api('GET', '/health')` devolve `{ status: 503, body: { code: 'transient', message: 'Serviço indisponível. Tente novamente.' } }`.
 3. **Lentidão e jitter.** Abra `/?scenario=slow` (4s por chamada) ou `/?scenario=jitter` (300ms a 7s). No console: `console.time('t'); await api('GET', '/health'); console.timeEnd('t')`. Nenhum passa de 10s, então não dá timeout no app.
 4. **Catálogo vazio.** Abra `/?scenario=empty`. `(await api('GET', '/nfts')).body` tem `items: []` e `total: 0`.
-5. **Sessão expirada.** Abra `/?scenario=session-expired`, cole o helper e rode `const token = await login(); await api('GET', '/auth/session', { token })` (200). Espere mais de 15s e repita a chamada: `{ status: 401, body: { code: 'unauthorized', ... } }`.
+5. **Sessão expirada (API).** Abra `/?scenario=session-expired`, cole o helper e rode `const token = await login(); await api('GET', '/auth/session', { token })` (200). Espere mais de 15s e repita a chamada: `{ status: 401, body: { code: 'unauthorized', ... } }`.
 6. **Cadastro com e-mail já usado.** Duas formas: sem cenário, `await api('POST', '/auth/signup', { body: { name: 'Ana', email: 'ana@kurio.test', password: 'Kurio#2026' } })` já devolve 409; com `/?scenario=signup-conflict`, o mesmo 409 sai para **qualquer** e-mail novo.
 7. **Cupom inválido ou expirado.** Sem cenário: `EXPIRED5` sai `expired` e `QUALQUER` sai `invalid`; `KURIO10` sai `applied` (10% de desconto). Com `/?scenario=coupon-invalid` ou `coupon-expired`, **qualquer** código (inclusive `KURIO10`) sai com aquele status. Receita: rode só a parte 1 de "Preparar uma compra", depois `await api('PUT', '/cart/coupon', { token, body: { code: 'KURIO10' } })` e `(await api('POST', '/quotes', { token })).body.coupon` mostra `{ code: 'KURIO10', status: 'invalid' }` com `discount: '0'`.
 8. **Preço mudou entre cotação e pedido.** Abra `/?scenario=price-changed` (comece pelo `reset()`), faça o "Preparar uma compra" e rode `await order('k1')`: `{ status: 409, body: { code: 'conflict', fieldErrors: { 'nft-005:open': 'Preço alterado de 0.15 para 0.16 ETH.' } } }`. Cote de novo, reatribuindo a variável (`quote = (await api('POST', '/quotes', { token })).body`), e peça com outra chave (`await order('k2')`): sai 201 (o helper `order` usa o `quote` atual), porque o preço só muda no primeiro toque do NFT.
@@ -200,7 +210,7 @@ const order = (n = 'k1') => api('POST', '/orders', { token, key: n, body: { quot
 
 ### Falhas do Início e do Detalhe (M2)
 
-Estas receitas são pela **interface** (não precisam do helper acima). Todas com mocks ligados. Cenário novo = banco do mock reiniciado, então as que precisam de login pedem a receita [Entrar pelo console](#entrar-pelo-console-até-as-telas-de-login) de novo.
+Estas receitas são pela **interface** (não precisam do helper acima). Todas com mocks ligados. Cenário novo = banco do mock reiniciado, então as que precisam de login pedem [entrar de novo](#entrar-e-sair) pela interface.
 
 16. **Catálogo vazio (`empty`).** Abra `/?scenario=empty`. O grid mostra "Nenhum NFT encontrado" com o botão "Limpar filtros", o status diz "0 NFTs encontrados", a sidebar mostra "Nenhuma coleção" e o slider de preço fica desabilitado.
 17. **Skeleton (`slow`).** Abra `/?scenario=slow` (4s por chamada). O grid mostra skeletons com a mesma caixa dos cards. Com o catálogo carregado, trocar de aba ("Em alta") ou de filtro deixa os cards atuais esmaecidos (`aria-busy`) até a resposta chegar. No Detalhe, `/nfts/nft-001?scenario=slow` mostra o skeleton "Carregando NFT…" depois de 1s; no cenário `default` o skeleton não aparece.
@@ -208,8 +218,24 @@ Estas receitas são pela **interface** (não precisam do helper acima). Todas co
 19. **Erro com retry (`offline` / `server-error`).** Abra `/?scenario=offline` ou `/?scenario=server-error`. Header, hero e filtros continuam na tela; o grid mostra "Não foi possível carregar os NFTs." com "Tentar novamente" (a sidebar e o hero têm o próprio erro). No Detalhe, `/nfts/nft-001?scenario=offline` mostra "Não foi possível carregar o NFT." com "Tentar novamente". O retry refaz a requisição, mas o cenário continua falhando; para ver a recuperação, abra `/?scenario=default` (o cenário só muda recarregando).
 20. **NFT inexistente.** Abra `/nfts/nao-existe` (com `?scenario=default` se um cenário anterior ficou salvo): "NFT não encontrado" com o link "Voltar ao Início", título da aba "NFT não encontrado · Kurio" e uma única requisição.
 21. **URL de catálogo inválida.** Abra `/?page=abc&tab=hot&priceMin=x&network=solana`: o Início ignora os valores inválidos e mostra os 12 primeiros NFTs. `/?page=9` mostra "Página não existe" com link para a última página. Em `/nfts/nft-017?edition=xyz` o valor é ignorado; `?edition=1/10` (esgotada nesse NFT) mostra o aviso "Edição indisponível. Mostrando a edição 1/50.".
-22. **Favorito com rollback (`favorite-fail`).** Abra `/nfts/nft-002?scenario=favorite-fail`, rode a receita de login (o cenário apagou a sessão; ela recarrega a página) e clique em "Favoritar Solar Veil" (a nft-002 já vem favoritada no seed da Ana, então `aria-pressed` passa de `true` para `false` na hora). A requisição falha com 503: o botão volta para `true` e aparece o toast "Não foi possível atualizar os favoritos.". Como visitante, o mesmo clique leva a `/login?redirect=%2Fnfts%2Fnft-002`. No Início em 390 px de largura, o coração fica no canto do card (no desktop o card não tem coração).
+22. **Favorito com rollback (`favorite-fail`).** Abra `/nfts/nft-002?scenario=favorite-fail`, entre como Ana pelo modal (o cenário apagou a sessão) e clique em "Favoritar Solar Veil" (a nft-002 já vem favoritada no seed da Ana, então `aria-pressed` passa de `true` para `false` na hora). A requisição falha com 503: o botão volta para `true` e aparece o toast "Não foi possível atualizar os favoritos.". Como visitante, o mesmo clique leva a `/login?redirect=%2Fnfts%2Fnft-002`. No Início em 390 px de largura, o coração fica no canto do card (no desktop o card não tem coração).
 23. **`?redirect=` externo.** Abra `/login?redirect=https://evil.example`: o valor é descartado (a URL fica `/login`). Só caminho interno (começando com `/`) é aceito.
+
+### Falhas de conta e sessão (M3)
+
+Pela **interface**, com mocks ligados. Lembre que trocar de cenário apaga as sessões: entre de novo depois.
+
+24. **Sessão expirada na tela (`session-expired`).** Abra `/?scenario=session-expired`, entre como Ana (o token vale 15s) e abra `/nfts/nft-001`. Em ~15s aparece **um** toast "Sua sessão expirou. Entre novamente.", a URL vira `/login?redirect=%2Fnfts%2Fnft-001` e o header volta a "Entrar", sem recarregar. Entrando de novo, você volta a `/nfts/nft-001`. Um 401 antes do timer (token que o mock não conhece) dá o mesmo fluxo.
+25. **Cadastro com e-mail já usado (`signup-conflict`).** Abra `/signup`. Sem cenário, use `ana@kurio.test`; com `/signup?scenario=signup-conflict`, qualquer e-mail novo. O erro "Já existe uma conta com este e-mail." aparece no campo e-mail, com o link "Entrar com este e-mail" (mantém o `redirect`). Envio vazio mostra 4 erros e não faz request.
+26. **Senha errada.** Em `/login`, `ana@kurio.test` com outra senha: "E-mail ou senha inválidos.", o modal continua aberto e **nenhuma sessão é apagada** (o 401 das rotas de entrada não derruba a sessão).
+27. **Senha atual incorreta.** Logada, em `/profile` > "Alterar senha", informe uma senha atual errada: "Senha atual incorreta." no campo (422). Confirmação diferente da nova dá erro antes do envio. Trocando com sucesso ("Senha alterada."), saia: a senha antiga falha e a nova entra. **Restaure** a senha da Ana para `Kurio#2026` (ou use `__kurioMock.reset()`).
+28. **Avatar grande ou formato errado.** Em `/profile` > "Alterar avatar", um `.svg` mostra "Envie uma imagem PNG, JPEG, WebP ou GIF." e um arquivo acima de 140 KB mostra "A imagem deve ter até 140 KB.", os dois **sem request**. Um PNG pequeno persiste no refresh; "Remover avatar" também.
+29. **Nome de exibição inválido.** Vazio ou com mais de 60 caracteres dá erro no campo, sem request. Mudar o nome **não** muda o nome do header, que vem da conta (`Account.name`).
+30. **Carteira duplicada.** Em `/wallets`, adicione o mesmo endereço e rede de uma carteira existente (a comparação ignora maiúsculas): "Esta carteira já está conectada." (409) no campo endereço.
+31. **Endereço inválido e apelido longo.** `0x123` mostra "Endereço inválido…" e "Selecione a rede." sem request; um apelido de 41 caracteres mostra "Use até 40 caracteres.". Um endereço `0x` + 40 hex em Polygon cria a carteira como Reserva.
+32. **Remover a principal.** No menu do card, "Remover" pede confirmação (foco em "Cancelar"); confirmando a principal, outra carteira assume. Remover todas mostra o estado vazio e sobrevive ao refresh. "Definir como principal" rebaixa a anterior.
+33. **Troca de usuário Ana → Bruno.** Entre como Ana, abra `/wallets` (1 carteira), saia, entre como Bruno: aparecem só as 2 do Bruno, sem flash dos cards da Ana, e `nft-001` não vem favoritado.
+34. **Troca de cenário apaga a sessão.** Abrir `/profile?scenario=offline` estando logado reinicia o banco do mock: o token guardado dá 401 e você cai em `/login?redirect=%2Fprofile%3Fscenario%3Doffline` com o toast de sessão expirada. Os estados de erro com "Tentar novamente" do Perfil e das Carteiras ("Não foi possível carregar seu perfil." / "suas carteiras.") só aparecem se o `GET` falhar com a sessão viva (por exemplo, interceptando a request nas ferramentas do navegador); o formulário de senha e o de carteira continuam disponíveis.
 
 ## Testes E2E (Playwright)
 
