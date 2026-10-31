@@ -1,5 +1,5 @@
 import { CircleAlert, LoaderCircle, TicketPercent, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { CouponStatus } from '@/contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +53,22 @@ export function CouponInput({
   const applying = status === 'applying'
   const error = errorMessage ?? DEFAULT_ERROR[status]
   const removable = onRemove !== undefined && (status === 'invalid' || status === 'expired')
+  // "Remover" desmonta o botão focado e o foco cairia no `body`: depois da remoção (status volta a `idle`) o foco
+  // vai para o campo. Só vale para quem clicou em "Remover"; os outros estados não mexem no foco.
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (refocus.current && status === 'idle') {
+      refocus.current = false
+      document.getElementById(id)?.focus()
+    }
+  }, [status, id])
+  const remove = () => {
+    if (!onRemove) return
+    refocus.current = true
+    // No modo `collapsible` o campo não pode voltar a ser o link, senão não há onde pôr o foco
+    setExpanded(true)
+    onRemove()
+  }
 
   if (status === 'applied') {
     return (
@@ -67,7 +83,7 @@ export function CouponInput({
           Cupom <strong className="font-bold">{appliedCode}</strong> aplicado
         </span>
         {onRemove && (
-          <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+          <Button type="button" variant="ghost" size="sm" onClick={remove}>
             <X aria-hidden />
             Remover<span className="sr-only"> cupom {appliedCode}</span>
           </Button>
@@ -92,7 +108,10 @@ export function CouponInput({
 
   const submit = () => {
     const trimmed = code.trim()
-    if (trimmed && !applying) onApply(trimmed)
+    if (trimmed && !applying) {
+      refocus.current = false
+      onApply(trimmed)
+    }
   }
 
   return (
@@ -143,7 +162,7 @@ export function CouponInput({
             </p>
           )}
           {removable && (
-            <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+            <Button type="button" variant="ghost" size="sm" onClick={remove}>
               <X aria-hidden />
               Remover<span className="sr-only"> cupom{appliedCode ? ` ${appliedCode}` : ''}</span>
             </Button>

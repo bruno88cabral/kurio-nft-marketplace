@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseEth } from '@/lib/eth'
 import { CouponInput } from './CouponInput'
@@ -15,6 +16,22 @@ describe('CouponInput: "Remover"', () => {
     expect(screen.getByRole('alert').textContent).toMatch(status === 'invalid' ? 'Cupom inválido.' : 'Cupom expirado.')
     fireEvent.click(screen.getByRole('button', { name: /Remover\s*cupom QUALQUER/ }))
     expect(onRemove).toHaveBeenCalledTimes(1)
+  })
+
+  it('depois de remover, o foco vai para o campo do cupom (applied e invalid), e fora disso o foco não é mexido', () => {
+    const Harness = ({ initial }: { initial: 'applied' | 'invalid' }) => {
+      const [status, setStatus] = useState<'applied' | 'invalid' | 'idle'>(initial)
+      return <CouponInput status={status} appliedCode="KURIO10" onApply={() => undefined} onRemove={() => setStatus('idle')} />
+    }
+    for (const initial of ['applied', 'invalid'] as const) {
+      const { unmount } = render(<Harness initial={initial} />)
+      fireEvent.click(screen.getByRole('button', { name: /Remover\s*cupom KURIO10/ }))
+      expect(document.activeElement).toBe(screen.getByLabelText('Cupom de desconto'))
+      unmount()
+    }
+    // Sem remoção (campo idle montado), o foco continua onde estava
+    render(<CouponInput status="idle" onApply={() => undefined} onRemove={() => undefined} />)
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('no estado applied continua com "Remover"', () => {
