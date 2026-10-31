@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cartKeys } from '@/api/cart'
 import type { AuthResponse, Cart, CartItem } from '@/contracts'
 import { mergeCart as mergeInMock } from '@/mocks/db/cart'
@@ -39,6 +39,10 @@ function setup(stored: CartItem[], overrides: Partial<MergeOnLoginDeps> = {}) {
   return { deps, queryClient, merge, store, guest: () => guest }
 }
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('mergeAnonymousCartOnLogin', () => {
   it('com itens guardados: chama o merge, popula [cart, id] e limpa o storage', async () => {
     const t = setup([{ nftId: 'nft-002', edition: '1/10', quantity: 2 }])
@@ -56,10 +60,13 @@ describe('mergeAnonymousCartOnLogin', () => {
     expect(t.queryClient.getQueryData(cartKeys.detail(ANA))).toBeUndefined()
   })
 
-  it('falha: o storage fica, avisa por toast e não relança', async () => {
+  it('falha: o storage fica, loga o erro, avisa por toast e não relança', async () => {
     const items: CartItem[] = [{ nftId: 'nft-002', edition: '1/10', quantity: 2 }]
-    const t = setup(items, { merge: vi.fn().mockRejectedValue(new Error('503')) })
+    const error = new Error('503')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const t = setup(items, { merge: vi.fn().mockRejectedValue(error) })
     await expect(mergeAnonymousCartOnLogin(auth, t.deps)).resolves.toBeUndefined()
+    expect(log).toHaveBeenCalledWith('[cart] merge do carrinho de visitante falhou', error)
     expect(t.guest()).toEqual(items)
     expect(t.deps.notifyError).toHaveBeenCalledWith(MERGE_FAILED_MESSAGE)
     expect(MERGE_FAILED_MESSAGE).toBe('Não foi possível juntar o carrinho de visitante.')
@@ -74,6 +81,7 @@ describe('mergeAnonymousCartOnLogin', () => {
   })
 
   it('sessão trocada e falha: sem toast para a conta errada', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const t = setup([{ nftId: 'nft-002', edition: '1/10', quantity: 1 }], {
       merge: vi.fn().mockRejectedValue(new Error('x')),
       sameSession: () => false,

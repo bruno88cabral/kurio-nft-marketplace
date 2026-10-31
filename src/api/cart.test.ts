@@ -38,6 +38,14 @@ describe('cartFingerprint', () => {
     expect(cartFingerprint(cart([l('n1', '1/10', 2), l('n2', 'open', 1)]))).not.toBe(base)
     expect(cartFingerprint(cart([l('n1', '1/10', 2)], 'KURIO10'))).not.toBe(base)
   })
+
+  it('sem ambiguidade: um id com caracteres de separador não colide com outro carrinho', () => {
+    // Com texto e separadores (`id:edição x qtd`, `|`, `#`) estes pares davam a mesma chave
+    // (`a:openx1|b:1/10x2` para os dois carrinhos abaixo)
+    expect(cartFingerprint(cart([l('a:openx1|b', '1/10', 2)]))).not.toBe(
+      cartFingerprint(cart([l('a', 'open', 1), l('b', '1/10', 2)])),
+    )
+  })
 })
 
 describe('quoteQuery', () => {

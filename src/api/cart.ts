@@ -55,11 +55,14 @@ export const applyCoupon = (body: ApplyCouponRequest) => apiClient.put<Cart>('/c
 export const removeCoupon = () => apiClient.delete<Cart>('/cart/coupon').then((r) => r.data)
 
 /**
- * Identidade do carrinho para a chave da cotação: linhas ordenadas por `nftId:edition`, com a quantidade,
- * e o cupom. Mesma composição em outra ordem dá a mesma chave; mudar quantidade, linha ou cupom, outra.
- * Os separadores (`|`, `x`, `#`) não aparecem em ids nem em edições (`1/10`, `open`).
+ * Identidade do carrinho para a chave da cotação: as linhas `[nftId, edition, quantity]` ordenadas por
+ * `nftId` e edição, e o cupom. Mesma composição em outra ordem dá a mesma chave; mudar quantidade, linha ou
+ * cupom, outra. É JSON, não texto com separadores: nenhum caractere de um id ou de um cupom pode ser
+ * confundido com a fronteira entre campos, então dois carrinhos diferentes nunca dão a mesma chave.
  */
 export function cartFingerprint(cart: Cart): string {
-  const lines = cart.items.map((i) => `${i.nftId}:${i.edition}x${i.quantity}`).sort()
-  return `${lines.join('|')}#${cart.couponCode ?? ''}`
+  const lines = cart.items
+    .map((i) => [i.nftId, i.edition, i.quantity] as const)
+    .sort(([a, ea], [b, eb]) => (a === b ? (ea < eb ? -1 : ea > eb ? 1 : 0) : a < b ? -1 : 1))
+  return JSON.stringify([lines, cart.couponCode ?? ''])
 }
