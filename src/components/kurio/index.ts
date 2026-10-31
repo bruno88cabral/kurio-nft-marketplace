@@ -1,0 +1,15 @@
+// Kit de componentes Kurio (MYK-1059): puramente visuais, dados só por props (sem fetch/useQuery).
+// Conferência em todos os estados: rota /dev/kit (só em dev).
+export * from './AccountSidebar'
+export * from './CouponInput'
+export * from './EditionChips'
+export * from './FavoriteButton'
+export * from './FormField'
+export * from './NftCard'
+export * from './OutOfScopeAction'
+export * from './PriceSummary'
+export * from './PriceTag'
+export * from './QuantityStepper'
+export * from './StateMessage'
+export * from './WalletCard'
+export * from './WalletOption'

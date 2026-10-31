@@ -10,8 +10,12 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  getThumbProps,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & {
+  /** Props por polo (ex.: `aria-label` em pt-BR; o padrão do Radix é "Minimum"/"Maximum"). */
+  getThumbProps?: (index: number) => React.ComponentProps<typeof SliderPrimitive.Thumb>
+}) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -48,6 +52,7 @@ function Slider({
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
+          {...getThumbProps?.(index)}
           className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
         />
       ))}

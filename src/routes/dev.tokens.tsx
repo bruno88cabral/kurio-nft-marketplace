@@ -55,7 +55,7 @@ const typeScale = [
 
 function TokensPage() {
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-10 p-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-10 p-6">
       <h1 className="text-heading">Design tokens</h1>
 
       <section className="flex flex-col gap-4" aria-labelledby="cores">
@@ -157,6 +157,6 @@ function TokensPage() {
           </CardContent>
         </Card>
       </section>
-    </main>
+    </div>
   )
 }

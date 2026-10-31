@@ -49,6 +49,14 @@ const ROWS: Row[] = [
   ['Comet Mailer', 'Paper Comets', 'arbitrum', '0.03', [['open', 880]], false, 16],
 ]
 
+/** Preço "de" (promoção) por nome; sempre maior que o preço atual da linha. */
+const PREVIOUS_PRICE: Record<string, string> = {
+  'Solar Veil': '0.5',
+  'Kelp Sprite': '0.55',
+  'Meridian Glow': '1.2',
+  'Slate Vine': '0.7',
+}
+
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
@@ -57,20 +65,25 @@ function createdAt(daysAgo: number): IsoDateTime {
   return new Date(REFERENCE_MS - daysAgo * DAY_MS).toISOString()
 }
 
-export const NFTS: readonly Nft[] = ROWS.map(
-  ([name, collection, network, price, editions, featured, daysAgo], index): Nft => ({
+export const NFTS: readonly Nft[] = ROWS.map(([name, collection, network, price, editions, featured, daysAgo], index): Nft => {
+  // Uma arte por NFT (o manifest de `src/lib/nftArt.ts` só tem a capa); a galeria cresce quando houver variações
+  const imageUrl = `/nfts/${slug(name)}.svg`
+  const previousPrice = PREVIOUS_PRICE[name]
+  return {
     id: nftId(index + 1),
     name,
-    imageUrl: `/nfts/${slug(name)}.svg`,
+    imageUrl,
+    images: [imageUrl],
     collection,
     description: `${name}, da coleção ${collection}. Arte digital fictícia para o marketplace Kurio.`,
     creator: COLLECTION_CREATORS[collection],
     network,
     price: parseEth(price),
+    ...(previousPrice !== undefined && { previousPrice: parseEth(previousPrice) }),
     editions: editions.map(
       ([kind, available]): NftEdition => ({ kind, available, total: EDITION_TOTAL[kind] }),
     ),
     createdAt: createdAt(daysAgo),
     featured,
-  }),
-)
+  }
+})
