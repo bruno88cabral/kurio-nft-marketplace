@@ -62,7 +62,7 @@ O mock (`src/mocks/socket.ts`) assina o bus do estado (ver "Mock") e entrega `nf
 ### Resultado do spike R1 (MYK-1057)
 
 - **Validado em `pnpm build && pnpm preview` local** (Chrome headless via CDP): `GET /api/health` mockado, `socket: connected`, `nft.updated` a cada 5s (emissor removido no M1), uma única conexão estável por 62s (12 eventos, sem reconexão).
-- **Vercel: PENDENTE.** Não houve deploy. Por isso o R1 está **parcialmente mitigado**, não mitigado. Os passos do deploy estão no `README.md`.
+- **Vercel: PENDENTE.** O projeto já faz deploy a cada push pela integração Git, mas os domínios estão atrás da Deployment Protection e nada foi conferido no ambiente publicado. Por isso o R1 está **parcialmente mitigado**, não mitigado. O deploy e a conferência estão no `README.md`.
 
 ### Correções necessárias no spike
 
