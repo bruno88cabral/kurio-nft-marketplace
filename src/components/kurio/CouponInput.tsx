@@ -10,10 +10,13 @@ export type CouponInputStatus = 'idle' | 'applying' | CouponStatus
 
 export interface CouponInputProps {
   status: CouponInputStatus
-  /** Código já aplicado (normalizado pelo mock), exibido no estado `applied`. */
+  /** Código gravado (normalizado pelo mock), exibido no estado `applied` e no nome do "Remover". */
   appliedCode?: string
   onApply: (code: string) => void
-  /** Remove o cupom aplicado (botão "Remover" no estado `applied`). */
+  /**
+   * Remove o cupom gravado: botão "Remover" no estado `applied` e também em `invalid` e `expired` (o código
+   * ruim continua gravado e entra nas próximas cotações até sair).
+   */
   onRemove?: () => void
   /** Sobrescreve a mensagem padrão de `invalid` ("Cupom inválido.") / `expired` ("Cupom expirado."). */
   errorMessage?: string
@@ -49,6 +52,7 @@ export function CouponInput({
   const [expanded, setExpanded] = useState(false)
   const applying = status === 'applying'
   const error = errorMessage ?? DEFAULT_ERROR[status]
+  const removable = onRemove !== undefined && (status === 'invalid' || status === 'expired')
 
   if (status === 'applied') {
     return (
@@ -130,11 +134,21 @@ export function CouponInput({
           {applying ? 'Aplicando…' : 'Aplicar'}
         </Button>
       </div>
-      {error && (
-        <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
-          <CircleAlert aria-hidden className="size-3.5" />
-          {error}
-        </p>
+      {(error || removable) && (
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {error && (
+            <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
+              <CircleAlert aria-hidden className="size-3.5" />
+              {error}
+            </p>
+          )}
+          {removable && (
+            <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+              <X aria-hidden />
+              Remover<span className="sr-only"> cupom{appliedCode ? ` ${appliedCode}` : ''}</span>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

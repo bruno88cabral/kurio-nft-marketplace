@@ -28,7 +28,7 @@ export function OrderReceipt({ order }: { order: Order }) {
           </li>
         ))}
       </ul>
-      <PriceSummary quote={receipt} />
+      <PriceSummary quote={receipt} mode="receipt" />
       {order.txHash && (
         <dl className="text-caption grid gap-1 sm:grid-cols-[auto_1fr] sm:gap-x-4">
           <dt className="text-muted-foreground">Rede</dt>
