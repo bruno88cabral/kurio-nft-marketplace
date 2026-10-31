@@ -24,6 +24,13 @@ describe('createScenarioEngine', () => {
     expect(timeout.latencyFor('GET', '/orders/:id', '/orders/1')).toBe(150)
   })
 
+  it('baseLatency ignora routeLatency; hasRouteLatency diz se a rota tem a sua', () => {
+    const timeout = createScenarioEngine(SCENARIOS['order-timeout'])
+    expect(timeout.hasRouteLatency('POST', '/orders', '/orders')).toBe(true)
+    expect(timeout.hasRouteLatency('GET', '/orders/:id', '/orders/1')).toBe(false)
+    expect(timeout.baseLatency()).toBe(150)
+  })
+
   it('jitter: mesma sequência em duas instâncias e sempre dentro de [min, max]', () => {
     const run = () => {
       const engine = createScenarioEngine(SCENARIOS.jitter)

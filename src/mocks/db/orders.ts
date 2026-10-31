@@ -79,6 +79,15 @@ function revalidate(db: MockDb, quote: StoredQuote, now: Date): void {
   if (Date.parse(quote.expiresAt) <= now.getTime()) {
     throw conflict('A cotação expirou. Gere uma nova cotação.')
   }
+  // Estoque não é reservado no `pending`: desconta o que já está prometido a pedidos em andamento
+  const reserved = new Map<string, number>()
+  for (const order of Object.values(db.orders)) {
+    if (order.status !== 'pending') continue
+    for (const item of order.items) {
+      const key = `${item.nftId}:${item.edition}`
+      reserved.set(key, (reserved.get(key) ?? 0) + item.quantity)
+    }
+  }
   const fieldErrors: Record<string, string> = {}
   for (const item of quote.items) {
     const nft = db.nfts[item.nftId]
@@ -86,7 +95,10 @@ function revalidate(db: MockDb, quote: StoredQuote, now: Date): void {
     const key = `${item.nftId}:${item.edition}`
     if (!nft || !edition) fieldErrors[key] = 'Item indisponível.'
     else if (nft.price !== item.unitPrice) fieldErrors[key] = `Preço alterado de ${item.unitPrice} para ${nft.price} ETH.`
-    else if (edition.available < item.quantity) fieldErrors[key] = `Estoque insuficiente (restam ${edition.available}).`
+    else {
+      const free = Math.max(0, edition.available - (reserved.get(key) ?? 0))
+      if (free < item.quantity) fieldErrors[key] = `Estoque insuficiente (restam ${free}).`
+    }
   }
   if (Object.keys(fieldErrors).length > 0) {
     throw conflict('Os itens da cotação mudaram. Revise o carrinho e gere uma nova cotação.', fieldErrors)

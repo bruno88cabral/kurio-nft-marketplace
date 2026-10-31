@@ -12,8 +12,8 @@ import { withScenario } from './withScenario'
 export const IDEMPOTENCY_HEADER = 'Idempotency-Key'
 
 export const orderHandlers = [
-  // `order-timeout`: o pedido é criado e o timer armado no resolver; só a RESPOSTA atrasa (> 10s do
-  // apiClient). O retry com a mesma chave encontra o pedido em vez de criar outro.
+  // `order-timeout`: o pedido é criado e o timer armado no resolver; só a RESPOSTA que o criou (201)
+  // atrasa (> 10s do apiClient). O retry com a mesma chave (200) volta com a latência base.
   http.post(
     `${API_URL}/orders`,
     withScenario(
@@ -50,7 +50,7 @@ export const orderHandlers = [
         if (created) scheduleOrder(order.id)
         return HttpResponse.json<Order>(toOrder(order), { status: created ? 201 : 200 })
       },
-      { latencyAfterResolver: true },
+      { slowRouteLatencyWhen: (response) => response.status === 201 },
     ),
   ),
 

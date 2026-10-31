@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BusEvent } from './bus'
 import { addItem } from './cart'
+import { DomainError } from './domainError'
 import { createOrder } from './orders'
 import { createOrderLifecycle } from './orderLifecycle'
 import { buildQuote } from './quote'
@@ -156,5 +157,64 @@ describe('orderLifecycle', () => {
     const third = setup('default', first.storage)
     third.lifecycle.resumePendingOrders()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  describe('último estoque', () => {
+    /** Ana cota e pede `qty` unidades de nft-002 (1/10, estoque 6) com a chave dada. */
+    function order(ctx: ReturnType<typeof setup>, key: string, qty: number) {
+      const { store, scenario } = ctx
+      store.mutate((db, touch) => {
+        db.carts[ANA].items = []
+        addItem(db, touch, ANA, { nftId: 'nft-002', edition: '1/10', quantity: qty })
+      })
+      const quote = store.mutate((db, touch) => buildQuote(db, touch, ANA, scenario.rules, new Date()))
+      return store.mutate((db, touch) =>
+        createOrder(db, touch, {
+          accountId: ANA,
+          idempotencyKey: key,
+          body: { quoteId: quote.quoteId, walletId: 'wallet-ana-1' },
+          now: new Date(),
+        }),
+      ).order
+    }
+
+    it('dois pedidos pending sobre o mesmo estoque: o segundo recebe 409 e nada é vendido a mais', () => {
+      const ctx = setup()
+      const a = order(ctx, 'k1', 6)
+      let error: unknown
+      try {
+        order(ctx, 'k2', 6)
+      } catch (e) {
+        error = e
+      }
+      expect(error).toBeInstanceOf(DomainError)
+      expect((error as DomainError).status).toBe(409)
+      expect((error as DomainError).fieldErrors).toEqual({ 'nft-002:1/10': 'Estoque insuficiente (restam 0).' })
+
+      ctx.lifecycle.scheduleOrder(a.id)
+      vi.advanceTimersByTime(2_500)
+      expect(ctx.store.getDb().orders[a.id].status).toBe('confirmed')
+      expect(ctx.store.getDb().nfts['nft-002'].editions[0].available).toBe(0)
+      expect(Object.keys(ctx.store.getDb().orders)).toHaveLength(1)
+    })
+
+    it('estoque parcial: o segundo pedido só vê o que sobrou depois do pending', () => {
+      const ctx = setup()
+      order(ctx, 'k1', 4)
+      expect(() => order(ctx, 'k2', 3)).toThrow(DomainError)
+      expect(order(ctx, 'k3', 2).status).toBe('pending')
+    })
+
+    it('se o estoque sumiu antes do settle, o pedido é declined e o estoque não é tocado nem fica negativo', () => {
+      const ctx = setup()
+      const a = order(ctx, 'k1', 6)
+      ctx.store.mutate((db, touch) => {
+        db.nfts['nft-002'].editions[0].available = 2 // vendido por fora (ex.: drift)
+        touch('nft', 'nft-002')
+      })
+      expect(ctx.lifecycle.settleOrder(a.id)).toBe(true)
+      expect(ctx.store.getDb().orders[a.id].status).toBe('declined')
+      expect(ctx.store.getDb().nfts['nft-002'].editions[0].available).toBe(2)
+    })
   })
 })

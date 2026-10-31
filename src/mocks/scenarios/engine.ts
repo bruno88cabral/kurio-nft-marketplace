@@ -25,6 +25,10 @@ function matchMethod(rule: string, method: string): boolean {
 export interface ScenarioEngine {
   /** Latência (ms) da requisição: `routeLatency` da rota, senão a base do cenário (fixa ou PRNG). */
   latencyFor: (method: string, handlerPath: string, pathname: string) => number
+  /** Latência base do cenário (fixa ou próximo sorteio do PRNG), ignorando `routeLatency`. */
+  baseLatency: () => number
+  /** A rota tem `routeLatency` própria? */
+  hasRouteLatency: (method: string, handlerPath: string, pathname: string) => boolean
   /** Falha a aplicar, se alguma casar e já tiver passado do `afterRequests`. Conta a requisição casada. */
   failureFor: (method: string, handlerPath: string, pathname: string) => ScenarioFailure['respond'] | null
 }
@@ -35,15 +39,19 @@ export function createScenarioEngine(scenario: Scenario): ScenarioEngine {
   const random = latency.kind === 'random' ? mulberry32(latency.seed) : null
   const seen = new Map<ScenarioFailure, number>()
 
+  const routeOf = (method: string, handlerPath: string, pathname: string) =>
+    scenario.routeLatency?.find((r) => matchMethod(r.method, method) && matchPath(r.path, handlerPath, pathname))
+  const baseLatency = () => {
+    if (latency.kind === 'fixed') return latency.ms
+    const draw = random ? random() : 0
+    return Math.round(latency.minMs + draw * (latency.maxMs - latency.minMs))
+  }
+
   return {
+    baseLatency,
+    hasRouteLatency: (method, handlerPath, pathname) => routeOf(method, handlerPath, pathname) !== undefined,
     latencyFor(method, handlerPath, pathname) {
-      const route = scenario.routeLatency?.find(
-        (r) => matchMethod(r.method, method) && matchPath(r.path, handlerPath, pathname),
-      )
-      if (route) return route.ms
-      if (latency.kind === 'fixed') return latency.ms
-      const draw = random ? random() : 0
-      return Math.round(latency.minMs + draw * (latency.maxMs - latency.minMs))
+      return routeOf(method, handlerPath, pathname)?.ms ?? baseLatency()
     },
     failureFor(method, handlerPath, pathname) {
       for (const failure of scenario.failures ?? []) {

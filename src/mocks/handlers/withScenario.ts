@@ -16,8 +16,13 @@ const apiBase = (() => {
 })()
 
 export interface WithScenarioOptions {
-  /** Aplica a latência do cenário depois do resolver (ex.: `POST /orders` no `order-timeout`). */
-  latencyAfterResolver?: boolean
+  /**
+   * Passa a aplicar a latência DEPOIS do resolver (o efeito colateral acontece primeiro). A latência
+   * longa de `routeLatency` só vale quando este predicado aprova a resposta (ex.: `POST /orders` que
+   * CRIOU o pedido, 201); as demais respostas (replay 200, erros de domínio) usam a latência base.
+   * Assim o retry do `order-timeout` com a mesma chave volta dentro do timeout do cliente.
+   */
+  slowRouteLatencyWhen?: (response: Response) => boolean
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -38,14 +43,15 @@ export function withScenario<R extends HttpResponseResolver>(
     const { pathname } = new URL(info.request.url)
     const relative = apiBase && pathname.startsWith(apiBase) ? pathname.slice(apiBase.length) || '/' : pathname
 
+    const deferred = options.slowRouteLatencyWhen
     const ms = engine.latencyFor(method, path, relative)
-    // Padrão: a latência vem antes do resolver. Com `latencyAfterResolver` o efeito colateral acontece
-    // primeiro e só a resposta atrasa (a falha do cenário, quando existe, continua impedindo o efeito)
-    if (!options.latencyAfterResolver) await sleep(ms)
+    // Padrão: a latência vem antes do resolver. No modo diferido o efeito colateral acontece primeiro
+    // e só a resposta atrasa (a falha do cenário, quando existe, continua impedindo o efeito)
+    if (!deferred) await sleep(ms)
 
     const failure = engine.failureFor(method, path, relative)
     if (failure) {
-      if (options.latencyAfterResolver) await sleep(ms)
+      if (deferred) await sleep(ms)
       if (failure === 'offline') return HttpResponse.error()
       return HttpResponse.json<ApiErrorBody>(failure.body, { status: failure.status })
     }
@@ -57,7 +63,10 @@ export function withScenario<R extends HttpResponseResolver>(
       if (!(thrown instanceof RaisedResponse)) throw thrown
       response = thrown.response
     }
-    if (options.latencyAfterResolver) await sleep(ms)
+    if (deferred) {
+      const slow = response instanceof Response && deferred(response)
+      await sleep(slow || !engine.hasRouteLatency(method, path, relative) ? ms : engine.baseLatency())
+    }
     return response
   }
   return wrapped as R

@@ -40,7 +40,13 @@ export function createOrderLifecycle({ store, scenario, now = () => new Date() }
       if (order?.status !== 'pending') return false
 
       order.updatedAt = now().toISOString()
-      if (scenario.rules?.paymentDeclined) {
+      // Defesa: a criação já desconta os `pending`, mas se o estoque não cobre mais o pedido ele é
+      // recusado em vez de vender além do que existe (sem clamp)
+      const outOfStock = order.items.some((item) => {
+        const edition = db.nfts[item.nftId]?.editions.find((e) => e.kind === item.edition)
+        return !edition || edition.available < item.quantity
+      })
+      if (scenario.rules?.paymentDeclined || outOfStock) {
         order.status = 'declined'
       } else {
         order.status = 'confirmed'
@@ -52,7 +58,7 @@ export function createOrderLifecycle({ store, scenario, now = () => new Date() }
           const nft = db.nfts[item.nftId]
           const edition = nft?.editions.find((e) => e.kind === item.edition)
           if (nft && edition) {
-            edition.available = Math.max(0, edition.available - item.quantity)
+            edition.available -= item.quantity
             touch('nft', nft.id)
           }
           // Só o que foi comprado sai do carrinho; o que sobrou da linha fica
