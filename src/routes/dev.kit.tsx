@@ -99,7 +99,7 @@ function KitPage() {
   const [couponStatus, setCouponStatus] = useState<'idle' | 'applying' | 'applied'>('idle')
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-6 sm:px-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-heading">Kit de componentes</h1>
         <p className="text-muted-foreground text-caption">
@@ -379,7 +379,7 @@ function KitPage() {
           <ErrorState title="NFT indisponível." onRetry={() => undefined} retrying />
         </div>
       </Section>
-    </main>
+    </div>
   )
 }
 

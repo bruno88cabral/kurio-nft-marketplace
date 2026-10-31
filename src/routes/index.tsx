@@ -12,10 +12,10 @@ export const Route = createFileRoute('/')({
 
 function HomePage() {
   return (
-    <main className="flex flex-col gap-6 p-6">
+    <section className="flex flex-col gap-6 p-6">
       <h1 className="text-heading">Início</h1>
       <RealtimeDebugPanel />
-    </main>
+    </section>
   )
 }
 
