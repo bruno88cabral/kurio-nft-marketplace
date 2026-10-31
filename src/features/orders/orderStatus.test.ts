@@ -46,12 +46,17 @@ function setup() {
 }
 
 describe('orderRefetchInterval', () => {
-  it('3 s enquanto pending; para no estado final', () => {
+  it('socket fora: 3 s enquanto pending; para no estado final', () => {
     expect(ORDER_POLL_MS).toBe(3_000)
-    expect(orderRefetchInterval({ status: 'pending' })).toBe(3_000)
-    expect(orderRefetchInterval({ status: 'confirmed' })).toBe(false)
-    expect(orderRefetchInterval({ status: 'declined' })).toBe(false)
-    expect(orderRefetchInterval(undefined)).toBe(false)
+    expect(orderRefetchInterval({ status: 'pending' }, false)).toBe(3_000)
+    expect(orderRefetchInterval({ status: 'confirmed' }, false)).toBe(false)
+    expect(orderRefetchInterval({ status: 'declined' }, false)).toBe(false)
+    expect(orderRefetchInterval(undefined, false)).toBe(false)
+  })
+
+  it('socket conectado: nunca polla (o order.updated atualiza o cache)', () => {
+    expect(orderRefetchInterval({ status: 'pending' }, true)).toBe(false)
+    expect(orderRefetchInterval({ status: 'confirmed' }, true)).toBe(false)
   })
 })
 

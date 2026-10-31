@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
 import { quoteQuery } from '@/api/quotes'
 import { useSession } from '@/auth/useSession'
+import { useQueryInvalidated } from '@/realtime/useQueryInvalidated'
 import type { Cart } from '@/contracts'
 import { CouponInput, EmptyState, ErrorState, PriceSummary } from '@/components/kurio'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -101,15 +102,18 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
   const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
 
   const cartForQuote: Cart = { items: [...cart.items], couponCode: cart.couponCode }
+  const quoteOptions = quoteQuery(accountId ?? '', cartForQuote)
   const quote = useQuery({
-    ...quoteQuery(accountId ?? '', cartForQuote),
+    ...quoteOptions,
     enabled: accountId !== undefined && cart.items.length > 0,
     // Recotando (chave nova): segue mostrando a cotação anterior, marcada como desatualizada
     placeholderData: keepPreviousData,
   })
+  // Mesma chave invalidada (ex.: `nft.updated` de um item do carrinho, MYK-1091): também é recotar
+  const invalidated = useQueryInvalidated(quoteOptions.queryKey)
   const quoteData = quote.data
   const issues = issuesByLine(quoteData?.issues)
-  const recalculating = quote.isPlaceholderData
+  const recalculating = quote.isPlaceholderData || (invalidated && quote.isFetching)
 
   const applyCoupon = async (code: string) => {
     setCouponSubmitting(true)

@@ -9,6 +9,7 @@ import { EmptyState, ErrorState } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
 import { OrderStatusView } from '@/features/orders/OrderStatusView'
 import { orderRefetchInterval } from '@/features/orders/orderStatus'
+import { useSocketConnected } from '@/realtime/useSocketConnected'
 
 export const Route = createFileRoute('/_authenticated/orders/$orderId')({
   // Mesmo padrão do Detalhe: `ensureQueryData` (o Pagamento já deixou o pedido no cache) e 404/403 viram
@@ -32,10 +33,11 @@ export const Route = createFileRoute('/_authenticated/orders/$orderId')({
 function OrderPage() {
   const { orderId } = Route.useParams()
   const { accountId } = Route.useLoaderData()
-  // Polling enquanto `pending` (também retoma depois de um refresh); para no estado final
+  // Polling enquanto `pending` só com o socket fora; conectado, o `order.updated` atualiza o cache (MYK-1091)
+  const socketConnected = useSocketConnected()
   const { data: order } = useSuspenseQuery({
     ...orderQuery(accountId, orderId),
-    refetchInterval: (query) => orderRefetchInterval(query.state.data),
+    refetchInterval: (query) => orderRefetchInterval(query.state.data, socketConnected),
   })
   return <OrderStatusView accountId={accountId} order={order} />
 }

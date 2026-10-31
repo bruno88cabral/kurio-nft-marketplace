@@ -8,11 +8,13 @@ import { withoutOrderKey, type CheckoutDraftStore } from '@/features/checkout/ch
 export const ORDER_POLL_MS = 3_000
 
 /**
- * `refetchInterval` de `orderQuery` na Confirmação: 3 s enquanto `pending`, e para no estado final.
- * Ponto único de troca para a MYK-1091 (tempo real), que passa a pollar só com o socket caído.
+ * `refetchInterval` de `orderQuery` na Confirmação: 3 s enquanto `pending` **e** com o socket fora
+ * (`socket.connected === false`); para no estado final. Com o socket conectado quem traz a mudança é o
+ * `order.updated` (MYK-1091). A Confirmação passa `useSocketConnected()`, então cair ou voltar com a tela
+ * aberta liga ou desliga o polling.
  */
-export function orderRefetchInterval(order: Pick<Order, 'status'> | undefined): number | false {
-  return order?.status === 'pending' ? ORDER_POLL_MS : false
+export function orderRefetchInterval(order: Pick<Order, 'status'> | undefined, socketConnected: boolean): number | false {
+  return order?.status === 'pending' && !socketConnected ? ORDER_POLL_MS : false
 }
 
 /**

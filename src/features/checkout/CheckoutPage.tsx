@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { issuesByLine, lineKey } from '@/features/cart/cartView'
 import { useCart } from '@/features/cart/useCart'
 import { sortWallets } from '@/lib/wallets'
+import { useQueryInvalidated } from '@/realtime/useQueryInvalidated'
 import { cn } from '@/lib/utils'
 import { pendingAttempt } from './checkoutDraft'
 import {
@@ -160,7 +161,10 @@ function CheckoutContent({ account, cart }: { account: Account; cart: Cart }) {
   const profile = useQuery(profileQuery(accountId))
   const wallets = useQuery(walletsQuery(accountId))
   const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
-  const quote = useQuery({ ...quoteQuery(accountId, cart), placeholderData: keepPreviousData })
+  const quoteOptions = quoteQuery(accountId, cart)
+  const quote = useQuery({ ...quoteOptions, placeholderData: keepPreviousData })
+  // Mesma chave invalidada (ex.: `nft.updated` de um item do carrinho, MYK-1091): também é recotar
+  const quoteInvalidated = useQueryInvalidated(quoteOptions.queryKey)
 
   // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança
   const [reviewed, setReviewed] = useState<ReviewSnapshot>()
@@ -295,7 +299,7 @@ function CheckoutContent({ account, cart }: { account: Account; cart: Cart }) {
   }
 
   const quoteData = quote.data
-  const recalculating = quote.isPlaceholderData
+  const recalculating = quote.isPlaceholderData || (quoteInvalidated && quote.isFetching)
   const staleAfterError = quote.isError && quoteData !== undefined
   const issues = issuesByLine(quoteData?.issues)
   const hasIssues = issues.size > 0

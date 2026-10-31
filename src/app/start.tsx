@@ -10,6 +10,9 @@ import { router } from '@/app/router'
 import { isSessionStorageEvent, sessionLifecycle } from '@/auth/sessionLifecycle'
 import { clearAnonymousCart, readAnonymousCart } from '@/features/cart/anonymousCart'
 import { mergeAnonymousCartOnLogin } from '@/features/cart/mergeOnLogin'
+import { bindRealtime } from '@/realtime/bindRealtime'
+import { createReconciler } from '@/realtime/reconcile'
+import { socket } from '@/realtime/socket'
 
 // Expiração: o lifecycle navega pelo router injetado aqui (importá-lo lá criaria o ciclo router -> rotas -> lifecycle)
 sessionLifecycle.setExpiredNavigation({
@@ -38,6 +41,13 @@ sessionLifecycle.onSessionEstablished((auth) =>
     sameSession: sessionLifecycle.captureSession(),
   }),
 )
+
+// Tempo real no cache (MYK-1091): `nft.updated`/`order.updated` passam pelo reconciliador (dedupe por `eventId`,
+// descarte por `version`); a reconexão por queda refaz `nfts`, `cart` e `orders`. Ligado antes do primeiro connect
+// (`resumeSession` logo abaixo) para nenhum evento chegar sem ouvinte. O reset privado zera o reconciliador.
+const reconciler = createReconciler()
+bindRealtime({ socket, queryClient, reconciler })
+sessionLifecycle.onPrivateReset(reconciler.reset)
 
 // Carregado por main.tsx só depois do enableMocks(); ver o comentário lá.
 // Socket com o token guardado (refresh logado não fica anônimo) e timer de expiração armado
