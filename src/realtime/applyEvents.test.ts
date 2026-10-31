@@ -215,6 +215,45 @@ describe('applyOrderUpdated', () => {
     expect(queryFn).toHaveBeenCalledTimes(1)
   })
 
+  it('evento durante o primeiro fetch (sem dado): a resposta velha chega e o pedido é refeito depois', async () => {
+    const { queryClient } = setup({ accountId: ANA })
+    const key = orderKeys.detail(ANA, 'o1')
+    let resolveFirst: (o: Order) => void = () => undefined
+    const queryFn = vi
+      .fn<() => Promise<Order>>()
+      .mockImplementationOnce(() => new Promise<Order>((r) => (resolveFirst = r)))
+      .mockResolvedValue({ ...order('o1', 'confirmed'), txHash: '0xabc' })
+    // Como o `ensureQueryData` do loader num refresh da Confirmação: a query existe, sem dado, com fetch em voo
+    const loader = queryClient.ensureQueryData({ queryKey: key, queryFn })
+
+    applyOrderUpdated(queryClient, orderEvent('o1', 'confirmed'))
+    // Sem dado não há o que trocar, e o fetch em voo não é cancelado (o loader não rejeita)
+    expect(queryClient.getQueryData(key)).toBeUndefined()
+    expect(queryFn).toHaveBeenCalledTimes(1)
+
+    // A resposta do GET saiu antes do evento: ainda `pending`
+    resolveFirst(order('o1', 'pending'))
+    await expect(loader).resolves.toMatchObject({ status: 'pending' })
+
+    await vi.waitFor(() => expect(queryClient.getQueryData<Order>(key)?.status).toBe('confirmed'))
+    expect(queryClient.getQueryData<Order>(key)?.txHash).toBe('0xabc')
+    expect(queryFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('evento durante o primeiro fetch que falha: não refaz por conta própria', async () => {
+    const { queryClient } = setup({ accountId: ANA })
+    const key = orderKeys.detail(ANA, 'o1')
+    let rejectFirst: (e: Error) => void = () => undefined
+    const queryFn = vi.fn<() => Promise<Order>>().mockImplementationOnce(() => new Promise<Order>((_, r) => (rejectFirst = r)))
+    const loader = queryClient.ensureQueryData({ queryKey: key, queryFn })
+
+    applyOrderUpdated(queryClient, orderEvent('o1', 'confirmed'))
+    rejectFirst(new Error('offline'))
+    await expect(loader).rejects.toThrow('offline')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(queryFn).toHaveBeenCalledTimes(1)
+  })
+
   it('confirmed invalida o carrinho da conta (inclui as cotações); pending/declined não', () => {
     const { queryClient, invalidated } = setup({ accountId: ANA })
     queryClient.setQueryData(cartKeys.detail(ANA), { items: [] })

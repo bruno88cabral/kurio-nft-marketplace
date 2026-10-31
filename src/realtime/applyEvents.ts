@@ -65,8 +65,12 @@ export function applyNftUpdated(queryClient: QueryClient, event: NftUpdatedEvent
 /**
  * `order.updated` (só o dono): põe o `status` no pedido em cache e o refaz para trazer `txHash`/`explorerUrl`.
  * O pedido só é tocado se a query já existe no cache da conta da sessão: nunca cria chave (nem de outra conta).
- * `refetchType: 'all'` refaz também o pedido sem observer (Confirmação fechada, ou o `ensureQueryData` do loader
- * em voo, cuja resposta poderia ser anterior ao evento e apagar a invalidação).
+ * `refetchType: 'all'` refaz também o pedido sem observer (Confirmação fechada).
+ * **Primeiro fetch em voo** (refresh ou deep link: o `ensureQueryData` do loader ainda sem dado): o react-query
+ * NÃO cancela um fetch sem dado, reaproveita a promise em voo (`Query.fetch`, query-core 5.105), e a resposta,
+ * talvez anterior ao evento, zera o `isInvalidated`. Por isso o pedido é refeito de novo depois que esse fetch
+ * termina; sem isso a Confirmação ficaria `pending` para sempre com o socket conectado (sem polling).
+ * Não usa `cancelQueries`: sem dado, rejeitaria o `ensureQueryData` do loader.
  * No `confirmed` o servidor tirou o comprado do carrinho: invalida `['cart', id]` (inclui as cotações).
  * Os efeitos de rascunho e de detalhe do NFT ficam com `applyOrderOutcome`, na Confirmação.
  */
@@ -75,10 +79,17 @@ export function applyOrderUpdated(queryClient: QueryClient, event: OrderUpdatedE
   if (accountId === undefined) return
   const { id, status } = event.payload
   const key = orderKeys.detail(accountId, id)
-  // A query pode existir sem dado (primeiro fetch em voo): a invalidação cancela e refaz a request
-  if (queryClient.getQueryCache().find({ queryKey: key, exact: true }) !== undefined) {
-    queryClient.setQueryData<Order>(key, (order) => (order && order.status !== status ? { ...order, status } : order))
-    void queryClient.invalidateQueries({ queryKey: key, exact: true, refetchType: 'all' })
+  const query = queryClient.getQueryCache().find({ queryKey: key, exact: true })
+  if (query !== undefined) {
+    const refetch = () => void queryClient.invalidateQueries({ queryKey: key, exact: true, refetchType: 'all' })
+    const inFlight = query.state.data === undefined && query.state.fetchStatus !== 'idle' ? query.promise : undefined
+    if (inFlight) {
+      // Falha do fetch em voo: o loader já mostra o erro (e o "Tentar novamente"); não refaz por conta própria
+      void inFlight.then(refetch, () => undefined)
+    } else {
+      queryClient.setQueryData<Order>(key, (order) => (order && order.status !== status ? { ...order, status } : order))
+      refetch()
+    }
   }
   if (status === 'confirmed') void queryClient.invalidateQueries({ queryKey: cartKeys.detail(accountId) })
 }
