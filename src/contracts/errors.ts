@@ -41,3 +41,8 @@ export class ApiError extends Error {
     this.fieldErrors = body.fieldErrors
   }
 }
+
+/** 401: a sessão guardada morreu (token desconhecido/expirado) ou, nas rotas de entrada, credenciais erradas. */
+export function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'unauthorized'
+}

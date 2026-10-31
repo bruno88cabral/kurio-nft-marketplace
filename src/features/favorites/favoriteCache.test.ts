@@ -1,7 +1,7 @@
 import { MutationObserver, QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
-import type { Favorite } from '@/contracts'
-import { applyFavoriteToggle, favoriteMutationOptions, isFavorited } from './favoriteCache'
+import { ApiError, type Favorite } from '@/contracts'
+import { applyFavoriteToggle, favoriteMutationOptions, isFavorited, shouldToastFavoriteFailure } from './favoriteCache'
 
 const NOW = '2026-10-31T12:00:00.000Z'
 const fav = (nftId: string, createdAt = '2026-10-01T00:00:00.000Z'): Favorite => ({ nftId, createdAt })
@@ -42,6 +42,18 @@ describe('isFavorited', () => {
   })
 })
 
+describe('shouldToastFavoriteFailure', () => {
+  it('401 não mostra o toast genérico (o de sessão expirada já aparece)', () => {
+    expect(shouldToastFavoriteFailure(new ApiError({ code: 'unauthorized', message: 'x' }, 401))).toBe(false)
+  })
+
+  it('outras falhas mostram', () => {
+    expect(shouldToastFavoriteFailure(new ApiError({ code: 'transient', message: 'x' }, 503))).toBe(true)
+    expect(shouldToastFavoriteFailure(new ApiError({ code: 'not_found', message: 'x' }, 404))).toBe(true)
+    expect(shouldToastFavoriteFailure(new Error('x'))).toBe(true)
+  })
+})
+
 describe('favoriteMutationOptions (QueryClient real em memória)', () => {
   const KEY = ['favorites', 'acc-1']
 
@@ -57,6 +69,8 @@ describe('favoriteMutationOptions (QueryClient real em memória)', () => {
       request,
       now: () => NOW,
       onFailure,
+      // sessão que não muda (a troca de conta é coberta em src/auth/sessionGuard.test.ts)
+      captureSession: () => () => true,
     })
     return { queryClient, snapshot, onFailure, observer: new MutationObserver(queryClient, options) }
   }

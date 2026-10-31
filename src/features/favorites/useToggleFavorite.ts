@@ -3,9 +3,10 @@ import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { addFavorite, favoriteKeys, favoritesQuery, removeFavorite } from '@/api/favorites'
+import { captureSession } from '@/auth/sessionGuard'
 import { useSession } from '@/auth/useSession'
 import type { Favorite, Id } from '@/contracts'
-import { favoriteMutationOptions, isFavorited } from './favoriteCache'
+import { favoriteMutationOptions, isFavorited, shouldToastFavoriteFailure } from './favoriteCache'
 
 export const FAVORITE_FAILURE_MESSAGE = 'Não foi possível atualizar os favoritos.'
 
@@ -40,7 +41,10 @@ export function useToggleFavorite(nftId: Id): ToggleFavorite {
       nftId,
       request,
       now,
-      onFailure: () => toast.error(FAVORITE_FAILURE_MESSAGE),
+      onFailure: (error) => {
+        if (shouldToastFavoriteFailure(error)) toast.error(FAVORITE_FAILURE_MESSAGE)
+      },
+      captureSession,
     }),
   )
 
@@ -55,9 +59,15 @@ export function useToggleFavorite(nftId: Id): ToggleFavorite {
     }
     // Lê do cache no clique (não do render): cliques rápidos invertem sempre o estado mais recente
     const on = !isFavorited(queryClient.getQueryData<Favorite[]>(favoriteKeys.list(account.id)), nftId)
+    // O anúncio também não vale para a sessão seguinte (o botão do Detalhe continua montado no logout)
+    const sameSession = captureSession()
     mutation.mutate(on, {
-      onSuccess: () => setAnnouncement(on ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.'),
-      onError: () => setAnnouncement(''),
+      onSuccess: () => {
+        if (sameSession()) setAnnouncement(on ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.')
+      },
+      onError: () => {
+        if (sameSession()) setAnnouncement('')
+      },
     })
   }
 
