@@ -33,7 +33,7 @@ import {
   type PlaceOrderOutcome,
 } from './placeOrder'
 import { ReviewStep } from './ReviewStep'
-import { ATTEMPT_REVIEW_MESSAGE, reviewSource } from './reviewSource'
+import { ATTEMPT_REVIEW_MESSAGE, reviewSource, type ReviewSource } from './reviewSource'
 import { changeMessages, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
 import { usePendingOrder, type PendingOrderState } from './usePendingOrder'
@@ -249,8 +249,13 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   const profile = useQuery(profileQuery(accountId))
   const wallets = useQuery(walletsQuery(accountId))
   const quote = useCartQuote(accountId, cart)
-  // Com tentativa pendente (e snapshot), a Revisão e o resumo mostram o que "Tentar de novo" compra
-  const source = reviewSource(cart.items, draft)
+  const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  // Com tentativa pendente (e snapshot), a Revisão e o resumo mostram o que "Tentar de novo" compra. Durante o
+  // "Confirmando…" o `withOrderKey` já gravou a tentativa antes do POST: a Revisão fica no carrinho (só exibição,
+  // nada do que é enviado muda) até o envio terminar. O reenvio ("Tentar de novo") já mostra a tentativa.
+  const source: ReviewSource =
+    !submitting || resending ? reviewSource(cart.items, draft) : { kind: 'cart', items: cart.items }
   const attempt = source.kind === 'attempt' ? source.snapshot : undefined
   // Nome e arte dos NFTs do carrinho e da tentativa: com a união, quando a tentativa termina e a Revisão volta ao
   // carrinho, as artes já estão carregadas (nada pisca em skeleton)
@@ -271,7 +276,6 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   }
 
   const [notice, setNotice] = useState<Notice>()
-  const [submitting, setSubmitting] = useState(false)
   const submitLock = useRef(false)
   const [connecting, setConnecting] = useState(false)
   const [walletError, setWalletError] = useState<string>()
@@ -411,7 +415,6 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     setNotice(undefined)
     void run(() => confirmPurchase(deps(), { reviewed, walletId: selectedId, requote }))
   }
-  const [resending, setResending] = useState(false)
   const resend = () => {
     if (submitLock.current) return
     setResending(true)

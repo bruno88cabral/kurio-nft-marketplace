@@ -185,6 +185,27 @@ describe('CheckoutPage', () => {
     expect(screen.queryByRole('button', { name: 'Conectar' })).toBeNull()
   })
 
+  it('durante o "Confirmando…" a Revisão não troca para a tentativa; ao falhar, mostra a tentativa', async () => {
+    renderPage()
+    await screen.findByText('Solar Veil')
+    await connectAndWaitForConfirm()
+    fireEvent.click(confirmButton())
+    await waitFor(() => expect(confirmButton().textContent).toContain('Confirmando…'))
+    // O withOrderKey já gravou a tentativa, mas ela não aparece enquanto o envio está em voo
+    expect(checkoutDraftStore(ANA.id).get().attempt).toBeDefined()
+    expect(screen.queryByText(ATTEMPT_REVIEW_MESSAGE)).toBeNull()
+  })
+
+  it('depois da falha transitória a Revisão mostra a tentativa', async () => {
+    postOrder = () => Promise.reject(new ApiError({ code: 'transient', message: 'timeout of 10000ms exceeded' }))
+    renderPage()
+    await screen.findByText('Solar Veil')
+    await connectAndWaitForConfirm()
+    fireEvent.click(confirmButton())
+    await screen.findByRole('button', { name: 'Tentar de novo' })
+    expect(screen.getByText(ATTEMPT_REVIEW_MESSAGE)).toBeTruthy()
+  })
+
   it('a tentativa no mount esconde a cotação do carrinho: o revisado é o que a tela mostrou depois que ela sai', async () => {
     // A tentativa (q0) está na Revisão; a cotação do carrinho (q1 a 0.35) carrega sem aparecer
     const draft: CheckoutDraft = {
