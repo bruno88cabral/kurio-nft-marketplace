@@ -34,7 +34,7 @@ export const Route = createFileRoute('/nfts/$nftId')({
   },
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${loaderData.name} · Kurio` : 'NFT · Kurio' }] }),
   // pendingMs/pendingMinMs padrão do router (1000/500): o `slow` (4s) mostra o skeleton e o
-  // `default` (resposta em ms) não pisca. Ver o report da MYK-1076.
+  // `default` (resposta em ms) não pisca. Ver ARCHITECTURE.md › "Cache" (loader do Detalhe).
   pendingComponent: NftDetailSkeleton,
   notFoundComponent: NftNotFound,
   errorComponent: NftDetailError,

@@ -24,10 +24,10 @@ function RootLayout() {
   return (
     <TooltipProvider>
       <HeadContent />
-      <div className="bg-background text-foreground font-sans flex min-h-dvh flex-col">
+      <div className={cn('bg-background text-foreground font-sans flex min-h-dvh flex-col', TAB_BAR_PADDING_CLASS)}>
         <SkipLink />
         <SiteHeader />
-        <main id={MAIN_CONTENT_ID} tabIndex={-1} className={cn('flex-1 outline-none', TAB_BAR_PADDING_CLASS)}>
+        <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 outline-none">
           <Outlet />
         </main>
         <SiteFooter />

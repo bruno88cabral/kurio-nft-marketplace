@@ -14,7 +14,11 @@ const GRID_CLASS = 'md:grid-cols-4 md:gap-4'
  * só nesta seção, com retry; sem outros NFTs na coleção, a seção não aparece.
  */
 export function MoreFromCollection({ nft, className }: { nft: Pick<Nft, 'id' | 'collection'>; className?: string }) {
-  const list = useQuery(nftListQuery({ collections: [nft.collection], pageSize: MAX_ITEMS + 1 }))
+  const list = useQuery({
+    ...nftListQuery({ collections: [nft.collection], pageSize: MAX_ITEMS + 1 }),
+    // Sem keepPreviousData: ao trocar de NFT/coleção, a coleção anterior não pode aparecer com o rótulo da nova
+    placeholderData: undefined,
+  })
   const items = list.data?.items.filter((item) => item.id !== nft.id).slice(0, MAX_ITEMS)
 
   if (items && items.length === 0) return null

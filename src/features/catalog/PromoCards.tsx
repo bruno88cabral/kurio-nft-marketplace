@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
+import { withFilter } from '@/lib/catalogSearch'
 import { nftArtSize } from '@/lib/nftArt'
 
 const PROMOS = [
@@ -37,7 +38,7 @@ export function PromoCards() {
                 <p className="text-muted-foreground text-caption sm:text-body">{p.text}</p>
                 <Link
                   to="/"
-                  search={{ tab: p.tab }}
+                  search={withFilter({}, { tab: p.tab })}
                   hash="catalogo"
                   className="text-text-accent text-body focus-visible:ring-ring mt-1 inline-flex items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-3"
                 >

@@ -251,7 +251,7 @@ Parte do mock (implementada no M1); a UI é TODO (M3/M4).
 
 ### Telas do M2: Início, Detalhe e moldura
 
-**Moldura (`src/components/layout`, MYK-1074).** `__root.tsx` monta `SkipLink` > `SiteHeader` > `<main id="conteudo" tabIndex={-1}>` > `SiteFooter` > `MobileTabBar`. O **único** `<main>` do app é o do root (`MAIN_CONTENT_ID = 'conteudo'`); as rotas usam `<section>`/`<div>`. Landmarks: `header`, `nav` "Principal" (a partir de `md`), `nav` da tab bar (abaixo de `md`), `main`, `footer`. A tab bar mobile é fixa, com `h-16` mais `env(safe-area-inset-bottom)`; o `<main>` recebe `TAB_BAR_PADDING_CLASS` para o conteúdo não ficar atrás dela, e qualquer barra fixa nova no mobile precisa ficar acima dela. `SessionLink` concentra a regra visitante / logado / carregando (header e tab bar): visitante vê "Entrar" (`/login?redirect=<href>`), logado vê o nome e vai a `/profile`, e enquanto `isPending` há um skeleton. "Mercado" aponta para `/#catalogo`. O header tem a busca (`HeaderSearch`, `role="search"`): em mobile abre como faixa sob o header e Esc devolve o foco; enviar leva a `/?q=<texto>#catalogo`. O carrinho do header não tem badge (carrinho é M3/M4).
+**Moldura (`src/components/layout`, MYK-1074).** `__root.tsx` monta `SkipLink` > `SiteHeader` > `<main id="conteudo" tabIndex={-1}>` > `SiteFooter` > `MobileTabBar`. O **único** `<main>` do app é o do root (`MAIN_CONTENT_ID = 'conteudo'`); as rotas usam `<section>`/`<div>`. Landmarks: `header`, `nav` "Principal" (a partir de `md`), `nav` da tab bar (abaixo de `md`), `main`, `footer`. A tab bar mobile é fixa, com `h-16` mais `env(safe-area-inset-bottom)`; o wrapper `div` do root recebe `TAB_BAR_PADDING_CLASS` (e não o `<main>`), para nem o conteúdo nem o fim do footer ficarem atrás dela e sem vão entre os dois, e qualquer barra fixa nova no mobile precisa ficar acima dela. `SessionLink` concentra a regra visitante / logado / carregando (header e tab bar): visitante vê "Entrar" (`/login?redirect=<href>`), logado vê o nome e vai a `/profile`, e enquanto `isPending` há um skeleton. "Mercado" aponta para `/#catalogo`. O header tem a busca (`HeaderSearch`, `role="search"`): em mobile abre como faixa sob o header e Esc devolve o foco; enviar leva a `/?q=<texto>#catalogo`. O carrinho do header não tem badge (carrinho é M3/M4).
 
 **Início (`/`, MYK-1075).** O estado do catálogo mora na URL e só nela (`src/lib/catalogSearch.ts`):
 
@@ -305,6 +305,8 @@ Política por recurso do M2 (as fábricas ficam em `src/api/nfts.ts`, `src/api/f
 
 Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista aparece antes da request resolver, a rejeição restaura o snapshot e chama `onFailure` uma vez, o sucesso mantém o otimista e invalida, e cliques em sequência fazem requests em série com um único invalidate.
 
+**Limitação (transitória):** com 3 ou mais cliques rápidos e falha só no primeiro, o rollback do primeiro restaura um snapshot que sobrescreve o otimista do terceiro até o invalidate final reconciliar.
+
 > TODO (M4): `staleTime`/invalidação por evento do socket (preço e estoque em tempo real), reconciliação do carrinho e a mutação do carrinho. Os eventos ainda não tocam o cache.
 
 ### Reconciliação
@@ -327,7 +329,8 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 - **Solana não existe no contrato.** `Network` tem 4 redes (`ethereum`, `polygon`, `arbitrum`, `optimism`); o filtro de rede e as contagens (`networks` das facetas) cobrem só elas.
 - **Nomes das coleções vêm das fixtures** (5 coleções com 6 NFTs), não dos textos do Figma.
 - **Badge de avaliação omitido** no Detalhe mobile (`15:5690`): o contrato não tem nota.
-- **`pageSize` 12** em vez dos 9 do mobile: ver "Telas do M2". O seed pagina em 3 páginas, e não "1 2 3 4" como no Figma desktop.
+- **`pageSize` 12** em vez dos 9 (3×3) do Figma desktop: ver "Telas do M2". O seed pagina em 3 páginas, e não "1 2 3 4" como no Figma desktop.
+- **Card "NFT em destaque"** fica oculto abaixo de `lg` (`CatalogSection.tsx`, `hidden lg:flex`, na coluna da sidebar) e não entra no drawer de filtros.
 - **Dots do hero** seguem a quantidade de destaques (6), não os 3 do Figma.
 - **Drawer de filtros abaixo de `lg`** (inclui 768); a sidebar só aparece a partir de 1024. O rótulo "Ordenar por:" fica `sr-only` abaixo de `sm`.
 - **Favorito no card só no mobile** (`md:hidden`): no desktop o card não tem coração; o Detalhe tem o botão em qualquer largura.
@@ -341,7 +344,8 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 
 - **Itens da tab bar mobile** (`14:5226`): Início, Mercado, Carrinho, Criadores (fora de escopo) e Conta, sem botão central destacado.
 - **Footer** (`2:2`): textos dos 3 destaques institucionais, e-mail e telefone de contato (`contato@kurio.example`, `+55 (11) 4000-0000`), nomes das 4 colunas de links e o slogan são placeholders; o logo é o texto "KURIO", sem SVG.
-- **Hero, promos e "Diário da Cunhagem":** os textos foram escritos na implementação (títulos, chamadas, as 3 matérias e as datas) e a escolha das artes de cada post. O card "NFT em destaque" reaproveita o `NftCard` com o badge "Oferta limitada".
+- **Hero:** eyebrow "Bem-vindo à Kurio", título "Seja dono do futuro da arte digital" (uppercase por CSS) e botão EXPLORAR seguem o Figma `2:2` (conferido por screenshot na MYK-1049); o texto de apoio abaixo do título continua pendente de conferência.
+- **Promos e "Diário da Cunhagem":** os textos foram escritos na implementação (títulos, chamadas, as 3 matérias e as datas) e a escolha das artes de cada post. O card "NFT em destaque" reaproveita o `NftCard` com o badge "Oferta limitada".
 - **Logos de MetaMask, WalletConnect e Coinbase:** não exportados; o `WalletOption` usa monograma (letra sobre a cor da marca).
 - **Artes dos NFTs:** continuam as SVGs placeholder; AVIF/WebP e a troca pelas ilustrações do Figma estão pendentes (ver "Substituição de assets").
 - **Conferência de `/dev/kit`, Início (`14:5226`), Detalhe desktop (`10:244`) e mobile (`15:5536`):** só contra descrições.
@@ -363,7 +367,7 @@ Testado com `QueryClient` real, sem React (`favoriteCache.test.ts`): o otimista 
 - **Contagens das facetas não dependem dos filtros** (vêm do catálogo inteiro). Escolha simples e estável: o número ao lado da coleção não muda enquanto o usuário filtra. O custo é que "Neon Atlas (6)" pode resultar em menos de 6 NFTs com outro filtro ativo.
 - **Preço aplicado só no "Aplicar".** O rótulo do slider acompanha o arrasto, a URL e a request não: evita uma request por passo de 0,01 ETH.
 - **Mudança de filtro, ordenação, busca ou aba zera a página** (`withFilter` remove `page`). Paginar mantém os filtros.
-- **A URL é a fonte do estado:** refresh, voltar/avançar e link compartilhado reproduzem a mesma tela (verificado). "Limpar filtros" volta a `/`.
+- **A URL é a fonte do estado:** refresh, voltar/avançar e link compartilhado reproduzem a mesma tela (verificado). "Limpar filtros" não volta a `/`: o da sidebar (`CLEAR_SIDEBAR_FILTERS`) limpa coleções, rede e preço e mantém `q`, `tab` e `sort`; o do estado vazio do grid limpa também `q` e mantém `tab` e `sort`. Ambos voltam à página 1.
 - **"Diário da Cunhagem" é estático**, com "Ler mais" fora de escopo (§3); os textos são de layout, não dados de negócio.
 
 **Detalhe:**
@@ -399,4 +403,4 @@ Ajustes feitos no M2, verificados em browser (Tab, Esc, foco) e **não** auditad
 - **Navegação por teclado.** Paginação com `aria-label="Página n"` e `aria-current="page"`; busca do header com Esc devolvendo o foco; miniaturas da galeria com `aria-pressed` e setas ←/→; o chip esgotado é pulado no Tab (`disabled`); o título do header de tela mobile é `aria-hidden` porque o `h1` já está no conteúdo.
 - **Hierarquia de títulos.** `h1` do hero (Início) ou do NFT (Detalhe), `h2` das seções (o "Catálogo" é `sr-only`), `h3` nos cards (o `NftCard` tem `<h3>` fixo).
 - **Movimento.** Skeletons usam `motion-reduce:animate-none`.
-- **Pendências:** foco visível e contraste contra o Figma não foram conferidos (sem cota); a tab bar mobile pode cobrir o fim do footer, porque o padding dela está no `<main>` e não depois do footer (observação da MYK-1076, ainda não verificada).
+- **Pendências:** foco visível e contraste contra o Figma não foram conferidos (sem cota).

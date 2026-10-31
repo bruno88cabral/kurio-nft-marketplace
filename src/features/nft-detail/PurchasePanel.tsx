@@ -37,7 +37,6 @@ export function PurchasePanel({ nft, requestedEdition, onEditionChange, classNam
 
       {soldOut && (
         <p
-          role="status"
           className="border-border-soft bg-muted text-foreground inline-flex items-center gap-2 self-start rounded-md border px-3 py-2 text-caption font-bold uppercase"
         >
           <Ban aria-hidden className="size-4" />

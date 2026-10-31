@@ -27,10 +27,10 @@ export function HeroFeatured() {
       <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
         <div className="flex flex-col items-start gap-4">
           <p className="text-text-accent text-caption font-bold tracking-widest uppercase">Bem-vindo à Kurio</p>
-          <h1 id={titleId} className="text-heading lg:text-display">
-            Arte digital única,
+          <h1 id={titleId} className="text-heading lg:text-display uppercase">
+            Seja dono do futuro
             <br />
-            direto de quem cria
+            da arte digital
           </h1>
           <p className="text-muted-foreground text-body md:text-body-lg max-w-prose">
             Descubra coleções de artistas independentes, escolha a edição que combina com você e
