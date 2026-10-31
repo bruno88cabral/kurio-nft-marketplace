@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useSignOut } from '@/features/account/useSignOut'
+import { focusMainContent, useSignOut } from '@/features/account/useSignOut'
 import { cn } from '@/lib/utils'
 import { SessionLink } from './SessionLink'
 
@@ -40,7 +40,17 @@ export function AccountMenu({ className, loadingClassName }: AccountMenuProps) {
           <ChevronDown aria-hidden className="ml-auto" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent
+        align="end"
+        className="w-60"
+        onCloseAutoFocus={(event) => {
+          // Saindo, o menu desmonta junto com o gatilho (o foco cairia no `<body>`); o Radix chama
+          // isto depois do unmount, quando ele já não prende o foco
+          if (!pending) return
+          event.preventDefault()
+          focusMainContent()
+        }}
+      >
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="text-foreground truncate">{account.name}</span>
           <span className="text-muted-foreground truncate text-xs font-normal">{account.email}</span>

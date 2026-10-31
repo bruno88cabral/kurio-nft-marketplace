@@ -3,6 +3,7 @@ import { Wallet as WalletIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { deleteWallet, invalidateWallets, updateWallet } from '@/api/wallets'
+import { captureSession, isSameSession } from '@/auth/sessionGuard'
 import type { Id, Wallet } from '@/contracts'
 import { EmptyState, WalletCard, type WalletCardAction } from '@/components/kurio'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,11 +32,12 @@ export function WalletList({ accountId, wallets }: WalletListProps) {
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLDivElement>(null)
   const removedRef = useRef(false)
-  const [announcement, setAnnouncement] = useState('')
+  // `seq` remonta o `<p>` da região viva: a mesma mensagem duas vezes seguidas é anunciada de novo
+  const [announcement, setAnnouncement] = useState({ message: '', seq: 0 })
   const [dialog, setDialog] = useState<DialogKind>()
   const [target, setTarget] = useState<Wallet>()
 
-  const announce = (message: string) => setAnnouncement(message)
+  const announce = (message: string) => setAnnouncement((prev) => ({ message, seq: prev.seq + 1 }))
   const fail = (error: unknown) => {
     const message = actionErrorMessage(error)
     if (message) {
@@ -44,36 +46,42 @@ export function WalletList({ accountId, wallets }: WalletListProps) {
     }
   }
 
+  // Resposta depois de um logout/troca de conta: sem toast nem invalidação na sessão seguinte
   const promote = useMutation({
     mutationFn: (wallet: Wallet) => updateWallet(wallet.id, { role: 'primary' }),
-    onSuccess: async () => {
+    onMutate: captureSession,
+    onSuccess: async (_wallet, _variables, sameSession) => {
+      if (!isSameSession(sameSession)) return
       await invalidateWallets(queryClient, accountId)
       toast.success(WALLET_MESSAGES.promoted)
       announce(WALLET_MESSAGES.promoted)
     },
-    onError: fail,
+    onError: (error, _wallet, sameSession) => {
+      if (isSameSession(sameSession)) fail(error)
+    },
   })
 
   const remove = useMutation({
     mutationFn: (wallet: Wallet) => deleteWallet(wallet.id),
-    onSuccess: async () => {
+    onMutate: captureSession,
+    onSuccess: async (_data, _wallet, sameSession) => {
+      if (!isSameSession(sameSession)) return
       await invalidateWallets(queryClient, accountId)
       removedRef.current = true
       setDialog(undefined)
       toast.success(WALLET_MESSAGES.removed)
       announce(WALLET_MESSAGES.removed)
     },
-    onError: (error) => {
+    onError: (error, _wallet, sameSession) => {
+      if (!isSameSession(sameSession)) return
       setDialog(undefined)
       fail(error)
     },
   })
 
-  const busyId = promote.isPending
-    ? promote.variables.id
-    : remove.isPending
-      ? remove.variables.id
-      : undefined
+  // Com uma ação pendente, todos os cards ficam ocupados: outra promoção em paralelo deixaria o
+  // `aria-busy` só no último card e daria dois toasts
+  const busy = promote.isPending || remove.isPending
 
   const open = (kind: DialogKind, wallet: Wallet) => {
     setTarget(wallet)
@@ -108,10 +116,16 @@ export function WalletList({ accountId, wallets }: WalletListProps) {
 
   return (
     // Recebe o foco depois de uma remoção (o gatilho do menu sumiu junto com o card)
-    <div ref={listRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
-      <p aria-live="polite" className="sr-only">
-        {announcement}
-      </p>
+    <div
+      ref={listRef}
+      tabIndex={-1}
+      role="group"
+      aria-label="Suas carteiras"
+      className="flex flex-col gap-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <div aria-live="polite" className="sr-only">
+        <p key={announcement.seq}>{announcement.message}</p>
+      </div>
       {sorted.length === 0 ? (
         <EmptyState
           icon={<WalletIcon />}
@@ -126,7 +140,7 @@ export function WalletList({ accountId, wallets }: WalletListProps) {
                 <WalletCard
                   wallet={wallet}
                   selectable={false}
-                  busy={busyId === wallet.id}
+                  busy={busy}
                   actions={actionsFor(wallet)}
                 />
               </li>

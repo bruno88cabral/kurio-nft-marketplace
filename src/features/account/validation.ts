@@ -1,4 +1,4 @@
-import { ApiError, type Network } from '@/contracts'
+import { ApiError, isUnauthorized, type Network } from '@/contracts'
 import { NETWORKS } from '@/lib/wallets'
 
 // Validadores puros dos formulários da conta (MYK-1083). Mesmas regras do mock
@@ -204,7 +204,7 @@ export function validateRenameWallet({ label }: WalletLabelValues): FieldErrors<
  * o ciclo de vida já avisa "Sua sessão expirou." e leva ao login.
  */
 export function actionErrorMessage(error: unknown): string | undefined {
-  if (error instanceof ApiError && error.code === 'unauthorized') return undefined
+  if (isUnauthorized(error)) return undefined
   return toFormErrors(error, []).formError
 }
 
@@ -224,13 +224,6 @@ export interface FormErrorState<K extends string> {
   fieldErrors: FieldErrors<K>
 }
 
-/**
- * Traduz a falha do envio em erro de formulário ou de campo:
- * - `validation` (422): `fieldErrors` dos campos conhecidos; sem nenhum conhecido, vira erro do formulário;
- * - `unauthorized` (401, só no login): "E-mail ou senha inválidos.";
- * - `conflict` (409, só no cadastro): erro no campo e-mail;
- * - o resto (`transient`, rede, inesperado): mensagem genérica para tentar de novo.
- */
 export interface ToFormErrorsOptions {
   /**
    * Mensagem do 401. Padrão: "E-mail ou senha inválidos." (login). Nas telas logadas o 401 é sessão
@@ -244,6 +237,15 @@ export interface ToFormErrorsOptions {
   conflictField?: string
 }
 
+/**
+ * Traduz a falha do envio em erro de formulário ou de campo:
+ * - `validation` (422): `fieldErrors` dos campos conhecidos; sem nenhum conhecido, vira erro do formulário;
+ * - `unauthorized` (401): `unauthorizedMessage` no formulário ("E-mail ou senha inválidos." no login;
+ *   nas telas logadas, a mensagem de sessão expirada);
+ * - `conflict` (409): com `conflictField`, a mensagem do servidor nesse campo (ou no formulário, se o
+ *   campo não estiver em `fields`); sem ele, a regra do cadastro (erro no campo e-mail);
+ * - o resto (`transient`, rede, inesperado): mensagem genérica para tentar de novo.
+ */
 export function toFormErrors<K extends string>(
   error: unknown,
   fields: readonly K[],

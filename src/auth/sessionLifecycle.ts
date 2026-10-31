@@ -67,7 +67,17 @@ export interface SessionLifecycleDeps {
   clearTimeout: (handle: TimerHandle) => void
 }
 
+/** Diz se a sessão capturada ainda é a atual (nenhum login, logout, expiração ou reset desde a captura). */
+export type SessionCheck = () => boolean
+
 export interface SessionLifecycle {
+  /**
+   * Captura a sessão atual. Mutations da conta chamam no envio (`onMutate`) e ignoram os callbacks
+   * (toast, `setQueryData`, invalidação, estado do formulário) se ela mudou antes da resposta: o
+   * `getMutationCache().clear()` do reset não impede que uma request em voo da conta anterior
+   * termine e rode `onSuccess`/`onError` na sessão seguinte.
+   */
+  captureSession: () => SessionCheck
   /** Cancela e remove as queries privadas, esvazia a `MutationCache` e desarma o timer de expiração. */
   resetPrivateState: () => Promise<void>
   /** Login, cadastro ou troca de conta: reset, grava a sessão, popula `['session']`, reconecta o socket com o token, arma o timer e roda os hooks. */
@@ -96,6 +106,14 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
   let navigation: ExpiredNavigation | null = null
   // Último token cuja sessão já foi encerrada: vários 401 juntos, ou 401 + timer, viram UMA expiração
   let endedToken: string | null = null
+  // Geração da sessão: sobe no início de todo login, logout, expiração e reset (antes de qualquer
+  // await), então o que foi capturado antes deixa de valer já no clique em "Sair"
+  let generation = 0
+
+  function captureSession(): SessionCheck {
+    const captured = generation
+    return () => generation === captured
+  }
 
   function clearExpiryTimer() {
     if (expiryTimer !== null) deps.clearTimeout(expiryTimer)
@@ -121,6 +139,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
   }
 
   async function resetPrivateState() {
+    generation++
     clearExpiryTimer()
     await queryClient.cancelQueries(privateFilter)
     dropPrivateState()
@@ -141,6 +160,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
 
   async function establishSession(auth: AuthResponse) {
     const { token, expiresAt, account } = auth
+    generation++
     clearExpiryTimer()
     await queryClient.cancelQueries(privateFilter)
     dropPrivateState()
@@ -160,6 +180,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
   }
 
   async function endSession(reason: EndSessionReason) {
+    generation++
     if (reason === 'logout') {
       // Um 401 do próprio logout não pode virar "sessão expirada"
       endedToken = currentToken() ?? endedToken
@@ -197,6 +218,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
   }
 
   return {
+    captureSession,
     resetPrivateState,
     establishSession,
     endSession,

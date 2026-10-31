@@ -58,7 +58,16 @@ export function ProfileForm({ profile, email }: ProfileFormProps) {
           error={form.errors.displayName}
           apiError={form.apiErrors.displayName}
         >
-          {(control) => <Input {...control} {...form.field('displayName')} autoComplete="nickname" className={FIELD_CLASS} />}
+          {(control) => (
+            // Só leitura durante o PATCH: o reset do sucesso apagaria o que fosse digitado nesse meio-tempo
+            <Input
+              {...control}
+              {...form.field('displayName')}
+              readOnly={form.submitting}
+              autoComplete="nickname"
+              className={FIELD_CLASS}
+            />
+          )}
         </FormField>
         <FormField label="E-mail" description="O e-mail não pode ser alterado.">
           {(control) => <Input {...control} type="email" value={email} readOnly className={`${FIELD_CLASS} text-muted-foreground`} />}

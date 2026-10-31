@@ -3,6 +3,7 @@ import { CircleAlert, ImageUp, LoaderCircle, Trash2, UserRound } from 'lucide-re
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { toast } from 'sonner'
 import { profileKeys, updateProfile } from '@/api/profile'
+import { captureSession, isSameSession } from '@/auth/sessionGuard'
 import { SESSION_EXPIRED_MESSAGE } from '@/auth/sessionLifecycle'
 import type { Profile } from '@/contracts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -29,13 +30,17 @@ export function AvatarField({ profile }: { profile: Profile }) {
 
   const mutation = useMutation({
     mutationFn: (avatarUrl: string) => updateProfile({ avatarUrl }),
-    onSuccess: (next, avatarUrl) => {
+    // Resposta depois de um logout/troca de conta: sem toast nem escrita na chave da conta anterior
+    onMutate: captureSession,
+    onSuccess: (next, avatarUrl, sameSession) => {
+      if (!isSameSession(sameSession)) return
       queryClient.setQueryData(profileKeys.detail(next.accountId), next)
       toast.success(PROFILE_UPDATED_MESSAGE)
       // "Remover" some depois de remover: o foco volta para "Alterar avatar" (quando reabilitar)
       if (avatarUrl === '') refocusInput.current = true
     },
-    onError: (failure) => {
+    onError: (failure, _avatarUrl, sameSession) => {
+      if (!isSameSession(sameSession)) return
       const { fieldErrors, formError } = toFormErrors(failure, ['avatarUrl'], {
         unauthorizedMessage: SESSION_EXPIRED_MESSAGE,
       })

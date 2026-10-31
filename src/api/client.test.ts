@@ -8,6 +8,10 @@ import { apiClient, onUnauthorized } from './client'
 describe('apiClient: normalização de erros', () => {
   let server: http.Server
   let base: string
+  // `/slow-unauthorized`: o handler avisa quando a request chegou (já com o token) e só responde
+  // quando o teste libera, depois de trocar a sessão (sem depender de tempo)
+  let slowArrived: () => void = () => undefined
+  let releaseSlow: Promise<void> = Promise.resolve()
 
   beforeAll(async () => {
     server = http.createServer((req, res) => {
@@ -33,10 +37,11 @@ describe('apiClient: normalização de erros', () => {
         res.end(JSON.stringify({ authorization: req.headers.authorization ?? null }))
       } else if (req.url === '/slow-unauthorized') {
         // 401 que volta depois de a sessão já ter sido trocada
-        setTimeout(() => {
+        slowArrived()
+        void releaseSlow.then(() => {
           res.statusCode = 401
           res.end(JSON.stringify({ code: 'unauthorized', message: 'Sessão ausente ou expirada.' }))
-        }, 50)
+        })
       } else if (req.url === '/hang') {
         // nunca responde
       } else {
@@ -161,11 +166,15 @@ describe('apiClient: normalização de erros', () => {
       store.set('kurio:session', SESSION)
       const cb = vi.fn()
       onUnauthorized(cb)
+      const arrived = new Promise<void>((resolve) => (slowArrived = resolve))
+      let release: () => void = () => undefined
+      releaseSlow = new Promise<void>((resolve) => (release = resolve))
       const pending = apiClient.get('/slow-unauthorized', { baseURL: base }).catch((e: unknown) => e)
-      // a request já saiu com o token A ('abc'); a sessão troca para B antes de o 401 voltar
-      await new Promise((r) => setTimeout(r, 10))
+      // a request já chegou ao servidor com o token A ('abc'); a sessão troca para B antes de o 401 voltar
+      await arrived
       const sessionB = JSON.stringify({ token: 'def', expiresAt: '2999-01-01T00:00:00.000Z' })
       store.set('kurio:session', sessionB)
+      release()
       const err = await pending
       expect(err).toMatchObject({ code: 'unauthorized', status: 401 })
       expect(store.get('kurio:session')).toBe(sessionB)

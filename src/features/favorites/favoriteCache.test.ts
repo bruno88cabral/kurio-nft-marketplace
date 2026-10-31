@@ -69,6 +69,8 @@ describe('favoriteMutationOptions (QueryClient real em memória)', () => {
       request,
       now: () => NOW,
       onFailure,
+      // sessão que não muda (a troca de conta é coberta em src/auth/sessionGuard.test.ts)
+      captureSession: () => () => true,
     })
     return { queryClient, snapshot, onFailure, observer: new MutationObserver(queryClient, options) }
   }

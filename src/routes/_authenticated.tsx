@@ -2,7 +2,8 @@ import { Outlet, createFileRoute, useRouter, type ErrorComponentProps } from '@t
 import { getToken } from '@/auth/sessionStorage'
 import { sessionQuery } from '@/auth/useSession'
 import { ErrorState } from '@/components/kurio'
-import { isUnauthorized, toLogin } from '@/features/account/authGuards'
+import { isUnauthorized } from '@/contracts'
+import { toLogin } from '@/features/account/authGuards'
 
 // Rotas privadas (perfil, carteiras, checkout, pedido): sem sessão vão para /login?redirect=<aqui>
 // e voltam depois de entrar. Com o token guardado, a sessão é confirmada (do cache, se já veio).
@@ -12,8 +13,11 @@ export const Route = createFileRoute('/_authenticated')({
     try {
       await queryClient.ensureQueryData(sessionQuery())
     } catch (error) {
-      // O 401 com o token atual também chama notifyExpired (toast + a mesma navegação para /login)
-      if (isUnauthorized(error)) throw toLogin(location.href)
+      // 401 com o token atual: o `notifyExpired` limpa a sessão e cancela as queries privadas, então
+      // aqui costuma chegar o `CancelledError` da query, não o `ApiError`. Sem token depois da
+      // falha a sessão morreu: vai direto ao login (sem passar pelo errorComponent). Com token, é
+      // falha de rede/servidor e cai no errorComponent sem apagar a sessão.
+      if (isUnauthorized(error) || getToken() === null) throw toLogin(location.href)
       throw error
     }
   },

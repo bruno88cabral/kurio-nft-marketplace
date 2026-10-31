@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRef, useState, type FormEvent } from 'react'
+import { captureSession, isSameSession } from '@/auth/sessionGuard'
 import { firstInvalidField, hasErrors, toFormErrors, type FieldErrors, type ToFormErrorsOptions } from './validation'
 
 export interface UseAccountFormOptions<K extends string, V extends Record<K, string>, R> extends ToFormErrorsOptions {
@@ -43,14 +44,26 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
     if (key) inputs.current[key]?.focus()
   }
 
+  // Resposta que chega depois de um logout/troca de conta não toca no formulário nem no cache
   const mutation = useMutation({
     mutationFn: request,
-    onSuccess: (result, submitted) => onSuccess?.(result, submitted),
-    onError: (error) => {
+    onMutate: captureSession,
+    onSuccess: (result, submitted, sameSession) => {
+      if (isSameSession(sameSession)) return onSuccess?.(result, submitted)
+    },
+    onError: (error, _submitted, sameSession) => {
+      if (!isSameSession(sameSession)) return
       const next = toFormErrors(error, fields, { unauthorizedMessage, conflictField })
       setApiErrors(next.fieldErrors)
       setFormError(next.formError)
-      focusFirstInvalid(next.fieldErrors)
+      // Erro só do formulário (401, transient): o botão está `disabled` e o foco cairia no
+      // `<body>`; volta para o primeiro campo
+      const firstField = fields[0]
+      if (!firstInvalidField(fields, next.fieldErrors) && next.formError && firstField !== undefined) {
+        inputs.current[firstField]?.focus()
+      } else {
+        focusFirstInvalid(next.fieldErrors)
+      }
     },
   })
 
