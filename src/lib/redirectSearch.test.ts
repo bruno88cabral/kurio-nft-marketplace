@@ -16,6 +16,11 @@ describe('validateRedirectSearch', () => {
     'javascript:alert(1)',
     'nfts/nft-001',
     ' /nfts',
+    '/\t/evil.example',
+    '/\n/evil.example',
+    '/\r/evil.example',
+    '/nfts\u0000',
+    '/nfts\u007F',
     '',
   ])('descarta %j', (redirect) => {
     expect(validateRedirectSearch({ redirect })).toEqual({ redirect: undefined })
