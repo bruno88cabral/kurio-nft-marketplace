@@ -108,11 +108,15 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
   }
 
   // Síncrono de propósito: entre o reset e a escrita da sessão nova nenhum render vê estado misto.
-  // `reset()` antes do `removeQueries` porque remover não avisa os observers montados (o `useSession`
-  // continuaria com a conta antiga até outro render); o reset notifica e o render seguinte já lê o cache novo.
+  // Toda query privada volta ao estado inicial (`reset()` avisa os observers montados: o `useSession`
+  // não fica com a conta antiga). Só as SEM observer saem do cache: remover uma observada deixaria o
+  // observer preso a uma query fora do cache, e o `setQueryData(['session'])` do login seguinte não o
+  // avisaria (visitante que entra continuava vendo "Entrar" no header até outro render, MYK-1083).
   function dropPrivateState() {
     for (const query of queryClient.getQueryCache().findAll(privateFilter)) query.reset()
-    queryClient.removeQueries(privateFilter)
+    queryClient.removeQueries({
+      predicate: (query) => isPrivateQueryKey(query.queryKey) && query.getObserversCount() === 0,
+    })
     queryClient.getMutationCache().clear()
   }
 

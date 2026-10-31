@@ -157,6 +157,32 @@ describe('resetPrivateState', () => {
     expect(seen.at(-1)).toBeUndefined()
     unsubscribe()
   })
+
+  it('query privada observada fica no cache, zerada; a sem observer sai', async () => {
+    const { lifecycle, queryClient } = setup()
+    seedCache(queryClient)
+    const observer = new QueryObserver(queryClient, { queryKey: ['favorites', 'a'], enabled: false })
+    const unsubscribe = observer.subscribe(() => undefined)
+    await lifecycle.resetPrivateState()
+    expect(queryClient.getQueryData(['favorites', 'a'])).toBeUndefined()
+    expect(has(queryClient, ['favorites', 'a'])).toBe(true)
+    expect(has(queryClient, ['profile', 'a'])).toBe(false)
+    unsubscribe()
+  })
+})
+
+describe('establishSession com o header montado (MYK-1083)', () => {
+  it('visitante que entra: o observer de ["session"] sem dados recebe a conta nova', async () => {
+    const { lifecycle, queryClient } = setup()
+    // Visitante: a query de sessão existe, desabilitada e sem dados (é o useSession do header)
+    const observer = new QueryObserver<Session>(queryClient, { queryKey: SESSION_QUERY_KEY, enabled: false })
+    const seen: (Session | undefined)[] = []
+    const unsubscribe = observer.subscribe((r) => seen.push(r.data))
+    await lifecycle.establishSession({ token: 'b', expiresAt: inSeconds(3600), account: ANA })
+    await vi.advanceTimersByTimeAsync(10) // entrega do notifyManager, sem chegar ao timer de expiração
+    expect(seen.at(-1)?.account).toEqual(ANA)
+    unsubscribe()
+  })
 })
 
 describe('establishSession', () => {
