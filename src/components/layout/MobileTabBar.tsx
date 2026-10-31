@@ -2,6 +2,9 @@ import { Link } from '@tanstack/react-router'
 import { Home, ShoppingCart, Store, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { OutOfScopeAction } from '@/components/kurio'
+import { CartBadge } from '@/features/cart/CartBadge'
+import { cartLinkLabel } from '@/features/cart/cartView'
+import { useCartCount } from '@/features/cart/useCartCount'
 import { cn } from '@/lib/utils'
 import { SessionLink } from './SessionLink'
 
@@ -21,6 +24,7 @@ function TabLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
 }
 
 export function MobileTabBar() {
+  const cartCount = useCartCount()
   return (
     <nav
       aria-label="Navegação principal (mobile)"
@@ -43,8 +47,17 @@ export function MobileTabBar() {
           </Link>
         </li>
         <li className="flex min-w-0 flex-1">
-          <Link to="/cart" className={item}>
-            <TabLabel icon={<ShoppingCart aria-hidden />}>Carrinho</TabLabel>
+          <Link to="/cart" aria-label={cartLinkLabel(cartCount)} className={item}>
+            <TabLabel
+              icon={
+                <span className="relative inline-flex">
+                  <ShoppingCart aria-hidden />
+                  <CartBadge count={cartCount} className="-top-1.5 -right-2.5" />
+                </span>
+              }
+            >
+              Carrinho
+            </TabLabel>
           </Link>
         </li>
         <li className="flex min-w-0 flex-1">

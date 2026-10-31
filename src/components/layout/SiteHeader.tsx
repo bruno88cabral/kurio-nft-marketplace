@@ -2,6 +2,9 @@ import { Link } from '@tanstack/react-router'
 import { ShoppingCart } from 'lucide-react'
 import { OutOfScopeAction } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
+import { CartBadge } from '@/features/cart/CartBadge'
+import { cartLinkLabel } from '@/features/cart/cartView'
+import { useCartCount } from '@/features/cart/useCartCount'
 import { BrandLogo } from './BrandLogo'
 import { HeaderSearch } from './HeaderSearch'
 import { AccountMenu } from './AccountMenu'
@@ -10,6 +13,7 @@ const navLink =
   'text-body text-muted-foreground hover:text-foreground aria-[current=page]:text-text-accent focus-visible:ring-ring rounded-md px-2 py-1 outline-none focus-visible:ring-3'
 
 export function SiteHeader() {
+  const cartCount = useCartCount()
   return (
     <header className="border-border bg-background sticky top-0 z-30 border-b">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-4 px-4 md:px-6">
@@ -37,10 +41,11 @@ export function SiteHeader() {
           <HeaderSearch />
           <Link
             to="/cart"
-            aria-label="Carrinho"
-            className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+            aria-label={cartLinkLabel(cartCount)}
+            className={`${buttonVariants({ variant: 'ghost', size: 'icon' })} relative`}
           >
             <ShoppingCart aria-hidden />
+            <CartBadge count={cartCount} className="top-0 right-0" />
           </Link>
           <AccountMenu
             className={`${buttonVariants({ variant: 'outline' })} max-w-40 min-w-24 justify-start sm:max-w-56`}
