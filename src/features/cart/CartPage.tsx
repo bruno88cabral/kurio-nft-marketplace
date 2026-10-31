@@ -11,11 +11,14 @@ import { CouponInput, EmptyState, ErrorState, PriceSummary } from '@/components/
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CartLine } from './CartLine'
-import { couponStatus, issuesByLine, lineKey } from './cartView'
+import { canCheckout as checkoutAllowed, couponStatus, issuesByLine, lineKey } from './cartView'
 import { useCart } from './useCart'
 
 export const COUPON_FAILURE_MESSAGE = 'Não foi possível atualizar o cupom.'
 const PAGE_CLASS = 'mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-4 pb-8 md:px-6 md:py-8'
+/** `ui/button` só estiliza `disabled:`; o CTA bloqueado usa `aria-disabled` (foco preservado), então estiliza aqui. */
+const BLOCKED_CTA_CLASS =
+  'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-primary aria-disabled:active:translate-y-0'
 const GRID_CLASS = 'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-10'
 
 /**
@@ -129,7 +132,9 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
     }
   }
 
-  const canCheckout = quoteData !== undefined && !recalculating && (quoteData.issues?.length ?? 0) === 0
+  const canCheckout = checkoutAllowed({ quote: quoteData, recalculating, quoteError: quote.isError })
+  // Recotação falhou mas há cotação antiga (que vai vencer): mostra-a como desatualizada, com retry
+  const staleAfterError = quote.isError && quoteData !== undefined
 
   return (
     <div className={GRID_CLASS}>
@@ -186,8 +191,19 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
               <PriceSummary
                 title="Resumo"
                 quote={quoteData}
-                stale={recalculating}
-                staleMessage="Recalculando os valores com a mudança no carrinho."
+                stale={recalculating || staleAfterError}
+                staleMessage={
+                  staleAfterError
+                    ? 'Não foi possível atualizar a cotação. Tente de novo antes de continuar.'
+                    : 'Recalculando os valores com a mudança no carrinho.'
+                }
+                staleAction={
+                  staleAfterError ? (
+                    <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void quote.refetch()}>
+                      Tentar novamente
+                    </Button>
+                  ) : undefined
+                }
               />
             )}
             {(quoteData?.issues?.length ?? 0) > 0 && (
@@ -200,7 +216,7 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
                 Ir para o pagamento
               </Link>
             ) : (
-              <Button type="button" size="lg" aria-disabled="true" aria-busy={recalculating || undefined}>
+              <Button type="button" size="lg" aria-disabled="true" aria-busy={recalculating || undefined} className={BLOCKED_CTA_CLASS}>
                 {recalculating && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
                 Ir para o pagamento
               </Button>

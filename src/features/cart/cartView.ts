@@ -40,3 +40,16 @@ export function cartLinkLabel(totalQuantity: number): string {
   if (totalQuantity <= 0) return 'Carrinho'
   return `Carrinho, ${totalQuantity} ${totalQuantity === 1 ? 'item' : 'itens'}`
 }
+
+export interface CheckoutGateInput {
+  quote: Pick<Quote, 'issues'> | undefined
+  /** A cotação mostrada é a anterior (chave nova ainda sendo buscada). */
+  recalculating: boolean
+  /** A última busca falhou. O React Query mantém `data` antigo nesse caso: não vale como cotação atual. */
+  quoteError: boolean
+}
+
+/** "Ir para o pagamento" só com cotação atual: existe, sem recotação, sem erro de recotação e sem `issues`. */
+export function canCheckout({ quote, recalculating, quoteError }: CheckoutGateInput): boolean {
+  return quote !== undefined && !recalculating && !quoteError && (quote.issues?.length ?? 0) === 0
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { couponStatus, issuesByLine } from './cartView'
+import { canCheckout, couponStatus, issuesByLine } from './cartView'
 
 describe('couponStatus', () => {
   const base = { submitting: false, couponCode: undefined, quote: undefined, quoteError: false } as const
@@ -32,5 +32,30 @@ describe('issuesByLine', () => {
     expect(map.get('a:1/10')).toBe('unavailable')
     expect(map.get('b:open')).toBe('price_changed')
     expect(issuesByLine(undefined).size).toBe(0)
+  })
+})
+
+describe('canCheckout', () => {
+  const ok = { quote: {}, recalculating: false, quoteError: false }
+
+  it('libera só com cotação atual, sem erro e sem issues', () => {
+    expect(canCheckout(ok)).toBe(true)
+    expect(canCheckout({ ...ok, quote: { issues: [] } })).toBe(true)
+  })
+
+  it('bloqueia sem cotação', () => {
+    expect(canCheckout({ ...ok, quote: undefined })).toBe(false)
+  })
+
+  it('bloqueia com issues', () => {
+    expect(canCheckout({ ...ok, quote: { issues: [{ nftId: 'a', edition: 'open', kind: 'unavailable' }] } })).toBe(false)
+  })
+
+  it('bloqueia durante a recotação (cotação anterior)', () => {
+    expect(canCheckout({ ...ok, recalculating: true })).toBe(false)
+  })
+
+  it('bloqueia quando a recotação falhou, mesmo com a cotação antiga em cache', () => {
+    expect(canCheckout({ ...ok, quoteError: true })).toBe(false)
   })
 })
