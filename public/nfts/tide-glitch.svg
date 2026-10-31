@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Tide Glitch">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(169 70% 45%)"/><stop offset="1" stop-color="hsl(239 70% 25%)"/></linearGradient></defs>
+  <rect width="120" height="120" fill="url(#g)"/>
+  <circle cx="49" cy="41" r="26" fill="hsl(239 80% 70%)" opacity="0.55"/>
+  <rect x="51" y="43" width="46" height="46" rx="8" fill="hsl(169 80% 80%)" opacity="0.35" transform="rotate(29 60 60)"/>
+</svg>
