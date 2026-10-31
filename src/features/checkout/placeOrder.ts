@@ -18,7 +18,7 @@ export type OrderErrorKind =
   | 'items'
   /** 409 sem `fieldErrors` (cotação vencida ou usada, chave com outro corpo): recotar e confirmar de novo. */
   | 'quote'
-  /** 401/403/404/422: não adianta repetir (a tentativa é descartada). */
+  /** Todo `ApiError` que não seja `transient` nem `conflict` (401, 403, 404, 422…): não adianta repetir (a tentativa é descartada). */
   | 'fatal'
 
 export function classifyOrderError(error: unknown): OrderErrorKind {
@@ -45,7 +45,7 @@ export type PlaceOrderOutcome =
   | { kind: 'items'; fieldErrors: Record<string, string>; message: string }
   /** 409 da cotação: a chave foi descartada; a tela recota. */
   | { kind: 'quote'; message: string }
-  /** 403/404/422 (ex.: carteira removida): a chave foi descartada; a tela mostra a mensagem e libera a carteira. */
+  /** Qualquer outro `ApiError` (401/403/404/422, ex.: carteira removida): a chave foi descartada; a tela mostra a mensagem e libera a carteira. */
   | { kind: 'fatal'; error: unknown }
   /** Login, logout ou expiração no meio: nada é gravado nem mostrado. */
   | { kind: 'stale-session' }

@@ -8,7 +8,10 @@ export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
 export interface CheckoutDraft {
   /** Carteira escolhida no Pagamento. */
   walletId?: Id
-  /** Carteira cuja conexão (`POST /wallets/:id/connect`) deu certo. Só vale se for a escolhida. */
+  /**
+   * Carteira cuja conexão (`POST /wallets/:id/connect`) deu certo. Só vale se for a escolhida. Cai no reset da
+   * sessão (login, troca de conta, logout, expiração; `dropWalletConnections`, MYK-1103): a conexão é da sessão.
+   */
   connectedWalletId?: Id
   /** Chave da tentativa de pedido ainda sem resposta final (`Idempotency-Key`). */
   idempotencyKey?: string
