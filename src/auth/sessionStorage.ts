@@ -48,7 +48,8 @@ export function clearSession(storage: SessionStorageLike): void {
   }
 }
 
-function browserStorage(): SessionStorageLike | null {
+/** `localStorage`, ou `null` quando indisponível (node, storage bloqueado). */
+export function browserStorage(): SessionStorageLike | null {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage
   } catch {

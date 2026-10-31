@@ -53,27 +53,42 @@ export interface WalletCardProps {
   ens?: string
   /** Itens do menu de ações (Figma `16:990`). Sem itens, o menu não aparece. */
   actions?: WalletCardAction[]
+  /**
+   * `true` (padrão): rádio de seleção, dentro de `WalletCardGroup` (Pagamento). `false`: só exibe
+   * (tela Carteiras, onde escolher a principal é uma ação do menu), sem rádio nem grupo.
+   */
+  selectable?: boolean
+  /**
+   * Ação em andamento sobre esta carteira: `aria-busy` no card e itens do menu desabilitados. O
+   * gatilho continua habilitado para não perder o foco, que volta para ele quando o menu fecha.
+   */
+  busy?: boolean
   className?: string
 }
 
 /**
  * Carteira salva (Figma mobile `70398:242`/`243`): apelido, papel (Principal/Reserva), endereço
- * ou ENS, rede, rádio de seleção e menu de ações. Precisa estar dentro de `WalletCardGroup`.
+ * ou ENS, rede, rádio de seleção e menu de ações. Selecionável, precisa estar dentro de `WalletCardGroup`.
  * O menu fica fora do `<label>` para não aninhar interativos.
  */
-export function WalletCard({ wallet, ens, actions = [], className }: WalletCardProps) {
+export function WalletCard({ wallet, ens, actions = [], selectable = true, busy = false, className }: WalletCardProps) {
   const id = useId()
+  const Info = selectable ? 'label' : 'div'
 
   return (
     <div
       data-slot="wallet-card"
+      aria-busy={busy || undefined}
       className={cn(
         'border-border bg-card has-data-[state=checked]:border-primary has-[button[role=radio]:focus-visible]:ring-ring/50 relative flex items-center gap-3 rounded-lg border p-3 has-[button[role=radio]:focus-visible]:ring-3',
         className,
       )}
     >
-      <RadioGroupItem id={id} value={wallet.id} className="size-5" />
-      <label htmlFor={id} className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5">
+      {selectable && <RadioGroupItem id={id} value={wallet.id} className="size-5" />}
+      <Info
+        htmlFor={selectable ? id : undefined}
+        className={cn('flex min-w-0 flex-1 flex-col gap-0.5', selectable && 'cursor-pointer')}
+      >
         <span className="flex items-center gap-2">
           <span className="text-body truncate font-medium">{wallet.label}</span>
           <span
@@ -90,7 +105,7 @@ export function WalletCard({ wallet, ens, actions = [], className }: WalletCardP
           <span className="sr-only">, endereço {wallet.address}</span>
         </span>
         <span className="text-muted-foreground text-tiny">{networkLabel(wallet.network)}</span>
-      </label>
+      </Info>
       {actions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -98,12 +113,12 @@ export function WalletCard({ wallet, ens, actions = [], className }: WalletCardP
               <EllipsisVertical aria-hidden />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-56">
             {actions.map((action) => (
               <DropdownMenuItem
                 key={action.label}
                 variant={action.destructive ? 'destructive' : 'default'}
-                disabled={action.outOfScope}
+                disabled={action.outOfScope || busy}
                 onSelect={action.onSelect}
               >
                 {action.label}

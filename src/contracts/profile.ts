@@ -1,7 +1,6 @@
 import type { Id } from './common'
 import type { Wallet } from './wallet'
 
-// TODO M4: campos do formulário de perfil
 /** `GET /profile`. */
 export interface Profile {
   accountId: Id

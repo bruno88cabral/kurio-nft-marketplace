@@ -4,7 +4,7 @@ import { OutOfScopeAction } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
 import { BrandLogo } from './BrandLogo'
 import { HeaderSearch } from './HeaderSearch'
-import { SessionLink } from './SessionLink'
+import { AccountMenu } from './AccountMenu'
 
 const navLink =
   'text-body text-muted-foreground hover:text-foreground aria-[current=page]:text-text-accent focus-visible:ring-ring rounded-md px-2 py-1 outline-none focus-visible:ring-3'
@@ -42,7 +42,7 @@ export function SiteHeader() {
           >
             <ShoppingCart aria-hidden />
           </Link>
-          <SessionLink
+          <AccountMenu
             className={`${buttonVariants({ variant: 'outline' })} max-w-40 min-w-24 justify-start sm:max-w-56`}
             loadingClassName="h-9 w-24 rounded-md"
           />
