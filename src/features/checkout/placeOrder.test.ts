@@ -260,6 +260,44 @@ describe('confirmPurchase', () => {
   })
 })
 
+describe('troca de sessão depois do createOrder', () => {
+  /** A sessão troca (login, logout, expiração) enquanto o `POST /orders` está em voo, já depois de ele sair. */
+  function swapDuringPost(t: ReturnType<typeof setup>) {
+    let same = true
+    const createOrder: PlaceOrderDeps['createOrder'] = async (body, key) => {
+      const pending = t.createOrder(body, key)
+      same = false
+      return pending
+    }
+    return { ...t.deps, createOrder, sameSession: () => same }
+  }
+
+  it('201: o pedido não vai para orderKeys.detail e o rascunho não ganha o orderId', async () => {
+    const t = setup()
+    const reviewed = snapshotOf(await t.requote())
+    const outcome = await confirmPurchase(swapDuringPost(t), { reviewed, walletId: WALLET, requote: t.requote })
+    expect(outcome.kind).toBe('stale-session')
+    expect(t.orders()).toHaveLength(1)
+    expect(t.queryClient.getQueryCache().findAll({ queryKey: orderKeys.all })).toHaveLength(0)
+    // A chave gravada antes do POST fica: o pedido existe com ela e o próximo envio da conta é o reenvio (R4)
+    expect(t.drafts.get().orderId).toBeUndefined()
+    expect(pendingAttempt(t.drafts.get())?.key).toBe('key-1')
+  })
+
+  it('409: nada é gravado nem descartado pela sessão antiga', async () => {
+    const t = setup('price-changed')
+    const reviewed = snapshotOf(await t.requote())
+    const before = t.drafts.get()
+    const outcome = await confirmPurchase(swapDuringPost(t), { reviewed, walletId: WALLET, requote: t.requote })
+    expect(outcome.kind).toBe('stale-session')
+    expect(t.orders()).toHaveLength(0)
+    expect(t.queryClient.getQueryCache().findAll({ queryKey: orderKeys.all })).toHaveLength(0)
+    // O rascunho é o que a confirmação gravou antes do POST; o 409 da sessão antiga não o toca
+    expect(t.drafts.get()).not.toEqual(before)
+    expect(pendingAttempt(t.drafts.get())?.key).toBe('key-1')
+  })
+})
+
 describe('classifyOrderError', () => {
   it('separa transient, 409 por item, 409 da cotação e o resto', () => {
     expect(classifyOrderError(new ApiError({ code: 'transient', message: 'x' }))).toBe('transient')
