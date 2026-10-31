@@ -11,7 +11,7 @@ src/
   components/ui componentes shadcn/ui (estilo radix-vega)
   contracts/    contratos tipados de REST e eventos (fonte única)
   lib/          utilitários puros (cn, eth, redirectSearch)
-  mocks/        MSW: browser.ts, handlers REST (handlers/) e socket.ts
+  mocks/        MSW: browser.ts, runtime.ts (store + cenário via ?scenario=), handlers REST (handlers/, todos via withScenario) e socket.ts
   realtime/     instância do socket.io-client
   routes/       rotas do TanStack Router (file-based; routeTree.gen.ts é gerado)
 public/
