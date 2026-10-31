@@ -15,7 +15,6 @@ Front-end do marketplace Kurio (desafio Jungle Gaming). Stack: React 19, Vite, T
 
 ```bash
 pnpm install
-cp .env.example .env.local
 pnpm dev
 ```
 
@@ -23,13 +22,13 @@ O dev server sobe em `http://localhost:5173` (porta padrão do Vite). Para outra
 
 Com os mocks ligados, a rota `/` abre o Início com o catálogo do mock (30 NFTs, 12 por página). O painel de debug do spike do R1 foi removido na MYK-1075.
 
-**Os mocks precisam de `VITE_ENABLE_MOCKS=true`.** O `.env.example` já traz esse valor e o `cp` acima o leva para o `.env.local`; sem esse arquivo o app abre sem API e o catálogo mostra o erro "Não foi possível carregar os NFTs.". Para subir sem arquivo: `VITE_ENABLE_MOCKS=true pnpm dev --port 5201 --strictPort`.
+**Os mocks precisam de `VITE_ENABLE_MOCKS=true`**, e esse valor já vem versionado. O `.env.development` (usado pelo `pnpm dev`) e o `.env.production` (usado pelo `pnpm build`, inclusive na Vercel) trazem as três variáveis abaixo; nenhuma é secreta. Sem mocks, o app abre sem API e o catálogo mostra o erro "Não foi possível carregar os NFTs.".
 
 ### Variáveis de ambiente
 
-Definidas em `.env.example` e tipadas em `src/vite-env.d.ts`.
+Versionadas em `.env.development` e `.env.production`, com os mesmos valores, e tipadas em `src/vite-env.d.ts`. O `.env.example` repete os valores como modelo. Para sobrescrever localmente, use um `.env.local` (ignorado pelo git) ou a variável no shell, que tem prioridade sobre os arquivos: `VITE_ENABLE_MOCKS=false pnpm dev` sobe sem MSW.
 
-| Variável | Valor no `.env.example` | Descrição |
+| Variável | Valor versionado | Descrição |
 | -- | -- | -- |
 | `VITE_ENABLE_MOCKS` | `true` | Quando `true`, o app inicia o MSW (REST via Service Worker e Socket.IO mockado) antes de renderizar. Com qualquer outro valor o MSW não é carregado e as chamadas `/api` falham com `ApiError`. |
 | `VITE_API_URL` | `/api` | `baseURL` do cliente Axios (`src/api/client.ts`). Se ausente, usa `/api`. |
@@ -68,7 +67,7 @@ O repositório está ligado à Vercel pela integração com o GitHub (projeto `k
 Configuração esperada do projeto na Vercel:
 
 1. Framework preset **Vite**, build command `pnpm build`, output directory `dist`. O `vercel.json` já tem o rewrite de SPA e o `pnpm-workspace.yaml` evita o erro de postinstall do `msw` no install.
-2. Em Settings -> Environment Variables (Production e Preview): `VITE_ENABLE_MOCKS=true`, `VITE_API_URL=/api`, `VITE_SOCKET_URL=wss://realtime.kurio.mock`.
+2. Nenhuma variável precisa ser cadastrada no painel: o build lê o `.env.production` versionado. Uma variável cadastrada em Settings -> Environment Variables **sobrescreve** o arquivo, então o painel deve ficar sem `VITE_*` (ou com os mesmos valores).
 3. Com o domínio público, conferir em aba anônima: o Início carregando o catálogo (30 NFTs, "Filtros" e paginação); refresh direto em `/nfts/nft-001` e `/cart` carregando a SPA; `/nfts/nao-existe` mostrando "NFT não encontrado"; `/mockServiceWorker.js` respondendo JavaScript. **A checagem do socket mudou:** o painel que mostrava `socket: connected` e o `nft.updated` saiu na MYK-1075 e nenhuma tela escuta o socket ainda; por isso o R1 segue só parcialmente mitigado. Em produção, verificar no console do navegador que não há erro de WebSocket (`wss://realtime.kurio.mock`) e deixar a prova de `nft.updated` para o M4, quando o cache passar a consumir os eventos.
 
 ## Documentação
