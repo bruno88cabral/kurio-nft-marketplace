@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Comet Mailer">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(123 70% 45%)"/><stop offset="1" stop-color="hsl(193 70% 25%)"/></linearGradient></defs>
+  <rect width="120" height="120" fill="url(#g)"/>
+  <circle cx="83" cy="67" r="34" fill="hsl(193 80% 70%)" opacity="0.55"/>
+  <rect x="37" y="81" width="46" height="46" rx="8" fill="hsl(123 80% 80%)" opacity="0.35" transform="rotate(43 60 60)"/>
+</svg>

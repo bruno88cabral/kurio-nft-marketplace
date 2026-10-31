@@ -30,8 +30,30 @@ export function formatEth(value: EthAmount, opts: FormatEthOptions = {}): string
   return padded ? `${int}.${padded}` : int
 }
 
+/** Igualdade numérica: `'3'` e `'3.0'` são o mesmo valor. */
+export function eqEth(a: EthAmount, b: EthAmount): boolean {
+  return new Big(a).eq(b)
+}
+
 export function addEth(...values: EthAmount[]): EthAmount {
   return toEth(values.reduce((acc, v) => acc.plus(v), new Big(0)))
+}
+
+/** `a - b`; resultado negativo é erro (ETH da API nunca é negativo). */
+export function subEth(a: EthAmount, b: EthAmount): EthAmount {
+  const result = new Big(a).minus(b)
+  if (result.lt(0)) {
+    throw new Error(`Subtração resultaria em valor negativo: ${a} - ${b}`)
+  }
+  return toEth(result)
+}
+
+/** `percent`% de `value` (10 → 10%), arredondado a 18 casas (precisão do wei), half-up. */
+export function percentEth(value: EthAmount, percent: number): EthAmount {
+  if (!Number.isFinite(percent) || percent < 0) {
+    throw new Error(`Percentual inválido: ${percent}`)
+  }
+  return toEth(new Big(value).times(percent).div(100).round(18, Big.roundHalfUp))
 }
 
 export function mulEth(value: EthAmount, qty: number): EthAmount {

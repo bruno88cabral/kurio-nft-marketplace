@@ -1,4 +1,4 @@
-import type { Id, Quantity } from './common'
+import type { Id, IsoDateTime, Quantity } from './common'
 import type { EthAmount } from './money'
 import type { Network } from './wallet'
 
@@ -16,16 +16,20 @@ export interface Nft {
   name: string
   imageUrl: string
   collection: string // TODO M3: virar entidade própria se a UI precisar
+  description: string
+  creator: string
   network: Network
   price: EthAmount
   editions: NftEdition[]
+  createdAt: IsoDateTime
+  featured: boolean
 }
 
 export type NftListTab = 'all' | 'new' | 'trending'
 
-export type NftListSort = 'price_asc' | 'price_desc' | 'newest' // TODO M3: confirmar opções de ordenação
+export type NftListSort = 'price_asc' | 'price_desc' | 'newest'
 
-/** Os nomes dos campos viram os search params do TanStack Router no M2. */
+/** `GET /nfts` (query = `NftListParams`, resposta `Paginated<Nft>`) e `GET /nfts/:nftId` (resposta `Nft`). Os nomes dos campos viram os search params do TanStack Router no M2. */
 export interface NftListParams {
   q?: string
   collections?: string[]

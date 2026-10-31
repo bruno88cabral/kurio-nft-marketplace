@@ -3,8 +3,8 @@ import '@/index.css'
 // Import dinâmico: o MSW fica fora do chunk de entrada (R2)
 async function enableMocks() {
   if (import.meta.env.VITE_ENABLE_MOCKS !== 'true') return
-  const { worker } = await import('./mocks/browser')
-  await worker.start({ onUnhandledRequest: 'bypass' })
+  const { startMocks } = await import('./mocks/browser')
+  await startMocks()
 }
 
 // O app inteiro só é avaliado depois do worker. O engine.io-client guarda `globalThis.WebSocket`
