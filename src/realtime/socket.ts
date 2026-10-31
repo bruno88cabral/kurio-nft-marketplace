@@ -7,3 +7,13 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SOC
   transports: ['websocket'],
   autoConnect: false,
 })
+
+/**
+ * Reabre a conexão com o token da sessão atual (ou anônima com `null`). O mock lê `?token=` uma vez só,
+ * no connect (`src/mocks/socket.ts`), por isso login, logout, troca de conta e o boot reconectam.
+ */
+export function reconnectSocket(token: string | null): void {
+  socket.disconnect()
+  socket.io.opts.query = token ? { token } : {}
+  socket.connect()
+}

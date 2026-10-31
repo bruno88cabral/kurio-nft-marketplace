@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { addFavorite, favoriteKeys, favoritesQuery, removeFavorite } from '@/api/favorites'
 import { useSession } from '@/auth/useSession'
 import type { Favorite, Id } from '@/contracts'
-import { favoriteMutationOptions, isFavorited } from './favoriteCache'
+import { favoriteMutationOptions, isFavorited, shouldToastFavoriteFailure } from './favoriteCache'
 
 export const FAVORITE_FAILURE_MESSAGE = 'Não foi possível atualizar os favoritos.'
 
@@ -40,7 +40,9 @@ export function useToggleFavorite(nftId: Id): ToggleFavorite {
       nftId,
       request,
       now,
-      onFailure: () => toast.error(FAVORITE_FAILURE_MESSAGE),
+      onFailure: (error) => {
+        if (shouldToastFavoriteFailure(error)) toast.error(FAVORITE_FAILURE_MESSAGE)
+      },
     }),
   )
 

@@ -25,6 +25,18 @@ describe('apiClient: normalização de erros', () => {
       } else if (req.url === '/unauthorized') {
         res.statusCode = 401
         res.end(JSON.stringify({ code: 'unauthorized', message: 'Sessão ausente ou expirada.' }))
+      } else if (req.url === '/auth/login') {
+        // credenciais erradas: 401 numa rota de entrada; ecoa o header para conferir que não foi
+        res.statusCode = 401
+        res.end(JSON.stringify({ code: 'unauthorized', message: req.headers.authorization ?? 'sem header' }))
+      } else if (req.url === '/auth/signup') {
+        res.end(JSON.stringify({ authorization: req.headers.authorization ?? null }))
+      } else if (req.url === '/slow-unauthorized') {
+        // 401 que volta depois de a sessão já ter sido trocada
+        setTimeout(() => {
+          res.statusCode = 401
+          res.end(JSON.stringify({ code: 'unauthorized', message: 'Sessão ausente ou expirada.' }))
+        }, 50)
       } else if (req.url === '/hang') {
         // nunca responde
       } else {
@@ -117,7 +129,7 @@ describe('apiClient: normalização de erros', () => {
       expect(data.authorization).toBeNull()
     })
 
-    it('401 numa request que levou token limpa a sessão e chama onUnauthorized', async () => {
+    it('401 com o token atual limpa a sessão e chama onUnauthorized com esse token', async () => {
       store.set('kurio:session', SESSION)
       const cb = vi.fn()
       onUnauthorized(cb)
@@ -125,6 +137,39 @@ describe('apiClient: normalização de erros', () => {
       expect(err).toMatchObject({ code: 'unauthorized', status: 401 })
       expect(store.has('kurio:session')).toBe(false)
       expect(cb).toHaveBeenCalledTimes(1)
+      expect(cb).toHaveBeenCalledWith('abc')
+    })
+
+    it('rotas de entrada (/auth/login, /auth/signup) não levam o Bearer', async () => {
+      store.set('kurio:session', SESSION)
+      const { data } = await apiClient.post<{ authorization: string | null }>('/auth/signup', {}, { baseURL: base })
+      expect(data.authorization).toBeNull()
+    })
+
+    it('401 em /auth/login (senha errada) com sessão guardada não limpa nem chama onUnauthorized', async () => {
+      store.set('kurio:session', SESSION)
+      const cb = vi.fn()
+      onUnauthorized(cb)
+      const err = await apiClient.post('/auth/login', {}, { baseURL: base }).catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ApiError)
+      expect(err).toMatchObject({ code: 'unauthorized', status: 401, message: 'sem header' })
+      expect(store.get('kurio:session')).toBe(SESSION)
+      expect(cb).not.toHaveBeenCalled()
+    })
+
+    it('401 de uma request que levou o token A, com o token B já guardado, não limpa', async () => {
+      store.set('kurio:session', SESSION)
+      const cb = vi.fn()
+      onUnauthorized(cb)
+      const pending = apiClient.get('/slow-unauthorized', { baseURL: base }).catch((e: unknown) => e)
+      // a request já saiu com o token A ('abc'); a sessão troca para B antes de o 401 voltar
+      await new Promise((r) => setTimeout(r, 10))
+      const sessionB = JSON.stringify({ token: 'def', expiresAt: '2999-01-01T00:00:00.000Z' })
+      store.set('kurio:session', sessionB)
+      const err = await pending
+      expect(err).toMatchObject({ code: 'unauthorized', status: 401 })
+      expect(store.get('kurio:session')).toBe(sessionB)
+      expect(cb).not.toHaveBeenCalled()
     })
 
     it('401 numa request sem token não chama onUnauthorized', async () => {

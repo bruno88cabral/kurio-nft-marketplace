@@ -1,6 +1,6 @@
 import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import { favoriteKeys } from '@/api/favorites'
-import type { Favorite, Id, IsoDateTime } from '@/contracts'
+import { ApiError, type Favorite, type Id, type IsoDateTime } from '@/contracts'
 
 /** `true` se o NFT está na lista de favoritos (lista ausente = nenhum). */
 export function isFavorited(list: readonly Favorite[] | undefined, nftId: Id): boolean {
@@ -23,7 +23,15 @@ export function applyFavoriteToggle(
   return on ? [...current, { nftId, createdAt: now }] : current.filter((f) => f.nftId !== nftId)
 }
 
-export const favoriteMutationKey = (nftId: Id) => ['favorite', nftId] as const
+/**
+ * A falha merece o toast genérico? 401 (`unauthorized`) não: a sessão expirou e o ciclo de vida
+ * (`notifyExpired`) já mostra "Sua sessão expirou", então seriam dois toasts para o mesmo problema.
+ */
+export function shouldToastFavoriteFailure(error: Error): boolean {
+  return !(error instanceof ApiError && error.code === 'unauthorized')
+}
+
+export const favoriteMutationKey =(nftId: Id) => ['favorite', nftId] as const
 
 export interface FavoriteMutationDeps {
   queryClient: QueryClient
