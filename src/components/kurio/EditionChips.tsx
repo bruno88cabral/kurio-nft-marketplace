@@ -17,7 +17,7 @@ export interface EditionChipsProps {
 
 /**
  * Seleção de edição (single). Edição com `available` 0 fica indisponível: desabilitada,
- * riscada e com o texto "esgotada" visível (não depende só de cor). Clicar no chip já
+ * riscada e com o texto "Esgotada" visível (não depende só de cor). Clicar no chip já
  * selecionado não desmarca (o Radix permitiria; aqui sempre há uma edição escolhida).
  */
 export function EditionChips({
@@ -56,7 +56,7 @@ export function EditionChips({
           >
             <span className={cn('font-bold', unavailable && 'line-through')}>{editionLabel(edition.kind)}</span>
             {unavailable && ' '}
-            {unavailable && <span className="text-tiny font-normal">esgotada</span>}
+            {unavailable && <span className="text-tiny font-normal">Esgotada</span>}
           </ToggleGroupItem>
         )
       })}
