@@ -15,6 +15,11 @@ const apiBase = (() => {
   }
 })()
 
+export interface WithScenarioOptions {
+  /** Aplica a latência do cenário depois do resolver (ex.: `POST /orders` no `order-timeout`). */
+  latencyAfterResolver?: boolean
+}
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
@@ -23,23 +28,37 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * `method`/`path` são os mesmos do `http.<verbo>` sem `API_URL` (ex.: `'PUT', '/favorites/:nftId'`).
  * Uma `Response` lançada pelo resolver (`apiError`, `requireSession`) vira a resposta.
  */
-export function withScenario<R extends HttpResponseResolver>(method: string, path: string, resolver: R): R {
+export function withScenario<R extends HttpResponseResolver>(
+  method: string,
+  path: string,
+  resolver: R,
+  options: WithScenarioOptions = {},
+): R {
   const wrapped: HttpResponseResolver = async (info) => {
     const { pathname } = new URL(info.request.url)
     const relative = apiBase && pathname.startsWith(apiBase) ? pathname.slice(apiBase.length) || '/' : pathname
 
-    await sleep(engine.latencyFor(method, path, relative))
+    const ms = engine.latencyFor(method, path, relative)
+    // Padrão: a latência vem antes do resolver. Com `latencyAfterResolver` o efeito colateral acontece
+    // primeiro e só a resposta atrasa (a falha do cenário, quando existe, continua impedindo o efeito)
+    if (!options.latencyAfterResolver) await sleep(ms)
 
     const failure = engine.failureFor(method, path, relative)
-    if (failure === 'offline') return HttpResponse.error()
-    if (failure) return HttpResponse.json<ApiErrorBody>(failure.body, { status: failure.status })
-
-    try {
-      return await resolver(info)
-    } catch (thrown) {
-      if (thrown instanceof RaisedResponse) return thrown.response
-      throw thrown
+    if (failure) {
+      if (options.latencyAfterResolver) await sleep(ms)
+      if (failure === 'offline') return HttpResponse.error()
+      return HttpResponse.json<ApiErrorBody>(failure.body, { status: failure.status })
     }
+
+    let response: Awaited<ReturnType<HttpResponseResolver>>
+    try {
+      response = await resolver(info)
+    } catch (thrown) {
+      if (!(thrown instanceof RaisedResponse)) throw thrown
+      response = thrown.response
+    }
+    if (options.latencyAfterResolver) await sleep(ms)
+    return response
   }
   return wrapped as R
 }
