@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { canCheckout, couponStatus, issuesByLine } from './cartView'
+import {
+  canCheckout,
+  CHECKOUT_BLOCK_MESSAGE,
+  checkoutBlock,
+  couponStatus,
+  guestStockLimitMessage,
+  issuesByLine,
+  QUOTE_ISSUES_MESSAGE,
+} from './cartView'
 
 describe('couponStatus', () => {
   const base = { submitting: false, couponCode: undefined, quote: undefined, quoteError: false } as const
@@ -57,5 +65,35 @@ describe('canCheckout', () => {
 
   it('bloqueia quando a recotação falhou, mesmo com a cotação antiga em cache', () => {
     expect(canCheckout({ ...ok, quoteError: true })).toBe(false)
+  })
+})
+
+describe('checkoutBlock (o motivo do CTA bloqueado)', () => {
+  const ok = { quote: {}, recalculating: false, quoteError: false }
+  const issues = { issues: [{ nftId: 'a', edition: 'open' as const, kind: 'unavailable' as const }] }
+
+  it('nenhum motivo com a cotação atual', () => {
+    expect(checkoutBlock(ok)).toBeUndefined()
+  })
+
+  it('erro vale mais que tudo; depois sem cotação, recotando e issues', () => {
+    expect(checkoutBlock({ ...ok, quote: undefined, quoteError: true })).toBe('error')
+    expect(checkoutBlock({ ...ok, quoteError: true, recalculating: true })).toBe('error')
+    expect(checkoutBlock({ ...ok, quote: undefined })).toBe('loading')
+    expect(checkoutBlock({ ...ok, quote: issues, recalculating: true })).toBe('recalculating')
+    expect(checkoutBlock({ ...ok, quote: issues })).toBe('issues')
+  })
+
+  it('cada motivo tem texto; o de issues é o mesmo aviso do resumo', () => {
+    for (const message of Object.values(CHECKOUT_BLOCK_MESSAGE)) expect(message.length).toBeGreaterThan(0)
+    expect(CHECKOUT_BLOCK_MESSAGE.issues).toBe(QUOTE_ISSUES_MESSAGE)
+  })
+})
+
+describe('guestStockLimitMessage', () => {
+  it('singular, plural e esgotado', () => {
+    expect(guestStockLimitMessage(1)).toBe('Só resta 1 unidade desta edição, e ela já está no seu carrinho.')
+    expect(guestStockLimitMessage(7)).toBe('Só restam 7 unidades desta edição, e todas já estão no seu carrinho.')
+    expect(guestStockLimitMessage(0)).toBe('Esta edição está esgotada.')
   })
 })

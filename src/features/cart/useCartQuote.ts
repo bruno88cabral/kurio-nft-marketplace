@@ -2,12 +2,12 @@ import { keepPreviousData, useQuery, type QueryObserverResult } from '@tanstack/
 import { quoteQuery } from '@/api/quotes'
 import type { Cart, CartItem, EthAmount, Id, Quote, QuoteIssue } from '@/contracts'
 import { useQueryInvalidated } from '@/realtime/useQueryInvalidated'
-import { canCheckout, issuesByLine, lineKey } from './cartView'
+import { checkoutBlock, issuesByLine, lineKey, type CheckoutBlock } from './cartView'
+
+export { QUOTE_ISSUES_MESSAGE } from './cartView'
 
 /** Título do erro sem cotação nenhuma (o resumo some e entra o `ErrorState`). */
 export const QUOTE_ERROR_TITLE = 'Não foi possível calcular o total.'
-/** Aviso da cotação com `issues` (indisponível ou preço alterado), no Carrinho e no Pagamento. */
-export const QUOTE_ISSUES_MESSAGE = 'Há itens indisponíveis ou com preço alterado. Ajuste o carrinho para continuar.'
 
 export interface CartQuote {
   /** A cotação na tela: a atual, a anterior enquanto recota (`keepPreviousData`) ou a antiga depois de um erro. */
@@ -29,6 +29,8 @@ export interface CartQuote {
   hasIssues: boolean
   /** Cotação atual, sem recotação, sem erro e sem `issues` (`canCheckout`). */
   canCheckout: boolean
+  /** Por que o checkout está bloqueado pela cotação (`checkoutBlock`); `undefined` com `canCheckout`. */
+  block: CheckoutBlock | undefined
   /** `unitPrice` da linha na cotação (nunca multiplicado); `undefined` se a cotação não tem a linha. */
   unitPriceOf: (item: Pick<CartItem, 'nftId' | 'edition'>) => EthAmount | undefined
   /** Recota a mesma chave; devolve o resultado da query (o Pagamento lê `data`/`error`). */
@@ -52,6 +54,7 @@ export function useCartQuote(accountId: Id | undefined, cart: Cart): CartQuote {
   const quote = query.data
   const recalculating = query.isPlaceholderData || (invalidated && query.isFetching)
   const issues = issuesByLine(quote?.issues)
+  const block = checkoutBlock({ quote, recalculating, quoteError: query.isError })
   return {
     quote,
     recalculating,
@@ -61,7 +64,8 @@ export function useCartQuote(accountId: Id | undefined, cart: Cart): CartQuote {
     staleAfterError: query.isError && quote !== undefined,
     issues,
     hasIssues: issues.size > 0,
-    canCheckout: canCheckout({ quote, recalculating, quoteError: query.isError }),
+    canCheckout: block === undefined,
+    block,
     unitPriceOf: (item) => {
       const key = lineKey(item)
       return quote?.items.find((line) => lineKey(line) === key)?.unitPrice

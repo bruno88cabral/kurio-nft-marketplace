@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError, type CartItem } from '@/contracts'
 import { Button } from '@/components/ui/button'
+import { guestStockLimitMessage } from './cartView'
 import { useCart } from './useCart'
 
 export const ADD_TO_CART_FAILURE_MESSAGE = 'Não foi possível adicionar ao carrinho.'
@@ -14,7 +15,8 @@ export interface AddToCartButtonProps {
   available: number
   /**
    * 409 (acima do estoque): recebe o texto da API para mostrar onde o consumidor quiser (`role="alert"`
-   * no painel). Sem esta prop, vira toast (barra mobile). `null` = nova tentativa, limpa o aviso.
+   * no painel). O visitante já no limite recebe o mesmo tratamento (`guestStockLimitMessage`). Sem esta prop,
+   * vira toast (barra mobile). `null` = nova tentativa, limpa o aviso.
    */
   onStockError?: (message: string | null) => void
   size?: 'default' | 'lg'
@@ -41,7 +43,13 @@ export function AddToCartButton({ item, available, onStockError, size, className
     setSending(true)
     onStockError?.(null)
     try {
-      await add(item, { available })
+      const added = await add(item, { available })
+      if (!added) {
+        const message = guestStockLimitMessage(available)
+        if (onStockError) onStockError(message)
+        else toast.error(message)
+        return
+      }
       toast.success('Adicionado ao carrinho', {
         action: { label: 'Ver carrinho', onClick: () => void navigate({ to: '/cart' }) },
       })

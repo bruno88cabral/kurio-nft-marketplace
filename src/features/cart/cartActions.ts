@@ -9,8 +9,10 @@ export interface CartActions {
   /**
    * Soma `item.quantity` à linha. Visitante: local, limitado a `available`. Logado: `POST /cart/items`
    * (`available` é ignorado: o servidor decide e responde 409 acima do estoque). Rejeita com o erro da API.
+   * Resolve `true` se a linha mudou; `false` só no visitante, quando nada coube (a linha já está no `available`,
+   * o caso em que o logado recebe o 409).
    */
-  add: (item: CartItem, opts: { available: number }) => Promise<void>
+  add: (item: CartItem, opts: { available: number }) => Promise<boolean>
   /** Define a quantidade da linha. Visitante: local (menor que 1 remove). Logado: `PATCH` (o servidor valida). */
   setQuantity: (nftId: Id, edition: NftEditionKind, quantity: number) => Promise<void>
   remove: (nftId: Id, edition: NftEditionKind) => Promise<void>
@@ -65,7 +67,10 @@ export function accountCartActions(deps: CartActionsDeps & { accountId: Id }): C
     if (sameSession()) queryClient.setQueryData(cartKeys.detail(accountId), cart)
   }
   return {
-    add: (item) => run(() => api.addCartItem(item)),
+    add: async (item) => {
+      await run(() => api.addCartItem(item))
+      return true
+    },
     setQuantity: (nftId, edition, quantity) => run(() => api.updateCartItem(nftId, edition, { quantity })),
     remove: (nftId, edition) => run(() => api.removeCartItem(nftId, edition)),
     applyCoupon: (code) => run(() => api.applyCoupon({ code })),

@@ -49,7 +49,42 @@ export interface CheckoutGateInput {
   quoteError: boolean
 }
 
+/** Por que "Ir para o pagamento" (e o "Confirmar compra") está bloqueado pela cotação. */
+export type CheckoutBlock = 'error' | 'loading' | 'recalculating' | 'issues'
+
+/** Aviso da cotação com `issues` (indisponível ou preço alterado), no Carrinho e no Pagamento. */
+export const QUOTE_ISSUES_MESSAGE = 'Há itens indisponíveis ou com preço alterado. Ajuste o carrinho para continuar.'
+
+/** O motivo, em texto, ligado ao CTA bloqueado por `aria-describedby`. */
+export const CHECKOUT_BLOCK_MESSAGE: Record<CheckoutBlock, string> = {
+  error: 'Não foi possível calcular o total. Tente novamente para continuar.',
+  loading: 'Calculando o total…',
+  recalculating: 'Aguarde: os valores estão sendo recalculados.',
+  issues: QUOTE_ISSUES_MESSAGE,
+}
+
+/** O que bloqueia o checkout pela cotação; `undefined` = cotação atual, sem recotação, sem erro e sem `issues`. */
+export function checkoutBlock({ quote, recalculating, quoteError }: CheckoutGateInput): CheckoutBlock | undefined {
+  if (quoteError) return 'error'
+  if (quote === undefined) return 'loading'
+  if (recalculating) return 'recalculating'
+  if ((quote.issues?.length ?? 0) > 0) return 'issues'
+  return undefined
+}
+
 /** "Ir para o pagamento" só com cotação atual: existe, sem recotação, sem erro de recotação e sem `issues`. */
-export function canCheckout({ quote, recalculating, quoteError }: CheckoutGateInput): boolean {
-  return quote !== undefined && !recalculating && !quoteError && (quote.issues?.length ?? 0) === 0
+export function canCheckout(input: CheckoutGateInput): boolean {
+  return checkoutBlock(input) === undefined
+}
+
+/**
+ * Visitante com a linha já no limite do estoque: nada foi adicionado. É o caso em que o logado recebe o 409
+ * do servidor, e o aviso segue o mesmo caminho (painel ou toast).
+ */
+export function guestStockLimitMessage(available: number): string {
+  if (!(available >= 1)) return 'Esta edição está esgotada.'
+  const units = Math.floor(available)
+  return units === 1
+    ? 'Só resta 1 unidade desta edição, e ela já está no seu carrinho.'
+    : `Só restam ${units} unidades desta edição, e todas já estão no seu carrinho.`
 }
