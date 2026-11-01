@@ -349,6 +349,25 @@ describe('formulário do colecionador e provedor no rascunho (MYK-1117)', () => 
     expect(storage.getItem('kurio:session')).toBe('x')
   })
 
+  it('dropCollectorForms com keep (login): tira o formulário das outras contas e mantém o da conta que entrou', () => {
+    const storage = memory()
+    writeCheckoutDraft(storage, 'ana-keep', withForm)
+    writeCheckoutDraft(storage, 'bruno-keep', { walletId: 'w9', collector: { username: 'bruno' } })
+    const memAna = checkoutDraftStore('ana-keep')
+    const memBruno = checkoutDraftStore('bruno-keep')
+    memAna.set({ collector: { username: 'ana' } })
+    memBruno.set({ collector: { username: 'bruno' } })
+    dropCollectorForms(storage, 'bruno-keep')
+    const ana = readCheckoutDraft(storage, 'ana-keep')
+    expect(ana.collector).toBeUndefined()
+    expect(pendingAttempt(ana)?.key).toBe('key-1')
+    expect(readCheckoutDraft(storage, 'bruno-keep')).toEqual({ walletId: 'w9', collector: { username: 'bruno' } })
+    expect(memAna.get().collector).toBeUndefined()
+    expect(memBruno.get().collector).toEqual({ username: 'bruno' })
+    memAna.clear()
+    memBruno.clear()
+  })
+
   it('dropCollectorForms limpa a cópia em memória, avisa os ouvintes e não lança', () => {
     const store = checkoutDraftStore('ana-collector')
     store.set(withForm)

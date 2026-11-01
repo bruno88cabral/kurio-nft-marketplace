@@ -10,7 +10,7 @@ import { router } from '@/app/router'
 import { isSessionStorageEvent, sessionLifecycle } from '@/auth/sessionLifecycle'
 import { clearAnonymousCart, readAnonymousCart } from '@/features/cart/anonymousCart'
 import { mergeAnonymousCartOnLogin } from '@/features/cart/mergeOnLogin'
-import { dropWalletConnections } from '@/features/checkout/checkoutDraft'
+import { dropCollectorForms, dropWalletConnections } from '@/features/checkout/checkoutDraft'
 import { bindRealtime } from '@/realtime/bindRealtime'
 import { createReconciler } from '@/realtime/reconcile'
 import { socket } from '@/realtime/socket'
@@ -42,6 +42,10 @@ sessionLifecycle.onSessionEstablished((auth) =>
     sameSession: sessionLifecycle.captureSession(),
   }),
 )
+
+// Troca de usuário sem logout (A expira e B entra na mesma aba): o formulário do colecionador das outras contas é
+// dado privado e cai; o da conta que entrou fica para a retomada (MYK-1114 D7)
+sessionLifecycle.onSessionEstablished((auth) => dropCollectorForms(undefined, auth.account.id))
 
 // A conexão da carteira no checkout é da sessão: cai em todo reset privado (logout incluído). A tentativa de pedido
 // pendente (chave + corpo) fica no rascunho: apagá-la abriria caminho para um pedido duplicado (R4, MYK-1103)

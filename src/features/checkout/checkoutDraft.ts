@@ -356,15 +356,20 @@ export function dropWalletConnections(storage: SessionStorageLike | null = brows
  * Logout explícito (`useSignOut`, MYK-1114 D7): os valores do formulário do colecionador são dados privados e
  * caem; carteira, conexão (que o reset já tirou), provedor e tentativa pendente ficam (R4). Não é ouvinte do
  * `onPrivateReset`, porque o reset também roda na expiração e lá o formulário fica para a retomada. Vale para
- * todos os rascunhos `kurio:checkout:*` da aba e as cópias em memória. Só reescreve o que tem formulário; não lança.
+ * todos os rascunhos `kurio:checkout:*` da aba e as cópias em memória, menos o da conta `keep`: o login
+ * (`onSessionEstablished`, em `start.tsx`) passa a conta que entrou, então a troca de usuário sem logout derruba o
+ * formulário das outras contas e a retomada da mesma conta continua (D7). Só reescreve o que tem formulário; não lança.
  */
-export function dropCollectorForms(storage: SessionStorageLike | null = browserSessionStorage()): void {
-  for (const store of stores.values()) {
+export function dropCollectorForms(storage: SessionStorageLike | null = browserSessionStorage(), keep?: Id): void {
+  for (const [accountId, store] of stores) {
+    if (accountId === keep) continue
     const draft = store.get()
     if (draft.collector !== undefined) store.set(withoutCollector(draft))
   }
   if (!storage) return
+  const kept = keep === undefined ? undefined : checkoutDraftKey(keep)
   for (const key of draftStorageKeys(storage)) {
+    if (key === kept) continue
     try {
       const draft = parseCheckoutDraft(storage.getItem(key))
       if (draft.collector === undefined) continue
