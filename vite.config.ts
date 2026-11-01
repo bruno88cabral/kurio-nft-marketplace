@@ -38,7 +38,19 @@ export default defineConfig({
         'src/routes/dev.*.tsx',
       ],
       reporter: ['text-summary', 'json-summary', 'html'],
-      thresholds: { lines: 57, statements: 58, functions: 50, branches: 55 },
+      thresholds: {
+        lines: 62,
+        statements: 63,
+        functions: 56,
+        branches: 59,
+        // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
+        'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/components/layout/{AccountMenu,SessionLink}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // Rotas: o plugin do router injeta código de HMR (import.meta.hot) que não executa no Vitest; valores medidos
+        'src/routes/_authenticated.tsx': { lines: 91, statements: 92, functions: 100, branches: 81 },
+        'src/routes/{login,signup}.tsx': { lines: 87, statements: 88, functions: 100, branches: 71 },
+      },
     },
   },
 })
