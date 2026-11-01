@@ -9,34 +9,41 @@ import { useSignOut } from './useSignOut'
 export interface AccountLayoutProps {
   /** Seção atual (sidebar no desktop, abas no mobile/tablet). */
   active: AccountSection
-  /** Único `<h1>` da página. */
+  /** Único `<h1>` da página: título pequeno, como no Figma ("Perfil do colecionador"). */
   title: string
-  description?: string
+  /**
+   * Deixa o `<h1>` só para o leitor de tela (Carteiras: o Figma abre com os títulos das seções,
+   * "Carteira principal" e "Carteira secundária", que são `<h2>`).
+   */
+  hideTitle?: boolean
   children: ReactNode
 }
 
-/** Caixa da página da conta (compartilhada com o skeleton, para não haver salto). */
+/** Caixa da página da conta. */
 export const ACCOUNT_PAGE_CLASS = 'mx-auto w-full max-w-7xl px-4 pt-4 pb-8 md:px-6 md:py-8'
 
+/** Título pequeno das páginas e seções da conta (Figma: "Perfil do colecionador", "Alterar senha"). */
+export const ACCOUNT_HEADING_CLASS = 'text-body-lg font-bold'
+
+/** Rótulo dos campos da conta: como no Figma, texto de corpo, branco e sem negrito. */
+export const ACCOUNT_LABEL_CLASS = 'text-body font-normal'
+
 /**
- * Página da conta (Perfil, Carteiras). Desktop (`lg`): `AccountSidebar` à esquerda com os itens fora
- * de escopo e "Sair". Mobile e tablet: abas Perfil/Carteiras (`aria-current`) e "Sair" visível no
- * topo, sem os itens fora de escopo (o Figma só desenha o desktop). Sair = `useSignOut`
- * (`endSession('logout')` + toast "Você saiu da conta." + `/`).
+ * Página da conta (Perfil, Carteiras), sem cards (Figma, MYK-1102). Desktop (`lg`): `AccountSidebar`
+ * à esquerda ("Meu perfil", itens com ícone, os fora de escopo e "Sair"). Mobile e tablet: abas
+ * Perfil/Carteiras (`aria-current`) e "Sair" visível no topo, sem os itens fora de escopo (o Figma só
+ * desenha o desktop). Sair = `useSignOut` (`endSession('logout')` + toast "Você saiu da conta." + `/`).
  */
-export function AccountLayout({ active, title, description, children }: AccountLayoutProps) {
+export function AccountLayout({ active, title, hideTitle = false, children }: AccountLayoutProps) {
   const { signOut, pending } = useSignOut()
   const onLogout = () => void signOut()
 
   return (
-    <div className={cn(ACCOUNT_PAGE_CLASS, 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-12')}>
+    <div className={cn(ACCOUNT_PAGE_CLASS, 'lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:gap-7')}>
       <AccountSidebar active={active} onLogout={onLogout} loggingOut={pending} className="hidden self-start lg:flex" />
       <div className="flex min-w-0 flex-col gap-6">
         <AccountMobileNav active={active} onLogout={onLogout} loggingOut={pending} className="lg:hidden" />
-        <header className="flex flex-col gap-1">
-          <h1 className="text-heading">{title}</h1>
-          {description && <p className="text-muted-foreground text-body">{description}</p>}
-        </header>
+        <h1 className={cn(ACCOUNT_HEADING_CLASS, hideTitle && 'sr-only')}>{title}</h1>
         {children}
       </div>
     </div>
