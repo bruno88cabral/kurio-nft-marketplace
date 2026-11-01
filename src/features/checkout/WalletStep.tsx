@@ -1,15 +1,28 @@
 import { Link } from '@tanstack/react-router'
-import { CircleAlert, CircleCheck, LoaderCircle, Wallet as WalletIcon } from 'lucide-react'
+import { CircleCheck, LoaderCircle, Wallet as WalletIcon } from 'lucide-react'
+import { useRef } from 'react'
+import { flushSync } from 'react-dom'
 import type { Id, Wallet } from '@/contracts'
-import { EmptyState, ErrorState, WalletCard, WalletCardGroup } from '@/components/kurio'
+import {
+  EmptyState,
+  ErrorState,
+  WalletCard,
+  WalletCardGroup,
+  WalletOption,
+  WalletOptionGroup,
+  type WalletOptionStatus,
+} from '@/components/kurio'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { WALLET_PROVIDERS, walletProviderLabel, type WalletProvider } from '@/lib/wallets'
 
 export type WalletConnection =
   | { status: 'idle' }
   | { status: 'connecting' }
   | { status: 'connected' }
   | { status: 'rejected'; message: string }
+  /** Só depois de um "Desconectar" explícito (em memória). */
+  | { status: 'disconnected' }
 
 export interface WalletStepProps {
   wallets: readonly Wallet[] | undefined
@@ -19,7 +32,13 @@ export interface WalletStepProps {
   selectedId: Id | undefined
   onSelect: (walletId: Id) => void
   connection: WalletConnection
+  /** O provedor da conexão simulada (`draft.provider`). */
+  provider: WalletProvider | undefined
+  /** Trocar de provedor desconecta. */
+  onSelectProvider: (provider: WalletProvider) => void
   onConnect: () => void
+  /** Só no cliente: tira a conexão do rascunho. */
+  onDisconnect: () => void
   /**
    * Envio sem resposta final: a carteira não pode mudar (o pedido pode existir com a escolhida). Sem conexão, o
    * "Conectar" e o status somem: "Tentar de novo" reenvia o mesmo pedido sem precisar dela.
@@ -28,8 +47,9 @@ export interface WalletStepProps {
 }
 
 /**
- * Etapa "Carteira": as carteiras cadastradas (`WalletCard selectable`, a principal pré-selecionada) e a
- * conexão com a escolhida (`POST /wallets/:id/connect`). Trocar a seleção desconecta.
+ * Etapa "Carteira": as carteiras cadastradas (`WalletCard selectable`, a principal pré-selecionada) e, em
+ * "Carteira e rede", o provedor (`WalletOption`) com que a conexão da escolhida é simulada
+ * (`POST /wallets/:id/connect`), mais Conectar / Desconectar. Trocar a carteira ou o provedor desconecta.
  */
 export function WalletStep({
   wallets,
@@ -39,9 +59,13 @@ export function WalletStep({
   selectedId,
   onSelect,
   connection,
+  provider,
+  onSelectProvider,
   onConnect,
+  onDisconnect,
   locked,
 }: WalletStepProps) {
+  const connectRef = useRef<HTMLButtonElement>(null)
   if (isError && !wallets) {
     return (
       <ErrorState
@@ -90,12 +114,31 @@ export function WalletStep({
           A carteira fica fixa até o pedido anterior ser resolvido.
         </p>
       )}
-      {/* Travada (tentativa pendente): o reenvio não exige conexão, então não há "Conectar" a oferecer */}
+      <h3 className="text-body font-medium">
+        Carteira e rede
+      </h3>
+      <WalletOptionGroup value={provider} onValueChange={onSelectProvider} label="Carteira e rede" disabled={locked}>
+        {WALLET_PROVIDERS.map((option) => (
+          <WalletOption
+            key={option}
+            provider={option}
+            status={option === provider ? optionStatus(connection) : 'idle'}
+            rejectedMessage={connection.status === 'rejected' ? connection.message : undefined}
+            disabled={locked}
+          />
+        ))}
+      </WalletOptionGroup>
+      {/* Travada (tentativa pendente): o reenvio não exige conexão, então não há "Conectar" nem "Desconectar" */}
       {selected && !(locked && connection.status !== 'connected') && (
         <div className="flex flex-wrap items-center gap-3" aria-live="polite">
-          <ConnectionStatus connection={connection} label={selected.label} />
-          {connection.status !== 'connected' && (
+          {!provider ? (
+            <p className="text-muted-foreground text-caption">Escolha como conectar.</p>
+          ) : (
+            <ConnectionStatus connection={connection} label={selected.label} provider={walletProviderLabel(provider)} />
+          )}
+          {provider && connection.status !== 'connected' && (
             <Button
+              ref={connectRef}
               type="button"
               variant="outline"
               size="sm"
@@ -106,7 +149,21 @@ export function WalletStep({
               {connection.status === 'connecting' && (
                 <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
               )}
-              {connection.status === 'rejected' ? 'Tentar novamente' : 'Conectar'}
+              {connection.status === 'rejected' ? 'Tentar novamente' : `Conectar com ${walletProviderLabel(provider)}`}
+            </Button>
+          )}
+          {connection.status === 'connected' && !locked && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // O "Conectar" toma o lugar do "Desconectar": o foco vai para ele, não para o <body>
+                flushSync(onDisconnect)
+                connectRef.current?.focus()
+              }}
+            >
+              Desconectar
             </Button>
           )}
         </div>
@@ -115,21 +172,30 @@ export function WalletStep({
   )
 }
 
-function ConnectionStatus({ connection, label }: { connection: WalletConnection; label: string }) {
+/** O estado da conexão no `WalletOption` do provedor escolhido (conectada não tem estado próprio nele). */
+function optionStatus(connection: WalletConnection): WalletOptionStatus {
+  return connection.status === 'connected' ? 'idle' : connection.status
+}
+
+function ConnectionStatus({ connection, label, provider }: { connection: WalletConnection; label: string; provider: string }) {
   switch (connection.status) {
     case 'connected':
       return (
         <p className="text-text-accent text-caption inline-flex items-center gap-1.5">
           <CircleCheck aria-hidden className="size-4" />
-          {label} conectada.
+          {label} conectada com {provider}.
         </p>
       )
     case 'connecting':
-      return <p className="text-muted-foreground text-caption">Conectando {label}… Aprove no app da carteira.</p>
-    case 'rejected':
       return (
-        <p role="alert" className="text-destructive text-caption inline-flex items-start gap-1.5">
-          <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+        <p className="text-muted-foreground text-caption">
+          Conectando {label} com {provider}… Aprove no app da carteira.
+        </p>
+      )
+    case 'rejected':
+      // A mensagem aparece no `WalletOption` do provedor; aqui ela só é anunciada
+      return (
+        <p role="alert" className="sr-only">
           {connection.message}
         </p>
       )

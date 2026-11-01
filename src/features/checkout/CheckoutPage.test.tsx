@@ -121,9 +121,15 @@ const describedText = (element: HTMLElement) =>
     .filter(Boolean)
     .map((id) => document.getElementById(id)?.textContent)
 
+/** Escolhe o provedor em "Carteira e rede" (o "Conectar com …" só aparece com um provedor). */
+async function chooseProvider(name = 'MetaMask') {
+  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(name) }))
+  return screen.findByRole('button', { name: `Conectar com ${name}` })
+}
+
 async function connectAndWaitForConfirm() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Conectar' }))
-  await screen.findByText('Principal conectada.')
+  fireEvent.click(await chooseProvider())
+  await screen.findByText('Principal conectada com MetaMask.')
   await waitFor(() => expect(confirmButton().getAttribute('aria-disabled')).toBeNull())
 }
 
@@ -131,7 +137,7 @@ describe('CheckoutPage', () => {
   it('"Confirmar compra" bloqueado diz o motivo por aria-describedby e o perde ao habilitar', async () => {
     renderPage()
     await screen.findByText('Solar Veil')
-    await screen.findByRole('button', { name: 'Conectar' })
+    await screen.findByText('Escolha como conectar.')
     expect(confirmButton().getAttribute('aria-disabled')).toBe('true')
     expect(describedText(confirmButton())).toEqual(['Conecte uma carteira para confirmar.'])
     await connectAndWaitForConfirm()
@@ -190,7 +196,44 @@ describe('CheckoutPage', () => {
     renderPage()
     await screen.findByRole('button', { name: 'Tentar de novo' })
     await screen.findByText('A carteira fica fixa até o pedido anterior ser resolvido.')
-    expect(screen.queryByRole('button', { name: 'Conectar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Conectar/ })).toBeNull()
+    expect(screen.queryByText('Escolha como conectar.')).toBeNull()
+    // Os provedores também ficam travados
+    for (const radio of screen.getAllByRole('radio')) expect((radio as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('conectar → "Desconectar": não conectada, foco no "Conectar com …" e "Confirmar compra" bloqueado com o motivo', async () => {
+    renderPage()
+    await connectAndWaitForConfirm()
+    fireEvent.click(screen.getByRole('button', { name: 'Desconectar' }))
+    const connect = screen.getByRole('button', { name: 'Conectar com MetaMask' })
+    expect(document.activeElement).toBe(connect)
+    expect(screen.queryByText('Principal conectada com MetaMask.')).toBeNull()
+    expect(screen.getByText('Desconectada')).toBeTruthy()
+    expect(confirmButton().getAttribute('aria-disabled')).toBe('true')
+    expect(describedText(confirmButton())).toEqual(['Conecte uma carteira para confirmar.'])
+    fireEvent.click(confirmButton())
+    expect(orderCalls()).toHaveLength(0)
+  })
+
+  it('a recusa (409) aparece no WalletOption do provedor, com "Tentar novamente", e não envia pedido', async () => {
+    const message = 'A carteira recusou a conexão. Aprove o pedido no app da carteira e tente de novo.'
+    api.post.mockImplementation((url: string) => {
+      if (url === '/quotes') return Promise.resolve({ data: quotes[0] })
+      if (url === `/wallets/${WALLET.id}/connect`) return Promise.reject(new ApiError({ code: 'conflict', message }, 409))
+      return Promise.reject(new Error(`POST ${url} sem mock`))
+    })
+    renderPage()
+    fireEvent.click(await chooseProvider())
+    const retry = await screen.findByRole('button', { name: 'Tentar novamente' })
+    const option = screen.getByRole('radio', { name: /MetaMask/ }).closest('[data-slot="wallet-option"]')
+    expect(option?.getAttribute('data-status')).toBe('rejected')
+    expect(option?.textContent).toContain(message)
+    expect(screen.getByRole('alert').textContent).toBe(message)
+    expect(confirmButton().getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(retry)
+    await waitFor(() => expect(api.post.mock.calls.filter(([url]) => url === `/wallets/${WALLET.id}/connect`)).toHaveLength(2))
+    expect(orderCalls()).toHaveLength(0)
   })
 
   it('durante o "Confirmando…" a Revisão não troca para a tentativa; ao falhar, mostra a tentativa', async () => {

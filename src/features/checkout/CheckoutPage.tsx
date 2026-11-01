@@ -114,7 +114,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   const nftOf = useNftDetails([...cart.items, ...(attempt?.items ?? [])].map((item) => item.nftId))
 
   const sortedWallets = wallets.data ? sortWallets(wallets.data) : undefined
-  const { selectedId, connected, connection, selectWallet, connect } = useWalletConnection({ draft, drafts, wallets: sortedWallets })
+  const { selectedId, connected, connection, selectWallet, connect, provider, selectProvider, disconnect } = useWalletConnection({ draft, drafts, wallets: sortedWallets })
   const pending = pendingAttempt(draft)
 
   const { quote: quoteData, recalculating, staleAfterError, issues, hasIssues } = quote
@@ -199,7 +199,10 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
             selectedId={selectedId}
             onSelect={selectWallet}
             connection={connection}
+            provider={provider}
+            onSelectProvider={selectProvider}
             onConnect={() => void connect()}
+            onDisconnect={disconnect}
             locked={pending !== undefined}
           />
         </Step>
