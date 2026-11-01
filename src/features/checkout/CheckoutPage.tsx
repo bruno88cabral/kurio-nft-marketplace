@@ -1,7 +1,7 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate } from '@tanstack/react-router'
 import { LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
 import { createOrder } from '@/api/orders'
@@ -13,14 +13,15 @@ import { ApiError, type Account, type Cart, type Id, type Quote } from '@/contra
 import { ErrorState, PriceSummary } from '@/components/kurio'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { lineKey } from '@/features/cart/cartView'
+import { CHECKOUT_BLOCK_MESSAGE, lineKey } from '@/features/cart/cartView'
 import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from '@/features/cart/layout'
 import { QuoteErrorState } from '@/features/cart/QuoteErrorState'
 import { useCart } from '@/features/cart/useCart'
 import { QUOTE_ISSUES_MESSAGE, useCartQuote } from '@/features/cart/useCartQuote'
 import { sortWallets } from '@/lib/wallets'
 import { cn } from '@/lib/utils'
-import { pendingAttempt, withConnectedWallet } from './checkoutDraft'
+import type { AttemptSnapshot } from './attemptSnapshot'
+import { pendingAttempt, pendingAttemptSnapshot, withConnectedWallet, withoutConnection } from './checkoutDraft'
 import {
   confirmPurchase,
   ORDER_FAILED_MESSAGE,
@@ -32,13 +33,18 @@ import {
   type PlaceOrderOutcome,
 } from './placeOrder'
 import { ReviewStep } from './ReviewStep'
+import { ATTEMPT_REVIEW_MESSAGE, reviewSource, type ReviewSource } from './reviewSource'
 import { changeMessages, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
-import { usePendingOrder } from './usePendingOrder'
+import { usePendingOrder, type PendingOrderState } from './usePendingOrder'
 import { WalletStep, type WalletConnection } from './WalletStep'
 
 const WALLET_FAILURE_MESSAGE = 'Não foi possível conectar a carteira. Tente de novo.'
 export const ORDER_IN_PROGRESS_MESSAGE = 'Seu pedido anterior ainda está em andamento.'
+export const ORDER_LOAD_FAILED_MESSAGE = 'Não foi possível consultar o pedido anterior.'
+/** Toast do 409 no "Tentar de novo" com o carrinho vazio: a tentativa sai e a página volta ao /cart. */
+export const ATTEMPT_CONFLICT_MESSAGE = 'O pedido não foi feito: os valores ou o estoque mudaram desde o envio.'
+const CONNECT_WALLET_MESSAGE = 'Conecte uma carteira para confirmar.'
 
 /** O que a última tentativa deixou para a tela (a falha transitória vem do rascunho, não daqui). */
 type Notice =
@@ -88,17 +94,20 @@ function Checkout({ account }: { account: Account }) {
     // carrinho). Sem isto o refresh mandaria para /cart sem dizer o que houve com o pedido. Com o pedido
     // conhecido (`orderId`) e já final, `usePendingOrder` limpa o rascunho e a página volta ao /cart
     if (pendingOrder.kind === 'none') return <Navigate to="/cart" replace />
-    body =
+    // O que a tentativa compra (snapshot, só exibição): o carrinho já não diz, e "Tentar de novo" envia o mesmo corpo
+    const snapshot = pendingAttemptSnapshot(draft)
+    const alert =
       pendingOrder.kind === 'in-progress' ? (
-        <OrderInProgressAlert orderId={pendingOrder.orderId} />
+        <OrderInProgressAlert state={pendingOrder} />
       ) : (
         <RecoverPendingOrder accountId={account.id} />
       )
+    body = snapshot ? <AttemptReview snapshot={snapshot}>{alert}</AttemptReview> : alert
   } else body = (
     <CheckoutContent
       account={account}
       cart={{ items: [...cart.items], couponCode: cart.couponCode }}
-      orderInProgress={pendingOrder.kind === 'in-progress' ? pendingOrder.orderId : undefined}
+      orderInProgress={pendingOrder.kind === 'in-progress' ? pendingOrder : undefined}
     />
   )
 
@@ -122,9 +131,10 @@ function RecoverPendingOrder({ accountId }: { accountId: Id }) {
       await navigate({ to: '/orders/$orderId', params: { orderId: outcome.order.id }, replace: true })
       return
     }
-    // 409 descarta a tentativa (a tela volta ao /cart); `transient` mantém o aviso
-    // `fatal` descarta a tentativa: sem ela e com o carrinho vazio a página volta ao /cart, então o motivo vai no toast
+    // 409 e `fatal` descartam a tentativa: sem ela e com o carrinho vazio a página volta ao /cart, então o motivo
+    // vai no toast. `transient` mantém o aviso
     if (outcome?.kind === 'fatal') toast.error(outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE)
+    if (outcome?.kind === 'items' || outcome?.kind === 'quote') toast.error(ATTEMPT_CONFLICT_MESSAGE, { description: outcome.message })
     lock.current = false
     setSubmitting(false)
   }
@@ -133,10 +143,36 @@ function RecoverPendingOrder({ accountId }: { accountId: Id }) {
 }
 
 /**
- * Tentativa com pedido criado (`orderId` no rascunho) e ainda sem estado final: nada a reenviar e nenhuma chave
- * nova enquanto ele não termina. O `order.updated` (ou a consulta do `usePendingOrder`) libera o checkout.
+ * Carrinho vazio com tentativa pendente e snapshot: a lista e os valores do que "Tentar de novo" compra, acima do
+ * aviso (`children`). Só exibe: o envio continua com a mesma chave e o mesmo corpo (R4).
  */
-function OrderInProgressAlert({ orderId }: { orderId: Id }) {
+function AttemptReview({ snapshot, children }: { snapshot: AttemptSnapshot; children: ReactNode }) {
+  const nftIds = [...new Set(snapshot.items.map((item) => item.nftId))]
+  const details = useQueries({ queries: nftIds.map((nftId) => nftDetailQuery(nftId)) })
+  const lines = snapshot.items.map((item) => ({ item, nft: details[nftIds.indexOf(item.nftId)]?.data, unitPrice: item.unitPrice }))
+  return (
+    <div className={GRID_CLASS}>
+      <Step number={3} title="Revisão">
+        <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>
+        <ReviewStep lines={lines} />
+      </Step>
+      <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
+        <PriceSummary title="Resumo" quote={snapshot} />
+        {children}
+      </aside>
+    </div>
+  )
+}
+
+type OrderInProgress = Extract<PendingOrderState, { kind: 'in-progress' }>
+
+/**
+ * Tentativa com pedido criado (`orderId` no rascunho) e ainda sem estado final: nada a reenviar e nenhuma chave
+ * nova enquanto ele não termina. O `order.updated` (ou a consulta do `usePendingOrder`) libera o checkout. Se a
+ * consulta falha, "Tentar novamente" consulta de novo; a tentativa não é descartada (o pedido existe).
+ */
+function OrderInProgressAlert({ state }: { state: OrderInProgress }) {
+  const { orderId, loadFailed, retrying, retry } = state
   return (
     <div role="status" className="border-border flex flex-col gap-2 rounded-md border p-3">
       <p className="text-body inline-flex items-start gap-2 font-medium">
@@ -146,6 +182,26 @@ function OrderInProgressAlert({ orderId }: { orderId: Id }) {
       <p className="text-muted-foreground text-caption">
         A rede ainda está processando o pagamento. Quando ele terminar, você pode confirmar uma nova compra.
       </p>
+      {loadFailed && (
+        <div className="flex flex-col gap-2">
+          <p className="text-destructive text-caption inline-flex items-start gap-1.5">
+            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {ORDER_LOAD_FAILED_MESSAGE}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn('self-start', BLOCKED_CTA_CLASS)}
+            aria-busy={retrying || undefined}
+            aria-disabled={retrying || undefined}
+            onClick={() => !retrying && retry()}
+          >
+            {retrying ? <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" /> : <RefreshCw aria-hidden />}
+            Tentar novamente
+          </Button>
+        </div>
+      )}
       <Link to="/orders/$orderId" params={{ orderId }} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
         Acompanhar o pedido
       </Link>
@@ -184,7 +240,7 @@ function PendingOrderAlert({ submitting, onResend }: { submitting: boolean; onRe
   )
 }
 
-function CheckoutContent({ account, cart, orderInProgress }: { account: Account; cart: Cart; orderInProgress?: Id }) {
+function CheckoutContent({ account, cart, orderInProgress }: { account: Account; cart: Cart; orderInProgress?: OrderInProgress }) {
   const accountId = account.id
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -192,15 +248,34 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
 
   const profile = useQuery(profileQuery(accountId))
   const wallets = useQuery(walletsQuery(accountId))
-  const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
   const quote = useCartQuote(accountId, cart)
+  const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  // Com tentativa pendente (e snapshot), a Revisão e o resumo mostram o que "Tentar de novo" compra. Durante o
+  // "Confirmando…" o `withOrderKey` já gravou a tentativa antes do POST: a Revisão fica no carrinho (só exibição,
+  // nada do que é enviado muda) até o envio terminar. O reenvio ("Tentar de novo") já mostra a tentativa.
+  const source: ReviewSource =
+    !submitting || resending ? reviewSource(cart.items, draft) : { kind: 'cart', items: cart.items }
+  const attempt = source.kind === 'attempt' ? source.snapshot : undefined
+  // Nome e arte dos NFTs do carrinho e da tentativa: com a união, quando a tentativa termina e a Revisão volta ao
+  // carrinho, as artes já estão carregadas (nada pisca em skeleton)
+  const nftIds = [...new Set([...cart.items, ...(attempt?.items ?? [])].map((item) => item.nftId))]
+  const details = useQueries({ queries: nftIds.map((nftId) => nftDetailQuery(nftId)) })
+  const nftOf = (nftId: Id) => details[nftIds.indexOf(nftId)]?.data
 
-  // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança
+  // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança. Com a
+  // tentativa na Revisão, a cotação do carrinho não está na tela: nada é revisado; quando a origem muda, o revisado
+  // recomeça (o próximo "Confirmar" compara com o que foi exibido)
   const [reviewed, setReviewed] = useState<ReviewSnapshot>()
-  if (!reviewed && quote.quote && !quote.isPlaceholderData) setReviewed(snapshotOf(quote.quote))
+  const [reviewedSource, setReviewedSource] = useState(source.kind)
+  if (reviewedSource !== source.kind) {
+    setReviewedSource(source.kind)
+    setReviewed(undefined)
+  } else if (!reviewed && source.kind === 'cart' && quote.quote && !quote.isPlaceholderData) {
+    setReviewed(snapshotOf(quote.quote))
+  }
 
   const [notice, setNotice] = useState<Notice>()
-  const [submitting, setSubmitting] = useState(false)
   const submitLock = useRef(false)
   const [connecting, setConnecting] = useState(false)
   const [walletError, setWalletError] = useState<string>()
@@ -224,9 +299,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     if (pending || walletId === selectedId) return
     setWalletError(undefined)
     // Trocar de carteira desconecta a anterior
-    const next = { ...drafts.get(), walletId }
-    delete next.connectedWalletId
-    drafts.set(next)
+    drafts.set({ ...withoutConnection(drafts.get()), walletId })
   }
 
   const connect = async () => {
@@ -328,32 +401,44 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   const messages = notice?.kind === 'changed' ? changeMessages(notice.changes) : undefined
 
   const canConfirm = quote.canCheckout && connected && reviewed !== undefined && !pending
+  // Motivos do "Confirmar compra" bloqueado, ligados a ele por `aria-describedby`
+  const issuesId = useId()
+  const blockId = useId()
+  const connectId = useId()
+  const showIssues = !attempt && (hasIssues || notice?.kind === 'blocked')
+  const blockReason = quote.block !== undefined && quote.block !== 'issues' ? CHECKOUT_BLOCK_MESSAGE[quote.block] : undefined
+  const describedBy = canConfirm
+    ? undefined
+    : [!connected && connectId, showIssues && issuesId, blockReason && blockId].filter(Boolean).join(' ') || undefined
   const confirm = () => {
     if (!canConfirm || !selectedId || !reviewed) return
     setNotice(undefined)
     void run(() => confirmPurchase(deps(), { reviewed, walletId: selectedId, requote }))
   }
-  const [resending, setResending] = useState(false)
   const resend = () => {
     if (submitLock.current) return
     setResending(true)
     void run(() => resendPendingOrder(deps())).finally(() => setResending(false))
   }
 
-  const lines = cart.items.map((item, index) => {
-    const key = lineKey(item)
-    return {
-      item,
-      nft: details[index]?.data,
-      unitPrice: quote.unitPriceOf(item),
-      issue: issues.get(key),
-      message: (notice?.kind === 'items' ? notice.fieldErrors[key] : undefined) ?? messages?.byLine.get(key),
-    }
-  })
+  const lines = attempt
+    ? attempt.items.map((item) => ({ item, nft: nftOf(item.nftId), unitPrice: item.unitPrice }))
+    : source.items.map((item) => {
+        const key = lineKey(item)
+        return {
+          item,
+          nft: nftOf(item.nftId),
+          unitPrice: quote.unitPriceOf(item),
+          issue: issues.get(key),
+          message: (notice?.kind === 'items' ? notice.fieldErrors[key] : undefined) ?? messages?.byLine.get(key),
+        }
+      })
 
   let staleMessage: string | undefined
   let staleAction: ReactNode
-  if (staleAfterError) {
+  if (attempt) {
+    // Os valores da tentativa são os do pedido enviado: a cotação do carrinho atual não os torna desatualizados
+  } else if (staleAfterError) {
     staleMessage = 'Não foi possível atualizar a cotação. Tente de novo antes de confirmar.'
     staleAction = (
       <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void quote.refetch()}>
@@ -400,12 +485,15 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
         </Step>
 
         <Step number={3} title="Revisão">
+          {attempt && <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>}
           <ReviewStep lines={lines} />
         </Step>
       </div>
 
       <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
-        {quote.isError && !quoteData ? (
+        {attempt ? (
+          <PriceSummary title="Resumo" quote={attempt} />
+        ) : quote.isError && !quoteData ? (
           <QuoteErrorState quote={quote} />
         ) : (
           <PriceSummary
@@ -417,9 +505,9 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
           />
         )}
 
-        {(hasIssues || notice?.kind === 'blocked') && (
+        {showIssues && (
           <div role="alert" className="text-destructive text-caption flex flex-col gap-2">
-            <p>{QUOTE_ISSUES_MESSAGE}</p>
+            <p id={issuesId}>{QUOTE_ISSUES_MESSAGE}</p>
             <Link to="/cart" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
               Voltar ao carrinho
             </Link>
@@ -430,7 +518,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
 
         {/* Durante o envio que acabou de criar o pedido a página está navegando: o CTA "Confirmando…" fica */}
         {orderInProgress !== undefined && !submitting ? (
-          <OrderInProgressAlert orderId={orderInProgress} />
+          <OrderInProgressAlert state={orderInProgress} />
         ) : pending && !(submitting && !resending) ? (
           <PendingOrderAlert submitting={resending} onResend={resend} />
         ) : (
@@ -439,6 +527,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
             size="lg"
             aria-busy={submitting || undefined}
             aria-disabled={!canConfirm || submitting || undefined}
+            aria-describedby={submitting ? undefined : describedBy}
             className={BLOCKED_CTA_CLASS}
             onClick={confirm}
           >
@@ -446,7 +535,16 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
             {submitting ? 'Confirmando…' : 'Confirmar compra'}
           </Button>
         )}
-        {!connected && !pending && <p className="text-muted-foreground text-caption">Conecte uma carteira para confirmar.</p>}
+        {!pending && !submitting && blockReason && (
+          <p id={blockId} className="text-muted-foreground text-caption">
+            {blockReason}
+          </p>
+        )}
+        {!connected && !pending && (
+          <p id={connectId} className="text-muted-foreground text-caption">
+            {CONNECT_WALLET_MESSAGE}
+          </p>
+        )}
       </aside>
     </div>
   )

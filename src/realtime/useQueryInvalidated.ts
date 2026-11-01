@@ -1,4 +1,4 @@
-import { hashKey, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { hashKey, notifyManager, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useCallback, useSyncExternalStore } from 'react'
 
 /**
@@ -6,11 +6,16 @@ import { useCallback, useSyncExternalStore } from 'react'
  * `useQuery` não expõe isso: refazer a MESMA chave não é `isPlaceholderData`, e `isStale` também liga sozinho
  * com o tempo. O carrinho e o checkout somam isto ao "recotando" para a cotação invalidada por um `nft.updated`
  * aparecer como desatualizada até a nova chegar (MYK-1091).
+ *
+ * O aviso ao React passa pelo `notifyManager.batchCalls`, como no `useIsFetching`: o `QueryCache` notifica de forma
+ * síncrona, inclusive quando uma query nasce no render de outro componente, e repassar isso direto ao
+ * `useSyncExternalStore` atualizaria este componente no meio daquele render ("Cannot update a component while
+ * rendering a different component").
  */
 export function useQueryInvalidated(queryKey: QueryKey): boolean {
   const cache = useQueryClient().getQueryCache()
   const hash = hashKey(queryKey)
-  const subscribe = useCallback((onChange: () => void) => cache.subscribe(onChange), [cache])
+  const subscribe = useCallback((onChange: () => void) => cache.subscribe(notifyManager.batchCalls(onChange)), [cache])
   const get = () => cache.get(hash)?.state.isInvalidated ?? false
   return useSyncExternalStore(subscribe, get, get)
 }

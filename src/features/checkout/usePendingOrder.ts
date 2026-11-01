@@ -16,8 +16,10 @@ export type PendingOrderState =
   /**
    * Tentativa com `orderId` (o 201/200 chegou): o pedido existe e ainda não tem estado final conhecido aqui.
    * Nada a reenviar; a tela aponta para a Confirmação. A carteira continua travada e não há chave nova.
+   * `loadFailed`: a consulta do pedido falhou (rede, 5xx, até 404); `retry` consulta de novo. Nenhuma falha
+   * descarta a tentativa: o pedido foi criado e só o servidor pode dizer o estado final (R4).
    */
-  | { kind: 'in-progress'; orderId: Id }
+  | { kind: 'in-progress'; orderId: Id; loadFailed: boolean; retrying: boolean; retry: () => void }
 
 /**
  * O que a tentativa guardada no rascunho significa para o checkout. Com `orderId`, consulta o pedido
@@ -38,5 +40,11 @@ export function usePendingOrder(accountId: Id, draft: CheckoutDraft, drafts: Che
 
   if (!pending) return { kind: 'none' }
   if (orderId === undefined) return { kind: 'unconfirmed' }
-  return { kind: 'in-progress', orderId }
+  return {
+    kind: 'in-progress',
+    orderId,
+    loadFailed: order.isError,
+    retrying: order.isError && order.isFetching,
+    retry: () => void order.refetch(),
+  }
 }

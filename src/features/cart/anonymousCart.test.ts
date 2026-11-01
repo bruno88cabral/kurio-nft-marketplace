@@ -95,6 +95,19 @@ describe('createAnonymousCartStore', () => {
     expect(store.read()).toEqual([line('a', '1/10', 3)])
   })
 
+  it('add devolve se a linha mudou: false com a linha já no available ou sem estoque, sem escrever nem notificar', () => {
+    const storage = memory()
+    const store = createAnonymousCartStore(() => storage)
+    const listener = vi.fn()
+    store.subscribe(listener)
+    expect(store.add(line('a', '1/10', 2), 3)).toBe(true)
+    expect(store.add(line('a', '1/10', 5), 3)).toBe(true) // clamp parcial: 2 -> 3
+    expect(store.add(line('a', '1/10', 1), 3)).toBe(false) // já no limite
+    expect(store.add(line('b', 'open', 1), 0)).toBe(false) // sem estoque
+    expect(store.read()).toEqual([line('a', '1/10', 3)])
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
   it('clear remove a chave', () => {
     const storage = memory(JSON.stringify([line('a', 'open', 1)]))
     const store = createAnonymousCartStore(() => storage)

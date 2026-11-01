@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cartKeys } from '@/api/cart'
-import type { Order } from '@/contracts'
+import { ApiError, type Order } from '@/contracts'
 import { parseEth } from '@/lib/eth'
 import { createDraftStore, type CheckoutDraft } from './checkoutDraft'
 import { usePendingOrder } from './usePendingOrder'
@@ -72,10 +72,10 @@ describe('usePendingOrder', () => {
   it('orderId com o pedido ainda pending: in-progress, rascunho e carteira travados', async () => {
     get.mockResolvedValue({ data: order('pending') })
     const { result, drafts } = setup(attempt('o1'))
-    expect(result.current).toEqual({ kind: 'in-progress', orderId: 'o1' })
+    expect(result.current).toMatchObject({ kind: 'in-progress', orderId: 'o1', loadFailed: false })
     await waitFor(() => expect(get).toHaveBeenCalledWith('/orders/o1', expect.anything()))
     await new Promise((r) => setTimeout(r, 0))
-    expect(result.current).toEqual({ kind: 'in-progress', orderId: 'o1' })
+    expect(result.current).toMatchObject({ kind: 'in-progress', orderId: 'o1', loadFailed: false })
     expect(drafts.get()).toEqual(attempt('o1'))
   })
 
@@ -92,5 +92,20 @@ describe('usePendingOrder', () => {
     const { result, drafts } = setup(attempt('o1'))
     await waitFor(() => expect(result.current).toEqual({ kind: 'none' }))
     expect(drafts.get()).toEqual({ walletId: 'w1', connectedWalletId: 'w1' })
+  })
+
+  it('a consulta falha (404): segue in-progress com "Tentar novamente", sem descartar a tentativa (R4)', async () => {
+    get.mockRejectedValue(new ApiError({ code: 'not_found', message: 'Pedido não encontrado.' }, 404))
+    const { result, drafts } = setup(attempt('o1'))
+    await waitFor(() => expect(result.current).toMatchObject({ kind: 'in-progress', orderId: 'o1', loadFailed: true }))
+    // O pedido foi criado (o 201/200 trouxe o id): nenhuma falha de leitura libera uma chave nova
+    expect(drafts.get()).toEqual(attempt('o1'))
+
+    get.mockResolvedValue({ data: order('confirmed') })
+    act(() => {
+      if (result.current.kind === 'in-progress') result.current.retry()
+    })
+    await waitFor(() => expect(result.current).toEqual({ kind: 'none' }))
+    expect(drafts.get()).toEqual({})
   })
 })

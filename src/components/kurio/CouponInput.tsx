@@ -1,5 +1,5 @@
 import { CircleAlert, LoaderCircle, TicketPercent, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { CouponStatus } from '@/contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,10 +10,13 @@ export type CouponInputStatus = 'idle' | 'applying' | CouponStatus
 
 export interface CouponInputProps {
   status: CouponInputStatus
-  /** Código já aplicado (normalizado pelo mock), exibido no estado `applied`. */
+  /** Código gravado (normalizado pelo mock), exibido no estado `applied` e no nome do "Remover". */
   appliedCode?: string
   onApply: (code: string) => void
-  /** Remove o cupom aplicado (botão "Remover" no estado `applied`). */
+  /**
+   * Remove o cupom gravado: botão "Remover" no estado `applied` e também em `invalid` e `expired` (o código
+   * ruim continua gravado e entra nas próximas cotações até sair).
+   */
   onRemove?: () => void
   /** Sobrescreve a mensagem padrão de `invalid` ("Cupom inválido.") / `expired` ("Cupom expirado."). */
   errorMessage?: string
@@ -49,6 +52,23 @@ export function CouponInput({
   const [expanded, setExpanded] = useState(false)
   const applying = status === 'applying'
   const error = errorMessage ?? DEFAULT_ERROR[status]
+  const removable = onRemove !== undefined && (status === 'invalid' || status === 'expired')
+  // "Remover" desmonta o botão focado e o foco cairia no `body`: depois da remoção (status volta a `idle`) o foco
+  // vai para o campo. Só vale para quem clicou em "Remover"; os outros estados não mexem no foco.
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (refocus.current && status === 'idle') {
+      refocus.current = false
+      document.getElementById(id)?.focus()
+    }
+  }, [status, id])
+  const remove = () => {
+    if (!onRemove) return
+    refocus.current = true
+    // No modo `collapsible` o campo não pode voltar a ser o link, senão não há onde pôr o foco
+    setExpanded(true)
+    onRemove()
+  }
 
   if (status === 'applied') {
     return (
@@ -63,7 +83,7 @@ export function CouponInput({
           Cupom <strong className="font-bold">{appliedCode}</strong> aplicado
         </span>
         {onRemove && (
-          <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+          <Button type="button" variant="ghost" size="sm" onClick={remove}>
             <X aria-hidden />
             Remover<span className="sr-only"> cupom {appliedCode}</span>
           </Button>
@@ -88,7 +108,10 @@ export function CouponInput({
 
   const submit = () => {
     const trimmed = code.trim()
-    if (trimmed && !applying) onApply(trimmed)
+    if (trimmed && !applying) {
+      refocus.current = false
+      onApply(trimmed)
+    }
   }
 
   return (
@@ -130,11 +153,21 @@ export function CouponInput({
           {applying ? 'Aplicando…' : 'Aplicar'}
         </Button>
       </div>
-      {error && (
-        <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
-          <CircleAlert aria-hidden className="size-3.5" />
-          {error}
-        </p>
+      {(error || removable) && (
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {error && (
+            <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
+              <CircleAlert aria-hidden className="size-3.5" />
+              {error}
+            </p>
+          )}
+          {removable && (
+            <Button type="button" variant="ghost" size="sm" onClick={remove}>
+              <X aria-hidden />
+              Remover<span className="sr-only"> cupom{appliedCode ? ` ${appliedCode}` : ''}</span>
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

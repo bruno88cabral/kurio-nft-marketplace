@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { orderKeys } from '@/api/orders'
 import { ApiError, type CreateOrderRequest, type Id, type Order, type Quote } from '@/contracts'
+import { attemptSnapshotOf } from './attemptSnapshot'
 import { pendingAttempt, withOrderId, withOrderKey, withoutOrderKey, type CheckoutDraftStore } from './checkoutDraft'
 import { diffSnapshots, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 
@@ -17,7 +18,7 @@ export type OrderErrorKind =
   | 'items'
   /** 409 sem `fieldErrors` (cotação vencida ou usada, chave com outro corpo): recotar e confirmar de novo. */
   | 'quote'
-  /** 401/403/404/422: não adianta repetir (a tentativa é descartada). */
+  /** Todo `ApiError` que não seja `transient` nem `conflict` (401, 403, 404, 422…): não adianta repetir (a tentativa é descartada). */
   | 'fatal'
 
 export function classifyOrderError(error: unknown): OrderErrorKind {
@@ -44,7 +45,7 @@ export type PlaceOrderOutcome =
   | { kind: 'items'; fieldErrors: Record<string, string>; message: string }
   /** 409 da cotação: a chave foi descartada; a tela recota. */
   | { kind: 'quote'; message: string }
-  /** 403/404/422 (ex.: carteira removida): a chave foi descartada; a tela mostra a mensagem e libera a carteira. */
+  /** Qualquer outro `ApiError` (401/403/404/422, ex.: carteira removida): a chave foi descartada; a tela mostra a mensagem e libera a carteira. */
   | { kind: 'fatal'; error: unknown }
   /** Login, logout ou expiração no meio: nada é gravado nem mostrado. */
   | { kind: 'stale-session' }
@@ -123,7 +124,8 @@ export async function confirmPurchase(deps: PlaceOrderDeps, input: ConfirmPurcha
   if ((quote.issues?.length ?? 0) > 0) return { kind: 'blocked', quote, snapshot }
 
   const body: CreateOrderRequest = { quoteId: quote.quoteId, walletId: input.walletId }
-  const { key, draft } = withOrderKey(deps.drafts.get(), body, deps.newKey)
+  // O snapshot é da mesma cotação enviada (a que acabou de bater com o revisado): só para exibir a tentativa
+  const { key, draft } = withOrderKey(deps.drafts.get(), body, deps.newKey, attemptSnapshotOf(quote))
   deps.drafts.set(draft)
   return send(deps, key, body)
 }

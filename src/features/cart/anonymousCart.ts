@@ -68,6 +68,17 @@ export function withQuantity(
   return items.map((i) => (sameLine(i, nftId, edition) ? { ...i, quantity: next } : i))
 }
 
+/** Mesmas linhas, na mesma ordem e com as mesmas quantidades. */
+function sameItems(a: readonly CartItem[], b: readonly CartItem[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((item, i) => {
+      const other = b[i]
+      return other !== undefined && sameLine(item, other.nftId, other.edition) && item.quantity === other.quantity
+    })
+  )
+}
+
 export function withoutItem(items: readonly CartItem[], nftId: Id, edition: NftEditionKind): CartItem[] {
   return items.filter((i) => !sameLine(i, nftId, edition))
 }
@@ -79,7 +90,8 @@ export interface AnonymousCartStore {
   getSnapshot: () => readonly CartItem[]
   /** Escritas locais e o evento `storage` de outra aba (o `storage` só dispara em OUTRA aba). */
   subscribe: (listener: () => void) => () => void
-  add: (item: CartItem, available: number) => void
+  /** `true` se a linha mudou; `false` quando nada coube (a linha já está no `available`, sem estoque ou quantidade inválida). */
+  add: (item: CartItem, available: number) => boolean
   setQuantity: (nftId: Id, edition: NftEditionKind, quantity: number, available?: number) => void
   remove: (nftId: Id, edition: NftEditionKind) => void
   clear: () => void
@@ -138,7 +150,13 @@ export function createAnonymousCartStore(getStorage: () => SessionStorageLike | 
     read: () => [...getSnapshot()],
     getSnapshot,
     subscribe,
-    add: (item, available) => write(withItem(getSnapshot(), item, available)),
+    add: (item, available) => {
+      const current = getSnapshot()
+      const next = withItem(current, item, available)
+      if (sameItems(current, next)) return false
+      write(next)
+      return true
+    },
     setQuantity: (nftId, edition, quantity, available) => write(withQuantity(getSnapshot(), nftId, edition, quantity, available)),
     remove: (nftId, edition) => write(withoutItem(getSnapshot(), nftId, edition)),
     clear: () => write([]),

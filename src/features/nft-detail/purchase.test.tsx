@@ -5,7 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ApiError, type CartItem, type Nft } from '@/contracts'
 import { parseEth } from '@/lib/eth'
 
-const add = vi.fn<(item: CartItem, opts: { available: number }) => Promise<void>>()
+const add = vi.fn<(item: CartItem, opts: { available: number }) => Promise<boolean>>()
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
 const navigate = vi.fn()
@@ -58,7 +58,7 @@ const addButtons = () => screen.getAllByRole('button', { name: 'Adicionar ao car
 beforeEach(() => {
   cartState = { isPending: false, isAuthenticated: false }
   add.mockReset()
-  add.mockResolvedValue(undefined)
+  add.mockResolvedValue(true)
   toastSuccess.mockReset()
   toastError.mockReset()
   navigate.mockReset()
@@ -113,6 +113,24 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('visitante já no limite (nada coube): aviso no painel no padrão do 409, sem "Adicionado ao carrinho"', async () => {
+    add.mockResolvedValue(false)
+    render(<Detail />)
+    fireEvent.click(addButtons()[0])
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Só restam 7 unidades desta edição, e todas já estão no seu carrinho.')
+    expect(toastSuccess).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('visitante já no limite na barra mobile: toast de erro, sem "Adicionado ao carrinho"', async () => {
+    add.mockResolvedValue(false)
+    render(<Detail />)
+    fireEvent.click(addButtons()[1])
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Só restam 7 unidades desta edição, e todas já estão no seu carrinho.'))
+    expect(toastSuccess).not.toHaveBeenCalled()
+  })
+
   it('outro erro vira toast genérico', async () => {
     add.mockRejectedValue(new Error('rede'))
     render(<Detail />)
@@ -122,7 +140,7 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
 
   it('enquanto envia fica aria-busy e ignora o segundo clique', async () => {
     let resolve: () => void = () => undefined
-    add.mockImplementation(() => new Promise<void>((r) => (resolve = r)))
+    add.mockImplementation(() => new Promise<boolean>((r) => (resolve = () => r(true))))
     render(<Detail />)
     const [desktop] = addButtons()
     fireEvent.click(desktop)

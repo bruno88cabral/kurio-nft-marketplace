@@ -1,5 +1,6 @@
 import type { SessionStorageLike } from '@/auth/sessionStorage'
 import type { CreateOrderRequest, Id, Order } from '@/contracts'
+import { parseAttemptSnapshot, type AttemptSnapshot } from './attemptSnapshot'
 
 /** Rascunho do checkout em `sessionStorage` (morre com a aba; não vaza para outra aba nem outro login). */
 export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
@@ -7,7 +8,10 @@ export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
 export interface CheckoutDraft {
   /** Carteira escolhida no Pagamento. */
   walletId?: Id
-  /** Carteira cuja conexão (`POST /wallets/:id/connect`) deu certo. Só vale se for a escolhida. */
+  /**
+   * Carteira cuja conexão (`POST /wallets/:id/connect`) deu certo. Só vale se for a escolhida. Cai no reset da
+   * sessão (login, troca de conta, logout, expiração; `dropWalletConnections`, MYK-1103): a conexão é da sessão.
+   */
   connectedWalletId?: Id
   /** Chave da tentativa de pedido ainda sem resposta final (`Idempotency-Key`). */
   idempotencyKey?: string
@@ -24,6 +28,12 @@ export interface CheckoutDraft {
    * rascunho mesmo com a Confirmação fechada. Só vale junto da tentativa.
    */
   orderId?: Id
+  /**
+   * Itens e valores da cotação enviada pela tentativa (`attemptSnapshotOf`). Só para exibir: com a tentativa
+   * pendente, a Revisão e o resumo mostram o que "Tentar de novo" compra, não o carrinho atual. Só vale junto
+   * da tentativa e com o mesmo `quoteId`; nunca muda o corpo nem a chave do reenvio.
+   */
+  attemptSnapshot?: AttemptSnapshot
 }
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== ''
@@ -50,6 +60,9 @@ export function parseCheckoutDraft(raw: string | null): CheckoutDraft {
       draft.keyFingerprint = value.keyFingerprint
       draft.attempt = { quoteId: value.attempt.quoteId, walletId: value.attempt.walletId }
       if (isString(value.orderId)) draft.orderId = value.orderId
+      // Snapshot ausente, malformado ou de outra cotação: a tentativa fica, só sem o que exibir (rascunho antigo)
+      const snapshot = parseAttemptSnapshot(value.attemptSnapshot)
+      if (snapshot && snapshot.quoteId === draft.attempt.quoteId) draft.attemptSnapshot = snapshot
     }
     return draft
   } catch {
@@ -98,20 +111,25 @@ export const keyFingerprint = (attempt: CreateOrderRequest) => `${attempt.quoteI
 
 /**
  * Chave da tentativa: a guardada se o par cotação+carteira é o mesmo (repetir a mesma tentativa nunca cria
- * outro pedido); senão uma nova. Devolve o rascunho já com a chave, o fingerprint e o corpo, para gravar
- * **antes** do POST.
+ * outro pedido); senão uma nova. Devolve o rascunho já com a chave, o fingerprint, o corpo e o `snapshot` do
+ * que a tentativa compra (só para exibir), para gravar **antes** do POST. O snapshot não entra na chave nem no corpo.
  */
 export function withOrderKey(
   draft: CheckoutDraft,
   attempt: CreateOrderRequest,
   newKey: () => string = () => crypto.randomUUID(),
+  snapshot?: AttemptSnapshot,
 ): { key: string; draft: CheckoutDraft } {
   const fingerprint = keyFingerprint(attempt)
   const reused = draft.idempotencyKey && draft.keyFingerprint === fingerprint ? draft.idempotencyKey : undefined
   const key = reused ?? newKey()
   const next: CheckoutDraft = { ...draft, idempotencyKey: key, keyFingerprint: fingerprint, attempt: { ...attempt } }
-  // Chave nova é outra tentativa: o pedido da anterior não é dela
-  if (!reused) delete next.orderId
+  // Chave nova é outra tentativa: o pedido e o snapshot da anterior não são dela
+  if (!reused) {
+    delete next.orderId
+    delete next.attemptSnapshot
+  }
+  if (snapshot && snapshot.quoteId === attempt.quoteId) next.attemptSnapshot = snapshot
   return { key, draft: next }
 }
 
@@ -123,6 +141,16 @@ export function withOrderKey(
 export function withConnectedWallet(draft: CheckoutDraft, walletId: Id): CheckoutDraft | undefined {
   if (draft.walletId !== undefined && draft.walletId !== walletId) return undefined
   return { ...draft, walletId, connectedWalletId: walletId }
+}
+
+/**
+ * Sem a conexão da carteira, e só ela. `walletId` e a tentativa pendente (`idempotencyKey`, `keyFingerprint`,
+ * `attempt`, `orderId`, `attemptSnapshot`) ficam: apagar a tentativa abriria caminho para um pedido duplicado depois de um timeout (R4).
+ */
+export function withoutConnection(draft: CheckoutDraft): CheckoutDraft {
+  const next = { ...draft }
+  delete next.connectedWalletId
+  return next
 }
 
 /** Grava o pedido criado na tentativa da chave `key`; outra tentativa (ou nenhuma) fica como está. */
@@ -137,6 +165,7 @@ export function withoutOrderKey(draft: CheckoutDraft): CheckoutDraft {
   delete next.keyFingerprint
   delete next.attempt
   delete next.orderId
+  delete next.attemptSnapshot
   return next
 }
 
@@ -169,6 +198,16 @@ export function settleCheckoutDraft(
 export function pendingAttempt(draft: CheckoutDraft): { key: string; body: CreateOrderRequest } | undefined {
   if (!draft.idempotencyKey || !draft.attempt || draft.keyFingerprint !== keyFingerprint(draft.attempt)) return undefined
   return { key: draft.idempotencyKey, body: draft.attempt }
+}
+
+/**
+ * Itens e valores que "Tentar de novo" compra: o snapshot da tentativa pendente. `undefined` sem tentativa ou
+ * com rascunho antigo, sem snapshot (a tela segue mostrando o carrinho atual).
+ */
+export function pendingAttemptSnapshot(draft: CheckoutDraft): AttemptSnapshot | undefined {
+  const pending = pendingAttempt(draft)
+  if (!pending || !draft.attemptSnapshot || draft.attemptSnapshot.quoteId !== pending.body.quoteId) return undefined
+  return draft.attemptSnapshot
 }
 
 /** Interface mínima de leitura/escrita do rascunho, injetável nos testes. */
@@ -219,4 +258,46 @@ export function checkoutDraftStore(accountId: Id): ObservableDraftStore {
     stores.set(accountId, store)
   }
   return store
+}
+
+const DRAFT_KEY_PREFIX = checkoutDraftKey('')
+
+/** Chaves `kurio:checkout:*` do storage; storage que não lista (ou lança) devolve só o que se sabe. */
+function draftStorageKeys(storage: SessionStorageLike): string[] {
+  const listable = storage as Partial<Storage>
+  if (typeof listable.length !== 'number' || typeof listable.key !== 'function') return []
+  const found: string[] = []
+  try {
+    for (let i = 0; i < listable.length; i++) {
+      const key = listable.key(i)
+      if (key?.startsWith(DRAFT_KEY_PREFIX)) found.push(key)
+    }
+  } catch {
+    // storage ilegível
+  }
+  return found
+}
+
+/**
+ * Reset da sessão (login, troca de conta, logout, expiração): a conexão da carteira é da sessão e cai, a
+ * tentativa pendente fica. O reset privado não diz de qual conta, então vale para todos os rascunhos
+ * `kurio:checkout:*` da aba, no storage e nas cópias em memória (a tela abre com a cópia em memória).
+ * Só reescreve o que tem conexão; não lança.
+ */
+export function dropWalletConnections(storage: SessionStorageLike | null = browserSessionStorage()): void {
+  for (const store of stores.values()) {
+    const draft = store.get()
+    if (draft.connectedWalletId !== undefined) store.set(withoutConnection(draft))
+  }
+  if (!storage) return
+  for (const key of draftStorageKeys(storage)) {
+    try {
+      const raw = storage.getItem(key)
+      const draft = parseCheckoutDraft(raw)
+      if (draft.connectedWalletId === undefined) continue
+      storage.setItem(key, JSON.stringify(withoutConnection(draft)))
+    } catch {
+      // sem persistência
+    }
+  }
 }

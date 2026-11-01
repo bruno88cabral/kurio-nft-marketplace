@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LoaderCircle, ShoppingCart } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
 import { useSession } from '@/auth/useSession'
@@ -10,7 +10,7 @@ import { CouponInput, EmptyState, ErrorState, PriceSummary } from '@/components/
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CartLine } from './CartLine'
-import { couponStatus, lineKey } from './cartView'
+import { CHECKOUT_BLOCK_MESSAGE, couponStatus, lineKey } from './cartView'
 import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from './layout'
 import { QuoteErrorState } from './QuoteErrorState'
 import { QUOTE_ISSUES_MESSAGE, useCartQuote } from './useCartQuote'
@@ -94,6 +94,8 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
   const { account } = useSession()
   const accountId = account?.id
   const [couponSubmitting, setCouponSubmitting] = useState(false)
+  const issuesId = useId()
+  const blockId = useId()
 
   const details = useQueries({ queries: cart.items.map((item) => nftDetailQuery(item.nftId)) })
 
@@ -188,19 +190,34 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
               />
             )}
             {quote.hasIssues && (
-              <p role="alert" className="text-destructive text-caption">
+              <p id={issuesId} role="alert" className="text-destructive text-caption">
                 {QUOTE_ISSUES_MESSAGE}
               </p>
             )}
-            {quote.canCheckout ? (
+            {quote.block === undefined ? (
               <Link to="/checkout" className={buttonVariants({ size: 'lg' })}>
                 Ir para o pagamento
               </Link>
             ) : (
-              <Button type="button" size="lg" aria-disabled="true" aria-busy={recalculating || undefined} className={BLOCKED_CTA_CLASS}>
-                {recalculating && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
-                Ir para o pagamento
-              </Button>
+              <>
+                {/* O motivo do bloqueio fica ligado ao botão; com `issues` é o próprio alerta acima */}
+                <Button
+                  type="button"
+                  size="lg"
+                  aria-disabled="true"
+                  aria-busy={recalculating || undefined}
+                  aria-describedby={quote.block === 'issues' ? issuesId : blockId}
+                  className={BLOCKED_CTA_CLASS}
+                >
+                  {recalculating && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
+                  Ir para o pagamento
+                </Button>
+                {quote.block !== 'issues' && (
+                  <p id={blockId} className="text-muted-foreground text-caption">
+                    {CHECKOUT_BLOCK_MESSAGE[quote.block]}
+                  </p>
+                )}
+              </>
             )}
           </>
         ) : (

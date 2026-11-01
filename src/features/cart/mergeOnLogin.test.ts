@@ -89,4 +89,28 @@ describe('mergeAnonymousCartOnLogin', () => {
     await mergeAnonymousCartOnLogin(auth, t.deps)
     expect(t.deps.notifyError).not.toHaveBeenCalled()
   })
+
+  it('um GET /cart em voo desde antes do merge e que responde depois não sobrescreve o carrinho mesclado', async () => {
+    const t = setup([{ nftId: 'nft-002', edition: '1/10', quantity: 2 }])
+    let respondOld: (cart: Cart) => void = () => undefined
+    // O GET saiu antes do merge (latência real); o servidor o respondeu com o carrinho antigo (vazio)
+    const inFlight = t.queryClient.fetchQuery({
+      queryKey: cartKeys.detail(ANA),
+      queryFn: () => new Promise<Cart>((resolve) => (respondOld = resolve)),
+    })
+    await mergeAnonymousCartOnLogin(auth, t.deps)
+    respondOld({ items: [] })
+    await expect(inFlight).rejects.toThrow()
+    expect(t.queryClient.getQueryData(cartKeys.detail(ANA))).toEqual({ items: [{ nftId: 'nft-002', edition: '1/10', quantity: 2 }] })
+  })
+
+  it('a cotação em cache não é cancelada (só a chave do carrinho)', async () => {
+    const t = setup([{ nftId: 'nft-002', edition: '1/10', quantity: 1 }])
+    const quoteKey = cartKeys.quote(ANA, 'fp')
+    let respondQuote: (value: string) => void = () => undefined
+    const quote = t.queryClient.fetchQuery({ queryKey: quoteKey, queryFn: () => new Promise<string>((resolve) => (respondQuote = resolve)) })
+    await mergeAnonymousCartOnLogin(auth, t.deps)
+    respondQuote('q1')
+    await expect(quote).resolves.toBe('q1')
+  })
 })
