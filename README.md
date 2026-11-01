@@ -63,7 +63,7 @@ O build não roda no CI: o check **Vercel** (abaixo) já executa o `pnpm build` 
 
 O repositório está ligado à Vercel pela integração com o GitHub (projeto `kurio-nft-marketplace`). Todo push gera um deploy e o check **Vercel** no commit. Cada PR recebe um comentário do bot com a URL do preview, e a produção sai da branch padrão do repo (`main`), salvo outra escolha em Settings -> Git na Vercel. Não há Action de deploy, de propósito: ela duplicaria os deploys da integração e exigiria um token da Vercel nos secrets.
 
-> TODO: os domínios do projeto (`*-bruno88cabrals-projects.vercel.app`) estão atrás da Deployment Protection da Vercel e respondem 302 para o login. O domínio `kurio-nft-marketplace.vercel.app` **não** é deste projeto (serve outro código). Para ter uma URL pública, desligar a proteção ou adicionar um domínio em Settings -> Domains. O spike do R1 continua validado só em `pnpm build && pnpm preview` local (ver `ARCHITECTURE.md`).
+**URL pública:** https://kurio-nft-marketplace-bruno-cabral.vercel.app (produção, a partir da `main`; o domínio antigo `kurio-nft-marketplace-three.vercel.app` redireciona para ela). Conferido na entrega: acesso direto e refresh respondem 200 em todas as rotas (`/`, `/nfts/nft-001`, `/nfts/nao-existe`, `/cart`, `/checkout`, `/login`, `/signup`, `/profile`, `/wallets`, `/orders/:id`), `/mockServiceWorker.js` e `/robots.txt` são servidos, e o tempo real funciona no domínio público (receita 41: `__kurioMock.emit.nftUpdated('nft-001', { price: '7.77' })` muda o preço do Detalhe sem recarregar).
 
 Configuração esperada do projeto na Vercel:
 
