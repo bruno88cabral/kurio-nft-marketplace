@@ -11,7 +11,7 @@ import { CatalogGrid } from './CatalogGrid'
 import { CatalogToolbar } from './CatalogToolbar'
 import { useCatalogSearch } from './useCatalogSearch'
 
-/** Âncora do "Mercado" (header e tab bar) e do EXPLORAR do hero. */
+/** Âncora do "Mercado" do header, das trilhas, das buscas (header e topo mobile), da paginação e do EXPLORAR do hero. */
 const CATALOG_ANCHOR_ID = 'catalogo'
 
 /**
@@ -28,8 +28,9 @@ export function CatalogSection() {
     <section
       id={CATALOG_ANCHOR_ID}
       aria-labelledby={titleId}
-      // scroll-mt: o header é sticky (h-16)
-      className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 pt-2 pb-10 md:px-6 md:pt-10"
+      // scroll-mt: a partir de `md` o header é sticky (h-16); abaixo de `md` o Início não tem header
+      // (`hideMobileChrome: 'header'`), então só uma folga pequena
+      className="mx-auto w-full max-w-7xl scroll-mt-2 px-4 md:scroll-mt-20 pt-2 pb-10 md:px-6 md:pt-10"
     >
       <h2 id={titleId} className="sr-only">
         Catálogo

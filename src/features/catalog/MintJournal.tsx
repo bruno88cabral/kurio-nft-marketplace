@@ -5,7 +5,7 @@ import { nftArtSize } from '@/lib/nftArt'
 /**
  * "Diário da Cunhagem" (blog do Figma `2:2`). A página editorial está fora do escopo (§3): o bloco
  * existe pela fidelidade visual, com os textos do Figma (não são dados de negócio) e "Ler mais" no
- * padrão `OutOfScopeAction`. As imagens são as artes do kit.
+ * padrão `OutOfScopeAction`. As imagens são as fotos dos macacos (`macaco-*-960.webp`, MYK-1079).
  */
 const POSTS = [
   {
