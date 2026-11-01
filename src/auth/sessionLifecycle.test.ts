@@ -221,6 +221,43 @@ describe('establishSession', () => {
   })
 })
 
+describe('onPrivateReset', () => {
+  it('avisa a cada reset privado (login, troca de conta, logout, expiração e reset direto); remover desliga', async () => {
+    const { lifecycle } = setup()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const listener = vi.fn()
+    lifecycle.onPrivateReset(() => {
+      throw new Error('falhou')
+    })
+    const remove = lifecycle.onPrivateReset(listener)
+
+    await lifecycle.establishSession(auth('tok-ana', ANA))
+    expect(listener).toHaveBeenCalledTimes(1)
+    await lifecycle.establishSession(auth('tok-bruno', BRUNO))
+    expect(listener).toHaveBeenCalledTimes(2)
+    await lifecycle.endSession('logout')
+    expect(listener).toHaveBeenCalledTimes(3)
+    await lifecycle.establishSession(auth('tok-ana-2', ANA))
+    await lifecycle.endSession('expired')
+    expect(listener).toHaveBeenCalledTimes(5)
+    await lifecycle.resetPrivateState()
+    expect(listener).toHaveBeenCalledTimes(6)
+
+    remove()
+    await lifecycle.resetPrivateState()
+    expect(listener).toHaveBeenCalledTimes(6)
+    error.mockRestore()
+  })
+
+  it('o boot (resumeSession) não reseta', () => {
+    const { lifecycle } = setup()
+    const listener = vi.fn()
+    lifecycle.onPrivateReset(listener)
+    lifecycle.resumeSession()
+    expect(listener).not.toHaveBeenCalled()
+  })
+})
+
 describe('endSession', () => {
   it('logout: chama a API, limpa a sessão e o cache privado e reconecta sem token', async () => {
     const { lifecycle, queryClient, storage, reconnectSocket, logout, notifyError, navigation } = setup()

@@ -1,0 +1,594 @@
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, Navigate, useNavigate } from '@tanstack/react-router'
+import { LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
+import { nftDetailQuery } from '@/api/nfts'
+import { createOrder } from '@/api/orders'
+import { profileQuery } from '@/api/profile'
+import { connectWallet, walletKeys, walletsQuery } from '@/api/wallets'
+import { captureSession } from '@/auth/sessionGuard'
+import { useSession } from '@/auth/useSession'
+import { ApiError, type Account, type Cart, type Id, type Quote } from '@/contracts'
+import { ErrorState, PriceSummary } from '@/components/kurio'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { CHECKOUT_BLOCK_MESSAGE, lineKey } from '@/features/cart/cartView'
+import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from '@/features/cart/layout'
+import { QuoteErrorState } from '@/features/cart/QuoteErrorState'
+import { useCart } from '@/features/cart/useCart'
+import { QUOTE_ISSUES_MESSAGE, useCartQuote } from '@/features/cart/useCartQuote'
+import { sortWallets } from '@/lib/wallets'
+import { cn } from '@/lib/utils'
+import type { AttemptSnapshot } from './attemptSnapshot'
+import { pendingAttempt, pendingAttemptSnapshot, withConnectedWallet, withoutConnection } from './checkoutDraft'
+import {
+  confirmPurchase,
+  ORDER_FAILED_MESSAGE,
+  REQUOTE_FAILED_MESSAGE,
+  resendPendingOrder,
+  TRANSIENT_ORDER_MESSAGE,
+  VALUES_CHANGED_MESSAGE,
+  type PlaceOrderDeps,
+  type PlaceOrderOutcome,
+} from './placeOrder'
+import { ReviewStep } from './ReviewStep'
+import { ATTEMPT_REVIEW_MESSAGE, reviewSource, type ReviewSource } from './reviewSource'
+import { changeMessages, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
+import { useCheckoutDraft } from './useCheckoutDraft'
+import { usePendingOrder, type PendingOrderState } from './usePendingOrder'
+import { WalletStep, type WalletConnection } from './WalletStep'
+
+const WALLET_FAILURE_MESSAGE = 'Não foi possível conectar a carteira. Tente de novo.'
+export const ORDER_IN_PROGRESS_MESSAGE = 'Seu pedido anterior ainda está em andamento.'
+export const ORDER_LOAD_FAILED_MESSAGE = 'Não foi possível consultar o pedido anterior.'
+/** Toast do 409 no "Tentar de novo" com o carrinho vazio: a tentativa sai e a página volta ao /cart. */
+export const ATTEMPT_CONFLICT_MESSAGE = 'O pedido não foi feito: os valores ou o estoque mudaram desde o envio.'
+const CONNECT_WALLET_MESSAGE = 'Conecte uma carteira para confirmar.'
+
+/** O que a última tentativa deixou para a tela (a falha transitória vem do rascunho, não daqui). */
+type Notice =
+  | { kind: 'changed'; changes: SnapshotChange[] }
+  | { kind: 'items'; fieldErrors: Record<string, string> }
+  | { kind: 'quote'; message: string }
+  | { kind: 'blocked' }
+  | { kind: 'requote-failed' }
+  | { kind: 'fatal'; message: string }
+
+/**
+ * Pagamento (`/checkout`, sob `_authenticated`): dados do colecionador, carteira (seleção + conexão) e
+ * revisão com o resumo da cotação. "Confirmar compra" recota e compara com o revisado antes de enviar (R3);
+ * o envio é idempotente, com a chave guardada no rascunho (R4). Nenhum valor é somado aqui.
+ */
+export function CheckoutPage() {
+  const { account } = useSession()
+  return account ? <Checkout account={account} /> : <Page><CheckoutSkeleton /></Page>
+}
+
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <div className={PAGE_CLASS}>
+      <h1 className="text-heading">Pagamento</h1>
+      {children}
+    </div>
+  )
+}
+
+function Checkout({ account }: { account: Account }) {
+  const cart = useCart()
+  const { draft, store: drafts } = useCheckoutDraft(account.id)
+  const pendingOrder = usePendingOrder(account.id, draft, drafts)
+
+  let body
+  if (cart.isPending) body = <CheckoutSkeleton />
+  else if (cart.isError) {
+    body = (
+      <ErrorState
+        title="Não foi possível carregar o carrinho."
+        description="Verifique sua conexão e tente de novo."
+        onRetry={() => void cart.refetch()}
+      />
+    )
+  } else if (cart.items.length === 0) {
+    // Carrinho vazio com envio pendente: o pedido pode ter sido confirmado (o servidor tira o comprado do
+    // carrinho). Sem isto o refresh mandaria para /cart sem dizer o que houve com o pedido. Com o pedido
+    // conhecido (`orderId`) e já final, `usePendingOrder` limpa o rascunho e a página volta ao /cart
+    if (pendingOrder.kind === 'none') return <Navigate to="/cart" replace />
+    // O que a tentativa compra (snapshot, só exibição): o carrinho já não diz, e "Tentar de novo" envia o mesmo corpo
+    const snapshot = pendingAttemptSnapshot(draft)
+    const alert =
+      pendingOrder.kind === 'in-progress' ? (
+        <OrderInProgressAlert state={pendingOrder} />
+      ) : (
+        <RecoverPendingOrder accountId={account.id} />
+      )
+    body = snapshot ? <AttemptReview snapshot={snapshot}>{alert}</AttemptReview> : alert
+  } else body = (
+    <CheckoutContent
+      account={account}
+      cart={{ items: [...cart.items], couponCode: cart.couponCode }}
+      orderInProgress={pendingOrder.kind === 'in-progress' ? pendingOrder : undefined}
+    />
+  )
+
+  return <Page>{body}</Page>
+}
+
+/** Só o "Tentar de novo" da tentativa gravada (carrinho já vazio). */
+function RecoverPendingOrder({ accountId }: { accountId: Id }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { store: drafts } = useCheckoutDraft(accountId)
+  const [submitting, setSubmitting] = useState(false)
+  const lock = useRef(false)
+
+  const resend = async () => {
+    if (lock.current) return
+    lock.current = true
+    setSubmitting(true)
+    const outcome = await resendPendingOrder({ queryClient, accountId, drafts, createOrder, sameSession: captureSession() })
+    if (outcome?.kind === 'created') {
+      await navigate({ to: '/orders/$orderId', params: { orderId: outcome.order.id }, replace: true })
+      return
+    }
+    // 409 e `fatal` descartam a tentativa: sem ela e com o carrinho vazio a página volta ao /cart, então o motivo
+    // vai no toast. `transient` mantém o aviso
+    if (outcome?.kind === 'fatal') toast.error(outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE)
+    if (outcome?.kind === 'items' || outcome?.kind === 'quote') toast.error(ATTEMPT_CONFLICT_MESSAGE, { description: outcome.message })
+    lock.current = false
+    setSubmitting(false)
+  }
+
+  return <PendingOrderAlert submitting={submitting} onResend={() => void resend()} />
+}
+
+/**
+ * Carrinho vazio com tentativa pendente e snapshot: a lista e os valores do que "Tentar de novo" compra, acima do
+ * aviso (`children`). Só exibe: o envio continua com a mesma chave e o mesmo corpo (R4).
+ */
+function AttemptReview({ snapshot, children }: { snapshot: AttemptSnapshot; children: ReactNode }) {
+  const nftIds = [...new Set(snapshot.items.map((item) => item.nftId))]
+  const details = useQueries({ queries: nftIds.map((nftId) => nftDetailQuery(nftId)) })
+  const lines = snapshot.items.map((item) => ({ item, nft: details[nftIds.indexOf(item.nftId)]?.data, unitPrice: item.unitPrice }))
+  return (
+    <div className={GRID_CLASS}>
+      <Step number={3} title="Revisão">
+        <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>
+        <ReviewStep lines={lines} />
+      </Step>
+      <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
+        <PriceSummary title="Resumo" quote={snapshot} />
+        {children}
+      </aside>
+    </div>
+  )
+}
+
+type OrderInProgress = Extract<PendingOrderState, { kind: 'in-progress' }>
+
+/**
+ * Tentativa com pedido criado (`orderId` no rascunho) e ainda sem estado final: nada a reenviar e nenhuma chave
+ * nova enquanto ele não termina. O `order.updated` (ou a consulta do `usePendingOrder`) libera o checkout. Se a
+ * consulta falha, "Tentar novamente" consulta de novo; a tentativa não é descartada (o pedido existe).
+ */
+function OrderInProgressAlert({ state }: { state: OrderInProgress }) {
+  const { orderId, loadFailed, retrying, retry } = state
+  return (
+    <div role="status" className="border-border flex flex-col gap-2 rounded-md border p-3">
+      <p className="text-body inline-flex items-start gap-2 font-medium">
+        <LoaderCircle aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+        {ORDER_IN_PROGRESS_MESSAGE}
+      </p>
+      <p className="text-muted-foreground text-caption">
+        A rede ainda está processando o pagamento. Quando ele terminar, você pode confirmar uma nova compra.
+      </p>
+      {loadFailed && (
+        <div className="flex flex-col gap-2">
+          <p className="text-destructive text-caption inline-flex items-start gap-1.5">
+            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {ORDER_LOAD_FAILED_MESSAGE}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn('self-start', BLOCKED_CTA_CLASS)}
+            aria-busy={retrying || undefined}
+            aria-disabled={retrying || undefined}
+            onClick={() => !retrying && retry()}
+          >
+            {retrying ? <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" /> : <RefreshCw aria-hidden />}
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+      <Link to="/orders/$orderId" params={{ orderId }} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
+        Acompanhar o pedido
+      </Link>
+    </div>
+  )
+}
+
+/** O botão "Confirmar compra" sai e este entra no lugar: o foco vai para "Tentar de novo" (não cai no `<body>`). */
+function PendingOrderAlert({ submitting, onResend }: { submitting: boolean; onResend: () => void }) {
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    buttonRef.current?.focus()
+  }, [])
+  return (
+    <div role="alert" className="border-destructive/40 flex flex-col gap-2 rounded-md border p-3">
+      <p className="text-body inline-flex items-start gap-2 font-medium">
+        <TriangleAlert aria-hidden className="text-destructive mt-0.5 size-4 shrink-0" />
+        {TRANSIENT_ORDER_MESSAGE}
+      </p>
+      <p className="text-muted-foreground text-caption">
+        O pedido pode ter sido recebido. Tentar de novo reenvia o mesmo pedido e não cobra duas vezes.
+      </p>
+      <Button
+        ref={buttonRef}
+        type="button"
+        size="lg"
+        aria-busy={submitting || undefined}
+        aria-disabled={submitting || undefined}
+        className={BLOCKED_CTA_CLASS}
+        onClick={() => !submitting && onResend()}
+      >
+        {submitting ? <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" /> : <RefreshCw aria-hidden />}
+        Tentar de novo
+      </Button>
+    </div>
+  )
+}
+
+function CheckoutContent({ account, cart, orderInProgress }: { account: Account; cart: Cart; orderInProgress?: OrderInProgress }) {
+  const accountId = account.id
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { draft, store: drafts } = useCheckoutDraft(accountId)
+
+  const profile = useQuery(profileQuery(accountId))
+  const wallets = useQuery(walletsQuery(accountId))
+  const quote = useCartQuote(accountId, cart)
+  const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  // Com tentativa pendente (e snapshot), a Revisão e o resumo mostram o que "Tentar de novo" compra. Durante o
+  // "Confirmando…" o `withOrderKey` já gravou a tentativa antes do POST: a Revisão fica no carrinho (só exibição,
+  // nada do que é enviado muda) até o envio terminar. O reenvio ("Tentar de novo") já mostra a tentativa.
+  const source: ReviewSource =
+    !submitting || resending ? reviewSource(cart.items, draft) : { kind: 'cart', items: cart.items }
+  const attempt = source.kind === 'attempt' ? source.snapshot : undefined
+  // Nome e arte dos NFTs do carrinho e da tentativa: com a união, quando a tentativa termina e a Revisão volta ao
+  // carrinho, as artes já estão carregadas (nada pisca em skeleton)
+  const nftIds = [...new Set([...cart.items, ...(attempt?.items ?? [])].map((item) => item.nftId))]
+  const details = useQueries({ queries: nftIds.map((nftId) => nftDetailQuery(nftId)) })
+  const nftOf = (nftId: Id) => details[nftIds.indexOf(nftId)]?.data
+
+  // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança. Com a
+  // tentativa na Revisão, a cotação do carrinho não está na tela: nada é revisado; quando a origem muda, o revisado
+  // recomeça (o próximo "Confirmar" compara com o que foi exibido)
+  const [reviewed, setReviewed] = useState<ReviewSnapshot>()
+  const [reviewedSource, setReviewedSource] = useState(source.kind)
+  if (reviewedSource !== source.kind) {
+    setReviewedSource(source.kind)
+    setReviewed(undefined)
+  } else if (!reviewed && source.kind === 'cart' && quote.quote && !quote.isPlaceholderData) {
+    setReviewed(snapshotOf(quote.quote))
+  }
+
+  const [notice, setNotice] = useState<Notice>()
+  const submitLock = useRef(false)
+  const [connecting, setConnecting] = useState(false)
+  const [walletError, setWalletError] = useState<string>()
+
+  const sortedWallets = wallets.data ? sortWallets(wallets.data) : undefined
+  const pending = pendingAttempt(draft)
+  // Com tentativa pendente vale a carteira dela; senão a escolhida, ou a principal
+  const selectedId: Id | undefined =
+    pending?.body.walletId ??
+    (sortedWallets?.some((w) => w.id === draft.walletId) ? draft.walletId : sortedWallets?.[0]?.id)
+  const connected = selectedId !== undefined && draft.connectedWalletId === selectedId
+  const connection: WalletConnection = connected
+    ? { status: 'connected' }
+    : connecting
+      ? { status: 'connecting' }
+      : walletError
+        ? { status: 'rejected', message: walletError }
+        : { status: 'idle' }
+
+  const selectWallet = (walletId: Id) => {
+    if (pending || walletId === selectedId) return
+    setWalletError(undefined)
+    // Trocar de carteira desconecta a anterior
+    drafts.set({ ...withoutConnection(drafts.get()), walletId })
+  }
+
+  const connect = async () => {
+    if (!selectedId || connecting) return
+    const sameSession = captureSession()
+    const walletId = selectedId
+    setConnecting(true)
+    setWalletError(undefined)
+    try {
+      await connectWallet(walletId)
+      if (!sameSession()) return
+      // A pessoa trocou de carteira durante a conexão: a resposta atrasada não desfaz a troca
+      const next = withConnectedWallet(drafts.get(), walletId)
+      if (next) drafts.set(next)
+    } catch (error) {
+      if (!sameSession()) return
+      setWalletError(error instanceof ApiError && error.status === 409 ? error.message : WALLET_FAILURE_MESSAGE)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const requote = async (): Promise<Quote> => {
+    const result = await quote.refetch()
+    if (result.isError || !result.data) throw result.error ?? new Error('Cotação indisponível.')
+    return result.data
+  }
+
+  const deps = (): PlaceOrderDeps => ({ queryClient, accountId, drafts, createOrder, sameSession: captureSession() })
+
+  const handle = async (outcome: PlaceOrderOutcome | undefined) => {
+    if (!outcome || outcome.kind === 'stale-session') return
+    switch (outcome.kind) {
+      case 'created':
+        // O pedido já está no cache: a Confirmação abre sem esperar; `replace` tira o Pagamento do Voltar
+        await navigate({ to: '/orders/$orderId', params: { orderId: outcome.order.id }, replace: true })
+        return
+      case 'changed':
+        setReviewed(outcome.snapshot)
+        setNotice({ kind: 'changed', changes: outcome.changes })
+        return
+      case 'blocked':
+        setReviewed(outcome.snapshot)
+        setNotice({ kind: 'blocked' })
+        return
+      case 'requote-failed':
+        setNotice({ kind: 'requote-failed' })
+        return
+      case 'transient':
+        // A tentativa ficou no rascunho: o aviso com "Tentar de novo" aparece por ela
+        setNotice(undefined)
+        return
+      case 'fatal':
+        // A tentativa já saiu do rascunho: o CTA volta e a carteira destrava. A lista pode ter mudado
+        // (carteira removida em outra aba): recarrega para o usuário escolher outra
+        void queryClient.invalidateQueries({ queryKey: walletKeys.list(accountId) })
+        setNotice({
+          kind: 'fatal',
+          message: outcome.error instanceof ApiError ? outcome.error.message : ORDER_FAILED_MESSAGE,
+        })
+        return
+      case 'items':
+      case 'quote': {
+        setNotice(
+          outcome.kind === 'items'
+            ? { kind: 'items', fieldErrors: outcome.fieldErrors }
+            : { kind: 'quote', message: outcome.message },
+        )
+        // A chave foi descartada: recota para a tela mostrar os valores atuais, que passam a ser o revisado
+        try {
+          setReviewed(snapshotOf(await requote()))
+        } catch {
+          // A cotação antiga segue na tela; o próximo clique recota de novo
+        }
+        return
+      }
+    }
+  }
+
+  const run = async (action: () => Promise<PlaceOrderOutcome | undefined>) => {
+    if (submitLock.current) return
+    submitLock.current = true
+    setSubmitting(true)
+    let navigated = false
+    try {
+      const outcome = await action()
+      navigated = outcome?.kind === 'created'
+      await handle(outcome)
+    } finally {
+      // Depois do sucesso a página sai; a trava fica até lá para não haver segundo envio
+      if (!navigated) {
+        submitLock.current = false
+        setSubmitting(false)
+      }
+    }
+  }
+
+  const { quote: quoteData, recalculating, staleAfterError, issues, hasIssues } = quote
+  const messages = notice?.kind === 'changed' ? changeMessages(notice.changes) : undefined
+
+  const canConfirm = quote.canCheckout && connected && reviewed !== undefined && !pending
+  // Motivos do "Confirmar compra" bloqueado, ligados a ele por `aria-describedby`
+  const issuesId = useId()
+  const blockId = useId()
+  const connectId = useId()
+  const showIssues = !attempt && (hasIssues || notice?.kind === 'blocked')
+  const blockReason = quote.block !== undefined && quote.block !== 'issues' ? CHECKOUT_BLOCK_MESSAGE[quote.block] : undefined
+  const describedBy = canConfirm
+    ? undefined
+    : [!connected && connectId, showIssues && issuesId, blockReason && blockId].filter(Boolean).join(' ') || undefined
+  const confirm = () => {
+    if (!canConfirm || !selectedId || !reviewed) return
+    setNotice(undefined)
+    void run(() => confirmPurchase(deps(), { reviewed, walletId: selectedId, requote }))
+  }
+  const resend = () => {
+    if (submitLock.current) return
+    setResending(true)
+    void run(() => resendPendingOrder(deps())).finally(() => setResending(false))
+  }
+
+  const lines = attempt
+    ? attempt.items.map((item) => ({ item, nft: nftOf(item.nftId), unitPrice: item.unitPrice }))
+    : source.items.map((item) => {
+        const key = lineKey(item)
+        return {
+          item,
+          nft: nftOf(item.nftId),
+          unitPrice: quote.unitPriceOf(item),
+          issue: issues.get(key),
+          message: (notice?.kind === 'items' ? notice.fieldErrors[key] : undefined) ?? messages?.byLine.get(key),
+        }
+      })
+
+  let staleMessage: string | undefined
+  let staleAction: ReactNode
+  if (attempt) {
+    // Os valores da tentativa são os do pedido enviado: a cotação do carrinho atual não os torna desatualizados
+  } else if (staleAfterError) {
+    staleMessage = 'Não foi possível atualizar a cotação. Tente de novo antes de confirmar.'
+    staleAction = (
+      <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => void quote.refetch()}>
+        Tentar novamente
+      </Button>
+    )
+  } else if (recalculating) staleMessage = 'Recalculando os valores.'
+  else if (notice?.kind === 'changed') {
+    staleMessage = VALUES_CHANGED_MESSAGE
+    staleAction = messages && messages.summary.length > 0 && (
+      <ul className="list-disc pl-5">
+        {messages.summary.map((text) => (
+          <li key={text}>{text}</li>
+        ))}
+      </ul>
+    )
+  } else if (notice?.kind === 'items') staleMessage = 'Alguns itens mudaram desde a revisão. Confira os valores e confirme de novo.'
+  else if (notice?.kind === 'quote') staleMessage = `${notice.message} Os valores foram atualizados; confirme de novo.`
+
+  return (
+    <div className={GRID_CLASS}>
+      <div className="flex min-w-0 flex-col gap-6">
+        <Step number={1} title="Seus dados" action={<Link to="/profile" className={buttonVariants({ variant: 'link', size: 'sm' })}>Editar</Link>}>
+          <dl className="text-body grid gap-1 sm:grid-cols-[auto_1fr] sm:gap-x-4">
+            <dt className="text-muted-foreground">Nome</dt>
+            <dd>{profile.data?.displayName ?? (profile.isError ? account.name : <Skeleton className="h-4 w-32 motion-reduce:animate-none" />)}</dd>
+            <dt className="text-muted-foreground">E-mail</dt>
+            <dd className="break-all">{account.email}</dd>
+          </dl>
+        </Step>
+
+        <Step number={2} title="Carteira">
+          <WalletStep
+            wallets={sortedWallets}
+            isError={wallets.isError}
+            retrying={wallets.isFetching}
+            onRetry={() => void wallets.refetch()}
+            selectedId={selectedId}
+            onSelect={selectWallet}
+            connection={connection}
+            onConnect={() => void connect()}
+            locked={pending !== undefined}
+          />
+        </Step>
+
+        <Step number={3} title="Revisão">
+          {attempt && <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>}
+          <ReviewStep lines={lines} />
+        </Step>
+      </div>
+
+      <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
+        {attempt ? (
+          <PriceSummary title="Resumo" quote={attempt} />
+        ) : quote.isError && !quoteData ? (
+          <QuoteErrorState quote={quote} />
+        ) : (
+          <PriceSummary
+            title="Resumo"
+            quote={quoteData}
+            stale={staleMessage !== undefined}
+            staleMessage={staleMessage}
+            staleAction={staleAction}
+          />
+        )}
+
+        {showIssues && (
+          <div role="alert" className="text-destructive text-caption flex flex-col gap-2">
+            <p id={issuesId}>{QUOTE_ISSUES_MESSAGE}</p>
+            <Link to="/cart" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
+              Voltar ao carrinho
+            </Link>
+          </div>
+        )}
+        {notice?.kind === 'requote-failed' && <Alert>{REQUOTE_FAILED_MESSAGE}</Alert>}
+        {notice?.kind === 'fatal' && <Alert>{notice.message}</Alert>}
+
+        {/* Durante o envio que acabou de criar o pedido a página está navegando: o CTA "Confirmando…" fica */}
+        {orderInProgress !== undefined && !submitting ? (
+          <OrderInProgressAlert state={orderInProgress} />
+        ) : pending && !(submitting && !resending) ? (
+          <PendingOrderAlert submitting={resending} onResend={resend} />
+        ) : (
+          <Button
+            type="button"
+            size="lg"
+            aria-busy={submitting || undefined}
+            aria-disabled={!canConfirm || submitting || undefined}
+            aria-describedby={submitting ? undefined : describedBy}
+            className={BLOCKED_CTA_CLASS}
+            onClick={confirm}
+          >
+            {submitting && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
+            {submitting ? 'Confirmando…' : 'Confirmar compra'}
+          </Button>
+        )}
+        {!pending && !submitting && blockReason && (
+          <p id={blockId} className="text-muted-foreground text-caption">
+            {blockReason}
+          </p>
+        )}
+        {!connected && !pending && (
+          <p id={connectId} className="text-muted-foreground text-caption">
+            {CONNECT_WALLET_MESSAGE}
+          </p>
+        )}
+      </aside>
+    </div>
+  )
+}
+
+function Step({ number, title, action, children }: { number: number; title: string; action?: ReactNode; children: ReactNode }) {
+  const id = `checkout-etapa-${number}`
+  return (
+    <section aria-labelledby={id} className="border-border flex flex-col gap-4 rounded-lg border p-4">
+      <header className="flex items-center justify-between gap-3">
+        <h2 id={id} className="text-body-lg flex items-center gap-2 font-medium">
+          <span aria-hidden className="bg-muted text-caption flex size-6 items-center justify-center rounded-full">
+            {number}
+          </span>
+          {title}
+        </h2>
+        {action}
+      </header>
+      {children}
+    </section>
+  )
+}
+
+function Alert({ children }: { children: ReactNode }) {
+  return (
+    <p role="alert" className="text-destructive text-caption inline-flex items-start gap-1.5">
+      <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+      {children}
+    </p>
+  )
+}
+
+function CheckoutSkeleton() {
+  return (
+    <div aria-busy className={GRID_CLASS}>
+      <div className="flex flex-col gap-6" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-36 rounded-lg motion-reduce:animate-none" />
+        ))}
+      </div>
+      <Skeleton aria-hidden className="h-64 rounded-lg motion-reduce:animate-none" />
+      <p role="status" className="sr-only">
+        Carregando o pagamento…
+      </p>
+    </div>
+  )
+}

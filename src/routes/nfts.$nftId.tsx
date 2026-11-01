@@ -3,7 +3,7 @@ import { Link, createFileRoute, notFound, useRouter } from '@tanstack/react-rout
 import { SearchX } from 'lucide-react'
 import { useState } from 'react'
 import { nftDetailQuery } from '@/api/nfts'
-import { ApiError, type NftEditionKind } from '@/contracts'
+import { ApiError, type Nft, type NftEditionKind } from '@/contracts'
 import { EmptyState, ErrorState } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
 import { isEditionKind } from '@/features/nft-detail/edition'
@@ -14,6 +14,7 @@ import { NftDetailSkeleton } from '@/features/nft-detail/NftDetailSkeleton'
 import { NftGallery } from '@/features/nft-detail/NftGallery'
 import { NftBreadcrumb, NftDescription, NftInfo } from '@/features/nft-detail/NftInfo'
 import { PurchasePanel } from '@/features/nft-detail/PurchasePanel'
+import { usePurchaseSelection } from '@/features/nft-detail/usePurchaseSelection'
 
 interface NftDetailSearch {
   edition?: NftEditionKind
@@ -46,28 +47,44 @@ function NftDetailPage() {
   const { edition } = Route.useSearch()
   const navigate = Route.useNavigate()
   const { data: nft } = useSuspenseQuery(nftDetailQuery(nftId))
+  // `key`: a quantidade escolhida (estado de `usePurchaseSelection`) zera ao trocar de NFT
+  return (
+    <NftDetailContent
+      key={nft.id}
+      nft={nft}
+      requestedEdition={edition}
+      onEditionChange={(kind) =>
+        void navigate({ search: (prev) => ({ ...prev, edition: kind }), replace: true, resetScroll: false })
+      }
+    />
+  )
+}
+
+function NftDetailContent({
+  nft,
+  requestedEdition,
+  onEditionChange,
+}: {
+  nft: Nft
+  requestedEdition: NftEditionKind | undefined
+  onEditionChange: (kind: NftEditionKind) => void
+}) {
+  const selection = usePurchaseSelection(nft, requestedEdition)
 
   return (
     <div className={DETAIL_PAGE_CLASS}>
       <MobileScreenHeader title={nft.name} className="-mx-2" />
       <NftBreadcrumb nft={nft} className="hidden md:block" />
       <div className={DETAIL_GRID_CLASS}>
-        <NftGallery key={nft.id} nft={nft} />
+        <NftGallery nft={nft} />
         <div className={DETAIL_ASIDE_CLASS}>
           <NftInfo nft={nft} />
-          <PurchasePanel
-            key={nft.id}
-            nft={nft}
-            requestedEdition={edition}
-            onEditionChange={(kind) =>
-              void navigate({ search: (prev) => ({ ...prev, edition: kind }), replace: true, resetScroll: false })
-            }
-          />
+          <PurchasePanel nft={nft} selection={selection} onEditionChange={onEditionChange} />
           <NftDescription description={nft.description} />
         </div>
       </div>
       <MoreFromCollection nft={nft} className="mt-4" />
-      <MobilePurchaseBar nft={nft} />
+      <MobilePurchaseBar nft={nft} selection={selection} />
     </div>
   )
 }

@@ -19,6 +19,8 @@ export interface WalletCardGroupProps {
   onValueChange: (walletId: Id) => void
   /** Nome acessível do grupo (padrão "Carteiras salvas"). */
   label?: string
+  /** Trava a troca (ex.: Pagamento com um envio sem resposta final). */
+  disabled?: boolean
   children: ReactNode
   className?: string
 }
@@ -28,11 +30,18 @@ export function WalletCardGroup({
   value,
   onValueChange,
   label = 'Carteiras salvas',
+  disabled,
   children,
   className,
 }: WalletCardGroupProps) {
   return (
-    <RadioGroup aria-label={label} value={value ?? ''} onValueChange={onValueChange} className={cn('gap-3', className)}>
+    <RadioGroup
+      aria-label={label}
+      value={value ?? ''}
+      onValueChange={onValueChange}
+      disabled={disabled}
+      className={cn('gap-3', className)}
+    >
       {children}
     </RadioGroup>
   )
