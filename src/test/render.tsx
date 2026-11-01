@@ -1,3 +1,8 @@
+/**
+ * Todo teste de componente usa `renderWithProviders` (ou ao menos importa `@/test/render`): é este módulo que
+ * registra o `afterEach` com `cleanup` e a limpeza de `localStorage`/`sessionStorage`, e instala os polyfills
+ * do DOM. Não há `setupFiles` global; sem o import, nada disso acontece.
+ */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, type RenderResult } from '@testing-library/react'
 import type { ReactElement } from 'react'
