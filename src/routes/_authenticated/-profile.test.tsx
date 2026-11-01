@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { queryOptions } from '@tanstack/react-query'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Profile } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
@@ -11,8 +11,7 @@ const { useSession, fetchProfile } = vi.hoisted(() => ({ useSession: vi.fn(), fe
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  const mock = (await import('@/test/routerMock')).routerMock()
-  return { ...actual, ...mock, createFileRoute: actual.createFileRoute }
+  return (await import('@/test/routerMock')).routeModuleMock(actual)
 })
 vi.mock('@/auth/useSession', () => ({ useSession }))
 vi.mock('@/api/profile', () => ({
@@ -71,6 +70,7 @@ describe('rota /profile', () => {
     renderWithProviders(<Component />)
     expect(screen.getByText('skeleton do perfil')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Alterar senha' })).toBeNull()
-    await waitFor(() => expect(fetchProfile).not.toHaveBeenCalled())
+    await act(async () => {}) // deixa efeitos e microtarefas assentarem antes da asserção negativa
+    expect(fetchProfile).not.toHaveBeenCalled()
   })
 })

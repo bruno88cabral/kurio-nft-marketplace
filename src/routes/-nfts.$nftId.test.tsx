@@ -2,7 +2,7 @@
 import { notFound, type ErrorComponentProps } from '@tanstack/react-router'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type Nft } from '@/contracts'
 import { makeNft } from '@/test/nftFixtures'
 import { createTestQueryClient, renderWithProviders } from '@/test/render'
@@ -12,8 +12,7 @@ import { Route } from './nfts.$nftId'
 // Rota real (createFileRoute/notFound de verdade) com os hooks do router mockados; as seções do Detalhe têm testes próprios
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  const mock = (await import('@/test/routerMock')).routerMock()
-  return { ...actual, ...mock, createFileRoute: actual.createFileRoute, notFound: actual.notFound }
+  return (await import('@/test/routerMock')).routeModuleMock(actual)
 })
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@/api/client', () => ({ apiClient: api }))
@@ -64,6 +63,8 @@ beforeEach(() => {
   vi.spyOn(Route, 'useSearch').mockImplementation((() => search) as never)
   vi.spyOn(Route, 'useNavigate').mockReturnValue(navigateSpy as never)
 })
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('rota /nfts/$nftId', () => {
   it('validateSearch mantém uma edição válida e descarta o resto', () => {

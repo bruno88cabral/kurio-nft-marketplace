@@ -9,8 +9,7 @@ import { Route } from './signup'
 // Rota real (createFileRoute/redirect de verdade) com os hooks do router mockados para renderizar o componente
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  const mock = (await import('@/test/routerMock')).routerMock()
-  return { ...actual, ...mock, createFileRoute: actual.createFileRoute }
+  return (await import('@/test/routerMock')).routeModuleMock(actual)
 })
 vi.mock('@/features/account/AuthDialog', async () => ({ AuthDialog: (await import('@/test/authRoute')).AuthDialogStub }))
 vi.mock('@/features/account/SignupForm', () => ({
@@ -57,7 +56,7 @@ describe('rota signup', () => {
     expect((error as { options: unknown }).options).toMatchObject({ href: '/', replace: true })
   })
 
-  it('o componente (code-split, lazy) monta o diálogo com o formulário e o redirect da busca', async () => {
+  it('o componente monta o diálogo com o formulário e o redirect da busca', async () => {
     // O componente lê a busca por `Route.useSearch` (a rota é a real, sem RouterProvider)
     vi.spyOn(Route, 'useSearch').mockReturnValue({ redirect: '/cart' })
     const Component = options.component

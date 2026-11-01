@@ -4,8 +4,9 @@ import type { QueryClient } from '@tanstack/react-query'
 import { fireEvent, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SESSION_STORAGE_KEY } from '@/auth/sessionStorage'
 import { ApiError } from '@/contracts'
+import { SESSION_STORAGE_KEY } from '@/auth/sessionStorage'
+import { guardarSessao } from '@/test/authRoute'
 import { renderWithProviders } from '@/test/render'
 import { invalidateSpy } from '@/test/routerMock'
 import { Route } from './_authenticated'
@@ -13,8 +14,7 @@ import { Route } from './_authenticated'
 // Rota real (createFileRoute/redirect de verdade) com os hooks do router mockados para renderizar o errorComponent
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  const mock = (await import('@/test/routerMock')).routerMock()
-  return { ...actual, ...mock, createFileRoute: actual.createFileRoute }
+  return (await import('@/test/routerMock')).routeModuleMock(actual)
 })
 
 type Ctx = { context: { queryClient: Pick<QueryClient, 'ensureQueryData'> }; location: { href: string } }
@@ -32,10 +32,6 @@ const ensureQueryData = ((options: { queryKey: readonly unknown[] }) => {
   return ensureImpl(options)
 }) as unknown as QueryClient['ensureQueryData']
 const ctx = (href = '/profile?tab=1'): Ctx => ({ context: { queryClient: { ensureQueryData } }, location: { href } })
-
-function guardarSessao() {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', expiresAt: new Date(Date.now() + 3_600_000).toISOString() }))
-}
 
 async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
   try {

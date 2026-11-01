@@ -22,9 +22,12 @@
  *   - `routerMock({ useSearch: () => ... })` troca um hook inteiro para o arquivo todo.
  * Spies de ação: `navigateSpy`, `invalidateSpy`, `historyBackSpy`, `historyGoSpy`.
  *
- * ROTAS (`createFileRoute`, `redirect`, `notFound`) NÃO são tratadas aqui: para testar `beforeLoad`, `loader`,
- * `validateSearch` e `head`, importe o módulo real da rota SEM mockar o router e chame
- * `Route.options.beforeLoad(...)` etc. direto. O componente da rota é coberto pela feature.
+ * ROTAS (`createFileRoute`, `redirect`, `notFound`) mantêm a implementação real: o teste da rota usa
+ * `routeModuleMock(actual)`, que devolve o módulo real do router com os hooks e componentes trocados por este mock,
+ * e chama `Route.options.beforeLoad(...)`, `loader`, `validateSearch`, `head` e `component` direto:
+ *
+ *   vi.mock('@tanstack/react-router', async (importOriginal) =>
+ *     (await import('@/test/routerMock')).routeModuleMock(await importOriginal()))
  */
 import type { AnchorHTMLAttributes, ReactNode } from 'react'
 import { afterEach, vi, type Mock } from 'vitest'
@@ -44,7 +47,6 @@ function selected(value: unknown, opts: Selectable): unknown {
 
 let currentSearch: unknown = {}
 let currentRouterState: unknown = DEFAULT_ROUTER_STATE
-
 
 export const useSearchSpy: Mock = vi.fn((opts?: Selectable): unknown => selected({}, opts))
 export const useParamsSpy: Mock = vi.fn((opts?: Selectable): unknown => selected({}, opts))
@@ -71,7 +73,10 @@ export const setCanGoBack = (value: boolean): void => void useCanGoBackSpy.mockR
 function resetRouterMock(): void {
   currentSearch = {}
   currentRouterState = DEFAULT_ROUTER_STATE
-  for (const spy of [navigateSpy, invalidateSpy, historyBackSpy, historyGoSpy]) spy.mockClear()
+  navigateSpy.mockReset().mockImplementation(() => Promise.resolve())
+  invalidateSpy.mockReset().mockImplementation(() => Promise.resolve())
+  historyBackSpy.mockReset()
+  historyGoSpy.mockReset()
   useSearchSpy.mockReset().mockImplementation((o?: Selectable) => selected({}, o))
   useParamsSpy.mockReset().mockImplementation((o?: Selectable) => selected({}, o))
   useLocationSpy.mockReset().mockImplementation((o?: Selectable) => selected({}, o))
@@ -198,4 +203,10 @@ export function routerMock(overrides: Partial<RouterMock> = {}): RouterMock {
     }),
     ...overrides,
   }
+}
+
+/** Módulo real do router (`createFileRoute`, `redirect`, `notFound`) com hooks e componentes substituídos pelo mock. */
+export function routeModuleMock<T extends object>(actual: T, extra: Partial<RouterMock> = {}): T & RouterMock {
+  const mock = routerMock(extra)
+  return { ...actual, ...mock, createFileRoute: (actual as { createFileRoute?: unknown }).createFileRoute }
 }

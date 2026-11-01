@@ -7,8 +7,7 @@ import { Route } from './index'
 // Rota real (createFileRoute de verdade); as seções da página viram stubs, que já têm testes próprios
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  const mock = (await import('@/test/routerMock')).routerMock()
-  return { ...actual, ...mock, createFileRoute: actual.createFileRoute }
+  return (await import('@/test/routerMock')).routeModuleMock(actual)
 })
 vi.mock('@/features/catalog/HeroFeatured', () => ({ HeroFeatured: () => <p>hero</p> }))
 vi.mock('@/features/catalog/CatalogSection', () => ({ CatalogSection: () => <p>catalogo</p> }))
