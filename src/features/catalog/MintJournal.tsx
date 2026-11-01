@@ -13,21 +13,21 @@ const POSTS = [
     dateLabel: '24 out 2026',
     title: 'Como escolher a edição certa: 1/1, 1/10, 1/50 ou aberta',
     excerpt: 'Raridade, preço e liquidez mudam com o tamanho da tiragem. Um guia rápido antes da primeira compra.',
-    art: '/nfts/origami-orbit.svg',
+    art: '/nfts/macaco-oculos-960.webp',
   },
   {
     date: '2026-10-17',
     dateLabel: '17 out 2026',
     title: 'Por dentro do ateliê de Pixel Reefs',
     excerpt: 'Tomo Kitano conta como recifes de 8 bits viraram uma das coleções mais procuradas do mês.',
-    art: '/nfts/reef-pulse.svg',
+    art: '/nfts/macaco-gola-alta-960.webp',
   },
   {
     date: '2026-10-09',
     dateLabel: '09 out 2026',
     title: 'Taxa de rede sem susto',
     excerpt: 'O que entra no total do pedido e por que a taxa aparece como estimada até a confirmação.',
-    art: '/nfts/night-compass.svg',
+    art: '/nfts/macaco-chapeu-960.webp',
   },
 ] as const
 
