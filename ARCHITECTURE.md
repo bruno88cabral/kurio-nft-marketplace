@@ -512,11 +512,30 @@ Código em `src/realtime/` (MYK-1091). O `bindRealtime` é ligado uma vez em `sr
 - **Header no mobile:** o Figma mobile não tem header (só a busca e a tab bar); o app mantém o header compacto (logo, busca, carrinho, conta). Fica para a tela do Início (MYK-1099).
 - **Footer abaixo de `lg`** não tem desenho: as colunas empilham (benefícios em 3 colunas a partir de `md`, a newsletter em linha inteira, a faixa e os links em 1 coluna no celular e 2 a partir de `sm`).
 
+**Início conferido contra os PNGs (MYK-1099).** Hero, sidebar de filtros, abas e ordenação, "NFT em destaque", paginação, promos e "Diário da Cunhagem" foram comparados com `Desktop/Início.png` em 1440 e revistos em 768 e 390 (drawer de filtros incluído). O que segue o Figma:
+
+- **Hero:** eyebrow "Bem-vindo à Kurio" branco, sem caixa alta e espaçado; texto de apoio do Figma ("Descubra NFTs selecionados de criadores emergentes e consagrados…"); EXPLORAR sem seta; a arte não tem sobreposição (o nome do slide fica só para o leitor de tela); os dots ficam abaixo do texto, à esquerda da arte (no celular, abaixo da arte). Os dots são um grupo "Escolher destaque" com `aria-controls` para o carrossel, e ←/→ funcionam na arte e nos dots.
+- **Sidebar:** sem o título "Filtros" visível (o `aside` se chama "Filtros" pelo `aria-label`); títulos das seções brancos, maiores e sem caixa alta; sem checkbox nem rádio visíveis: a linha inteira é o controle (`role="checkbox"` e `role="radio"` do Radix, com o nome vindo do texto), o ativo fica laranja; contagens das coleções brancas em negrito, as das redes em marrom; "Aplicar" abaixo de "Preço: x – y ETH". O mesmo vale para o drawer abaixo de `lg`.
+- **Abas e ordenação:** abas brancas, a ativa laranja com sublinhado laranja; "Ordenar por: Listados recentemente" é texto com chevron (o `Select` continua, só sem caixa e borda).
+- **NFT em destaque:** título laranja grande "NFT em destaque", "Oferta limitada" branco e centralizado, e só a arte grande arredondada (link para o Detalhe, com o nome para o leitor de tela), sem nome e sem preço visíveis.
+- **Paginação:** alinhada à direita; a página atual é laranja sólido e as demais têm borda. O skeleton da linha da paginação também foi para a direita.
+- **Promos:** arte grande à esquerda na altura do card, texto alinhado à direita, sem eyebrow, títulos e textos do Figma e botão laranja sólido "Explorar →" (abre as abas "Novos lançamentos" e "Em alta", como antes).
+- **Diário da Cunhagem:** título centralizado com o subtítulo do Figma, sem o eyebrow "BLOG", 4 cards com os títulos, resumos e o metadado "12 de setembro | Leitura de 6 min" do Figma, e "Ler mais →" em laranja.
+
+**Desvios que ficam (MYK-1099):**
+
+- **Opção de rede "Todas" mantida.** O Figma não a desenha, mas um grupo de rádio não se desmarca: sem ela, voltar a "todas as redes" exigiria "Limpar filtros", que também apaga coleções e preço. Fica como o primeiro rádio, marcado quando a URL não tem `network`, com o total como contagem. O contrato da URL não muda.
+- **Ativo dos filtros não depende só de cor (§8):** além do laranja, o item ativo fica em negrito e ganha um ✓ no recuo à esquerda (o recuo já existe no Figma). O Figma só muda a cor.
+- **Dots do hero** em laranja; o atual é mais largo e os outros ficam translúcidos (o Figma desenha três dots iguais e não mostra o estado ativo).
+- **Texto da segunda promo** é cortado no Figma ("…obras digitais que definem a"); aqui termina em "a cultura da internet.".
+- **Datas do Diário** com ano 2026 no `dateTime` (o Figma só mostra dia e mês); "Ler mais →" continua `OutOfScopeAction` ("Em breve"), sem a opacidade de desabilitado, como os itens do header e do footer.
+- **Mobile do Início** (`Mobile/Início.png`: hero dentro de um card com a busca acima, grade escalonada, tab bar com botão central) não foi redesenhado nesta task, nem o header compacto que a MYK-1098 deixou para cá: em 390 e 768 o Início é o layout desktop empilhado, com as mudanças acima.
+- **Paginação com `aria-current` só na página atual:** o `Link` do TanStack marca `aria-current="page"` sozinho e, com a busca casando por subconjunto, na página 2 o link da página 1 também ficava "atual". Os links da paginação usam `activeOptions={{ exact: true }}`.
+
 **Escolhas minhas, pendentes de conferência contra o Figma:**
 
 - **Itens da tab bar mobile** (`14:5226`): Início, Mercado, Carrinho, Criadores (fora de escopo) e Conta, sem botão central destacado.
-- **Hero:** eyebrow "Bem-vindo à Kurio", título "Seja dono do futuro da arte digital" (uppercase por CSS) e botão EXPLORAR seguem o Figma `2:2` (conferido por screenshot na MYK-1049); o texto de apoio abaixo do título continua pendente de conferência.
-- **Promos e "Diário da Cunhagem":** os textos foram escritos na implementação (títulos, chamadas, as 3 matérias e as datas) e a escolha das artes de cada post. O card "NFT em destaque" reaproveita o `NftCard` com o badge "Oferta limitada".
+- **Artes das promos e do "Diário da Cunhagem":** a escolha de qual SVG placeholder vai em cada card (os textos agora são os do Figma; ver MYK-1099).
 - **Logos de MetaMask, WalletConnect e Coinbase:** não exportados; o `WalletOption` fica só com o nome e o rádio, sem logo nem monograma (decisão do humano).
 - **Artes dos NFTs:** continuam as SVGs placeholder; AVIF/WebP e a troca pelas ilustrações do Figma estão pendentes (ver "Substituição de assets").
 - **Conferência de `/dev/kit`, Início (`14:5226`), Detalhe desktop (`10:244`) e mobile (`15:5536`):** só contra descrições.
