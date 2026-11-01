@@ -94,21 +94,21 @@ export function ProfileFormSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Skeleton className="size-20 rounded-full motion-reduce:animate-none sm:size-24" />
+        <Skeleton className="size-20 rounded-full sm:size-24" />
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-11 w-40 motion-reduce:animate-none" />
-          <Skeleton className="h-4 w-48 motion-reduce:animate-none" />
+          <Skeleton className="h-11 w-40" />
+          <Skeleton className="h-4 w-48" />
         </div>
       </div>
       <div className="flex max-w-xl flex-col gap-4">
         {[0, 1].map((i) => (
           <div key={i} className="flex flex-col gap-1.5">
-            <Skeleton className="h-4 w-32 motion-reduce:animate-none" />
-            <Skeleton className={`${FIELD_CLASS} w-full motion-reduce:animate-none`} />
-            <Skeleton className="h-3 w-40 motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className={`${FIELD_CLASS} w-full`} />
+            <Skeleton className="h-3 w-40" />
           </div>
         ))}
-        <Skeleton className="h-11 w-full motion-reduce:animate-none sm:w-24" />
+        <Skeleton className="h-11 w-full sm:w-24" />
       </div>
     </div>
   )

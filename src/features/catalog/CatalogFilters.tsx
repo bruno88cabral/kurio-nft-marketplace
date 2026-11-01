@@ -186,9 +186,9 @@ function FiltersSkeleton() {
     <div aria-hidden className="flex flex-col gap-6">
       {[5, 2, 5].map((rows, g) => (
         <div key={g} className="flex flex-col gap-3">
-          <Skeleton className="h-3 w-24 motion-reduce:animate-none" />
+          <Skeleton className="h-3 w-24" />
           {Array.from({ length: rows }, (_, i) => (
-            <Skeleton key={i} className="h-5 w-full motion-reduce:animate-none" />
+            <Skeleton key={i} className="h-5 w-full" />
           ))}
         </div>
       ))}

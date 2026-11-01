@@ -183,7 +183,7 @@ export function WalletListSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-3">
       {[0, 1].map((i) => (
-        <Skeleton key={i} className="h-[83px] w-full rounded-lg motion-reduce:animate-none" />
+        <Skeleton key={i} className="h-[83px] w-full rounded-lg" />
       ))}
     </div>
   )

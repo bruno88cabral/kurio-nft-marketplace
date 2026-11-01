@@ -30,6 +30,12 @@
 }
 
 @theme inline {
+    --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+    @keyframes shimmer {
+        to {
+            background-position: -200% 0;
+        }
+    }
     --font-heading: var(--font-sans);
     --font-sans: 'Roboto Mono', ui-monospace, monospace;
     --font-mono: 'Roboto Mono', ui-monospace, monospace;
@@ -161,5 +167,14 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Movimento reduzido para todo Skeleton, de uma vez (MYK-1112). Fica fora do
+   @layer porque o utilitário animate-shimmer está na camada utilities e
+   ganharia de uma regra em @layer base. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='skeleton'] {
+    animation: none;
   }
 }

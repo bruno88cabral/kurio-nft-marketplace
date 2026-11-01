@@ -379,15 +379,31 @@ function Alert({ id, children }: { id?: string; children: ReactNode }) {
   )
 }
 
+/**
+ * Mesma grade do Pagamento pronto (formulário à esquerda; "Seus NFTs", cupom, resumo, carteira e CTA no
+ * `aside`), com as alturas medidas para um NFT no carrinho em 390 e 1440 (MYK-1112): o conteúdo não desloca.
+ */
 function CheckoutSkeleton() {
   return (
     <div aria-busy className={CHECKOUT_GRID_CLASS}>
-      <div className="flex flex-col gap-6" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-36 rounded-lg motion-reduce:animate-none" />
-        ))}
+      <div className="flex min-w-0 flex-col gap-4" aria-hidden>
+        <Skeleton className="h-6 w-56" />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-4 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
+          {Array.from({ length: 7 }, (_, i) => (
+            <Skeleton key={i} className="h-[105px] rounded-lg last:max-sm:h-[104px] sm:h-[89px]" />
+          ))}
+        </div>
+        <Skeleton className="h-[21px] w-56" />
+        <Skeleton className="h-[184px] rounded-lg sm:w-1/2" />
       </div>
-      <Skeleton aria-hidden className="h-64 rounded-lg motion-reduce:animate-none" />
+      <div className="flex min-w-0 flex-col gap-5" aria-hidden>
+        <Skeleton className="h-[159px] rounded-lg" />
+        <Skeleton className="h-5 w-[283px] max-w-full" />
+        <Skeleton className="h-[113px] rounded-lg" />
+        <Skeleton className="h-[223px] rounded-lg" />
+        <Skeleton className="h-10 rounded-lg" />
+        <Skeleton className="h-[18px] w-3/4" />
+      </div>
       <p role="status" className="sr-only">
         Carregando o pagamento…
       </p>

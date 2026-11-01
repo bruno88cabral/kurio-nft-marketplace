@@ -72,7 +72,7 @@ export function CartLine({ item, nft, nftFailed = false, unitPrice, issue, onQua
             className="size-full object-cover"
           />
         ) : nftFailed ? null : (
-          <Skeleton className="size-full motion-reduce:animate-none" />
+          <Skeleton className="size-full" />
         )}
       </div>
 
@@ -91,7 +91,7 @@ export function CartLine({ item, nft, nftFailed = false, unitPrice, issue, onQua
             ) : name ? (
               <p className="text-body font-bold">{name}</p>
             ) : (
-              <Skeleton className="h-5 w-40 motion-reduce:animate-none" />
+              <Skeleton className="h-5 w-40" />
             )}
             <p className="text-muted-foreground text-caption">{editionText}</p>
           </div>

@@ -215,17 +215,17 @@ function CartSkeleton() {
     <div aria-busy className={GRID_CLASS}>
       <div className="flex flex-col gap-4" aria-hidden>
         {[0, 1].map((i) => (
-          <div key={i} className="flex gap-4">
-            <Skeleton className="size-24 rounded-lg motion-reduce:animate-none" />
-            <div className="flex flex-1 flex-col gap-2">
-              <Skeleton className="h-5 w-48 motion-reduce:animate-none" />
-              <Skeleton className="h-4 w-24 motion-reduce:animate-none" />
-              <Skeleton className="h-6 w-28 motion-reduce:animate-none" />
+          <div key={i} className="flex gap-3 py-4 first:pt-0 sm:gap-4">
+            <Skeleton className="size-20 shrink-0 rounded-lg sm:size-24" />
+            <div className="flex min-h-[97px] flex-1 flex-col gap-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-28" />
             </div>
           </div>
         ))}
       </div>
-      <Skeleton aria-hidden className="h-56 rounded-lg motion-reduce:animate-none" />
+      <Skeleton aria-hidden className="h-[319px] rounded-lg" />
       <p role="status" className="sr-only">
         Carregando o carrinho…
       </p>

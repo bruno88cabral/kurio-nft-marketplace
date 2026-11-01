@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import { DETAIL_ASIDE_CLASS, DETAIL_GRID_CLASS, DETAIL_PAGE_CLASS } from './layout'
 
 function Bar({ className }: { className?: string }) {
-  return <Skeleton className={cn('rounded-md motion-reduce:animate-none', className)} />
+  return <Skeleton className={cn('rounded-md', className)} />
 }
 
 /**
@@ -24,7 +24,7 @@ export function NftDetailSkeleton() {
         </div>
         <Bar className="hidden h-5 w-64 md:block" />
         <div className={DETAIL_GRID_CLASS}>
-          <Skeleton className="aspect-square w-full rounded-xl motion-reduce:animate-none" />
+          <Skeleton className="aspect-square w-full rounded-xl" />
           <div className={DETAIL_ASIDE_CLASS}>
             <div className="flex flex-col gap-3">
               <Bar className="h-4 w-28" />
