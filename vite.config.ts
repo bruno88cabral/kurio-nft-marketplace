@@ -40,15 +40,23 @@ export default defineConfig({
       ],
       reporter: ['text-summary', 'json-summary', 'html'],
       thresholds: {
-        lines: 62,
-        statements: 63,
-        functions: 56,
-        branches: 61,
+        lines: 68,
+        statements: 68,
+        functions: 65,
+        branches: 68,
         // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
         'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/layout/{AccountMenu,SessionLink}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/{login,signup,_authenticated}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // COV-9: fluxo "Catálogo (Início)" travado em 100% (HeroFeatured: ver abaixo)
+        'src/features/catalog/{CatalogFilters,CatalogGrid,CatalogPagination,CatalogSection,CatalogToolbar,MintJournal,NftGrid,PromoCards}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/catalog/useCatalogSearch.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/components/layout/HeaderSearch.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/components/kurio/{NftCard,StateMessage,PriceTag}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/routes/index.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // HeroFeatured: `if (!current) return null` em FeaturedCarousel é inalcançável (o pai já trata lista vazia)
+        'src/features/catalog/HeroFeatured.tsx': { lines: 100, statements: 95, functions: 100, branches: 94 },
       },
     },
   },
