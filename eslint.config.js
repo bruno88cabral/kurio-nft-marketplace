@@ -7,7 +7,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'playwright-report', 'test-results', 'blob-report', 'public/mockServiceWorker.js', 'src/routeTree.gen.ts']),
+  globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results', 'blob-report', 'public/mockServiceWorker.js', 'src/routeTree.gen.ts']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -45,6 +45,13 @@ export default defineConfig([
   {
     // shadcn exporta as variantes (cva) junto do componente; é o padrão do gerador
     files: ['src/components/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    // Utilitários de teste exportam helpers junto de componentes
+    files: ['src/test/**/*.{ts,tsx}'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

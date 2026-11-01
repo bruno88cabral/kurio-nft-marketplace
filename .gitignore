@@ -153,6 +153,9 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
+# Coverage
+coverage/
+
 # Playwright
 playwright-report/
 test-results/

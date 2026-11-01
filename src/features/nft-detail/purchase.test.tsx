@@ -23,6 +23,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { MobilePurchaseBar } = await import('./MobileDetailChrome')
 const { PurchasePanel } = await import('./PurchasePanel')
 const { usePurchaseSelection } = await import('./usePurchaseSelection')
+type PurchaseSelection = import('./usePurchaseSelection').PurchaseSelection
 
 const nft: Nft = {
   id: 'nft-023',
@@ -221,3 +222,41 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
     expect(add).not.toHaveBeenCalled()
   })
 })
+
+describe('PurchasePanel: estados da seleção', () => {
+  const sel = (over: Partial<PurchaseSelection>): PurchaseSelection => ({
+    edition: nft.editions[0],
+    unavailable: false,
+    quantity: 1,
+    setQuantity: () => undefined,
+    soldOut: false,
+    ...over,
+  })
+  const panel = (selection: PurchaseSelection) =>
+    render(
+      <TooltipProvider>
+        <PurchasePanel nft={nft} selection={selection} onEditionChange={() => undefined} />
+      </TooltipProvider>,
+    )
+
+  it('tudo esgotado: aviso, chips e stepper desabilitados e "Esgotado" no lugar do carrinho', () => {
+    panel(sel({ soldOut: true, edition: undefined }))
+    expect(screen.getAllByText('Esgotado').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByRole('button', { name: 'Adicionar ao carrinho' })).toBeNull()
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Quantidade' }).disabled).toBe(true)
+    expect(screen.getByRole('radiogroup', { name: 'Edição' }).querySelector('button')?.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('edição pedida indisponível: avisa qual edição está sendo mostrada', () => {
+    panel(sel({ unavailable: true }))
+    expect(screen.getByRole('status').textContent).toContain('Edição indisponível. Mostrando a edição')
+  })
+
+  it('sem edição efetiva (e não esgotado): sem ação de compra e o stepper fica desabilitado', () => {
+    panel(sel({ edition: undefined, unavailable: true }))
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Adicionar ao carrinho' })).toBeNull()
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Quantidade' }).disabled).toBe(true)
+  })
+})
+
