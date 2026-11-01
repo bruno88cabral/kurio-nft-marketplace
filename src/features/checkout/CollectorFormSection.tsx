@@ -272,7 +272,7 @@ function WalletsState({
     return (
       <div aria-busy className={cn('flex flex-col gap-4', className)}>
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} aria-hidden className="h-16 rounded-md motion-reduce:animate-none" />
+          <Skeleton key={i} aria-hidden className="h-16 rounded-md" />
         ))}
         <p role="status" className="sr-only">
           Carregando as carteiras…

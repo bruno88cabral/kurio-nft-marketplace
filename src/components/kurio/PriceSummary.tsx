@@ -126,19 +126,22 @@ function Row({
   )
 }
 
+/** Mesma caixa do resumo pronto sem cupom (subtotal, taxa de rede com "Estimada", separador, total): 113px. */
 function SummarySkeleton() {
   return (
-    <div className="flex flex-col gap-3" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="flex justify-between gap-4">
-          <Skeleton className="h-4 w-24 motion-reduce:animate-none" />
-          <Skeleton className="h-4 w-20 motion-reduce:animate-none" />
-        </div>
-      ))}
+    <div className="flex flex-col gap-2" aria-hidden>
+      <div className="flex h-[21px] items-center justify-between gap-4">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      <div className="flex h-[35px] items-center justify-between gap-4">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-4 w-20" />
+      </div>
       <Separator className="my-1" />
-      <div className="flex justify-between gap-4">
-        <Skeleton className="h-5 w-16 motion-reduce:animate-none" />
-        <Skeleton className="h-5 w-24 motion-reduce:animate-none" />
+      <div className="flex h-6 items-center justify-between gap-4">
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-5 w-24" />
       </div>
     </div>
   )

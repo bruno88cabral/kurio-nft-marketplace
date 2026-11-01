@@ -49,7 +49,7 @@ export function HeroFeatured() {
         <div className="flex justify-center md:justify-end">
           {featured.isPending ? (
             <div className={cn(artBox, 'flex flex-col gap-4')} aria-hidden>
-              <Skeleton className="aspect-square w-full rounded-2xl motion-reduce:animate-none" />
+              <Skeleton className="aspect-square w-full rounded-2xl" />
             </div>
           ) : featured.isError || featured.data.length === 0 ? (
             // Sem destaques: mantém a caixa (sem deslocar o layout) e não compete com o erro do grid

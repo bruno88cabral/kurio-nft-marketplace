@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { useSession } from '@/auth/useSession'
 import { Skeleton } from '@/components/ui/skeleton'
 import { visitorLoginRedirect } from '@/features/account/authRedirect'
-import { cn } from '@/lib/utils'
 
 interface SessionLinkProps {
   className?: string
@@ -24,7 +23,7 @@ export function SessionLink({ className, loadingClassName, children }: SessionLi
   const redirect = useLocation({ select: visitorLoginRedirect })
 
   if (isPending) {
-    return <Skeleton aria-hidden className={cn('motion-reduce:animate-none', loadingClassName)} />
+    return <Skeleton aria-hidden className={loadingClassName} />
   }
   const label = isAuthenticated && account ? account.name : 'Entrar'
   const content = children ? (

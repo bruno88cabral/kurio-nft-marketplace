@@ -53,7 +53,7 @@ export function ReviewStep({ lines, announce = true }: { lines: readonly ReviewL
                     className="size-full object-cover"
                   />
                 ) : (
-                  <Skeleton className="size-full motion-reduce:animate-none" />
+                  <Skeleton className="size-full" />
                 )}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -64,7 +64,7 @@ export function ReviewStep({ lines, announce = true }: { lines: readonly ReviewL
                     {unitPrice ? (
                       <PriceTag price={mulEth(unitPrice, item.quantity)} size="sm" />
                     ) : (
-                      <Skeleton className="h-4 w-16 motion-reduce:animate-none" />
+                      <Skeleton className="h-4 w-16" />
                     )}
                   </span>
                 </div>
