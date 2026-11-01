@@ -44,7 +44,12 @@ export function CatalogToolbar() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <TabsList variant="line" aria-label="Recorte do catálogo" className="max-w-full justify-start overflow-x-auto">
           {CATALOG_TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="text-caption sm:text-body flex-none px-2 sm:px-3">
+            <TabsTrigger
+              key={t.value}
+              value={t.value}
+              // Figma: as abas são brancas; a ativa fica laranja com o sublinhado laranja
+              className="text-caption sm:text-body text-foreground dark:text-foreground data-active:text-text-accent dark:data-active:text-text-accent after:bg-primary flex-none px-2 sm:px-3"
+            >
               {t.label}
             </TabsTrigger>
           ))}
@@ -70,14 +75,18 @@ export function CatalogToolbar() {
             </SheetContent>
           </Sheet>
           <div className="flex min-w-0 items-center gap-2">
-            <Label htmlFor={sortId} className="text-muted-foreground text-body sr-only shrink-0 font-normal sm:not-sr-only">
+            <Label htmlFor={sortId} className="text-foreground text-body sr-only shrink-0 font-normal sm:not-sr-only">
               Ordenar por:
             </Label>
             <Select
               value={search.sort ?? 'newest'}
               onValueChange={(value) => update({ sort: value as NftListSort })}
             >
-              <SelectTrigger id={sortId} className="min-w-0">
+              {/* Figma: o valor é texto com chevron, sem caixa nem borda */}
+              <SelectTrigger
+                id={sortId}
+                className="text-foreground text-body min-w-0 border-transparent bg-transparent px-1 shadow-none dark:bg-transparent dark:hover:bg-transparent [&_svg]:text-foreground"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" align="end">

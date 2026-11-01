@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useId } from 'react'
 import { featuredNftsQuery } from '@/api/nfts'
 import type { NftListTab } from '@/contracts'
-import { NftCard, NftCardSkeleton } from '@/components/kurio'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { nftArtSize } from '@/lib/nftArt'
 import { CatalogFilters } from './CatalogFilters'
 import { CatalogGrid } from './CatalogGrid'
 import { CatalogToolbar } from './CatalogToolbar'
@@ -19,7 +21,6 @@ const CATALOG_ANCHOR_ID = 'catalogo'
 export function CatalogSection() {
   const { search, update } = useCatalogSearch()
   const titleId = useId()
-  const filtersId = useId()
   const tab: NftListTab = search.tab ?? 'all'
 
   return (
@@ -33,11 +34,9 @@ export function CatalogSection() {
         Catálogo
       </h2>
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[16.5rem_minmax(0,1fr)]">
-        <aside aria-labelledby={filtersId} className="hidden flex-col gap-8 lg:flex">
-          <div className="bg-card ring-border flex flex-col gap-5 rounded-xl p-5 ring-1">
-            <h3 id={filtersId} className="text-body-lg font-bold">
-              Filtros
-            </h3>
+        {/* Sem título visível (Figma): o painel começa em "Coleções"; o nome fica no aria-label */}
+        <aside aria-label="Filtros" className="hidden flex-col gap-6 lg:flex">
+          <div className="bg-card p-5">
             <CatalogFilters />
           </div>
           <FeaturedSpotlight />
@@ -59,20 +58,44 @@ export function CatalogSection() {
   )
 }
 
-/** Card "NFT em destaque / Oferta limitada" abaixo dos filtros: o primeiro item de `featured`. */
+/**
+ * "NFT em destaque / Oferta limitada" abaixo dos filtros (Figma): títulos e a arte grande do
+ * primeiro item de `featured`, sem nome nem preço visíveis; a arte leva ao Detalhe.
+ */
 function FeaturedSpotlight() {
   const featured = useQuery(featuredNftsQuery())
+  const titleId = useId()
   const first = featured.data?.[0]
   if (featured.isError || (featured.data && !first)) return null
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-text-accent text-caption font-bold tracking-widest uppercase">NFT em destaque</p>
+    <section aria-labelledby={titleId} className="bg-card flex flex-col overflow-hidden rounded-b-2xl">
+      <h3 id={titleId} className="flex flex-col gap-1 px-5 pt-5 pb-3">
+        <span className="text-text-accent text-heading uppercase">NFT em destaque</span>
+        <span className="text-foreground text-body-lg self-center font-bold tracking-wide uppercase">
+          Oferta limitada
+        </span>
+      </h3>
       {first ? (
-        <NftCard nft={first} previousPrice={first.previousPrice} badge="Oferta limitada" />
+        <Link
+          to="/nfts/$nftId"
+          params={{ nftId: first.id }}
+          className="focus-visible:ring-ring block overflow-hidden rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-inset"
+        >
+          <img
+            src={first.imageUrl}
+            alt=""
+            width={nftArtSize(first.imageUrl).width}
+            height={nftArtSize(first.imageUrl).height}
+            loading="lazy"
+            decoding="async"
+            className="bg-muted aspect-square w-full object-cover"
+          />
+          <span className="sr-only">{first.name}</span>
+        </Link>
       ) : (
-        <NftCardSkeleton />
+        <Skeleton aria-hidden className="aspect-square w-full rounded-2xl" />
       )}
-    </div>
+    </section>
   )
 }

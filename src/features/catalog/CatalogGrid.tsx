@@ -41,7 +41,7 @@ export function CatalogGrid() {
         <span className="sr-only">Carregando NFTs…</span>
         <NftGridSkeleton count={CATALOG_PAGE_SIZE} />
         {/* Reserva a linha da paginação (size-9), para o grid pronto não empurrar o que vem depois */}
-        <div aria-hidden className="flex h-9 justify-center gap-1">
+        <div aria-hidden className="flex h-9 justify-end gap-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="size-9" />
           ))}

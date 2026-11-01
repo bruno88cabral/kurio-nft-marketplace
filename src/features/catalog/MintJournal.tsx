@@ -4,30 +4,41 @@ import { nftArtSize } from '@/lib/nftArt'
 
 /**
  * "Diário da Cunhagem" (blog do Figma `2:2`). A página editorial está fora do escopo (§3): o bloco
- * existe pela fidelidade visual, com textos de layout (não são dados de negócio) e "Ler mais" no
+ * existe pela fidelidade visual, com os textos do Figma (não são dados de negócio) e "Ler mais" no
  * padrão `OutOfScopeAction`. As imagens são as artes do kit.
  */
 const POSTS = [
   {
-    date: '2026-10-24',
-    dateLabel: '24 out 2026',
-    title: 'Como escolher a edição certa: 1/1, 1/10, 1/50 ou aberta',
-    excerpt: 'Raridade, preço e liquidez mudam com o tamanho da tiragem. Um guia rápido antes da primeira compra.',
+    date: '2026-09-12',
+    dateLabel: '12 de setembro',
+    readingTime: 'Leitura de 6 min',
+    title: 'Como funciona a propriedade de NFTs',
+    excerpt: 'Aprenda a colecionar, negociar e verificar ativos digitais.',
     art: '/nfts/origami-orbit.svg',
   },
   {
-    date: '2026-10-17',
-    dateLabel: '17 out 2026',
-    title: 'Por dentro do ateliê de Pixel Reefs',
-    excerpt: 'Tomo Kitano conta como recifes de 8 bits viraram uma das coleções mais procuradas do mês.',
+    date: '2026-09-13',
+    dateLabel: '13 de setembro',
+    readingTime: 'Leitura de 2 min',
+    title: '10 artistas digitais para acompanhar',
+    excerpt: 'Conheça criadores que moldam a cultura digital.',
     art: '/nfts/reef-pulse.svg',
   },
   {
-    date: '2026-10-09',
-    dateLabel: '09 out 2026',
-    title: 'Taxa de rede sem susto',
-    excerpt: 'O que entra no total do pedido e por que a taxa aparece como estimada até a confirmação.',
+    date: '2026-09-15',
+    dateLabel: '15 de setembro',
+    readingTime: 'Leitura de 3 min',
+    title: 'Raridade, atributos e procedência',
+    excerpt: 'Entenda raridade, procedência, direitos autorais e utilidade.',
     art: '/nfts/night-compass.svg',
+  },
+  {
+    date: '2026-09-15',
+    dateLabel: '15 de setembro',
+    readingTime: 'Leitura de 2 min',
+    title: 'Como proteger sua carteira',
+    excerpt: 'Proteja sua carteira, seus ativos e sua identidade.',
+    art: '/nfts/kelp-sprite.svg',
   },
 ] as const
 
@@ -35,17 +46,19 @@ export function MintJournal() {
   const titleId = useId()
   return (
     <section aria-labelledby={titleId} className="mx-auto w-full max-w-7xl px-4 py-10 md:px-6 md:pb-16">
-      <div className="mb-6 flex flex-col gap-1">
-        <p className="text-text-accent text-caption font-bold tracking-widest uppercase">Blog</p>
-        <h2 id={titleId} className="text-heading">
+      <div className="mb-8 flex flex-col items-center gap-2 text-center">
+        <h2 id={titleId} className="text-heading tracking-wide">
           Diário da Cunhagem
         </h2>
+        <p className="text-muted-foreground text-caption sm:text-body tracking-wide">
+          Histórias, guias e insights para colecionadores sobre o universo da propriedade digital.
+        </p>
       </div>
-      <ul className="grid gap-4 md:grid-cols-3 md:gap-6">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
         {POSTS.map((post) => {
           const size = nftArtSize(post.art)
           return (
-            <li key={post.title} className="bg-card ring-border flex flex-col overflow-hidden rounded-xl ring-1">
+            <li key={post.title} className="bg-card flex flex-col overflow-hidden rounded-xl">
               <article className="flex flex-1 flex-col">
                 <img
                   src={post.art}
@@ -54,16 +67,25 @@ export function MintJournal() {
                   height={size.height}
                   loading="lazy"
                   decoding="async"
-                  className="aspect-[16/9] w-full object-cover"
+                  className="bg-muted aspect-[4/3] w-full rounded-t-xl object-cover"
                 />
                 <div className="flex flex-1 flex-col items-start gap-2 p-4">
-                  <time dateTime={post.date} className="text-muted-foreground text-tiny uppercase">
-                    {post.dateLabel}
-                  </time>
-                  <h3 className="text-body font-medium">{post.title}</h3>
+                  <p className="text-muted-foreground text-caption tracking-wide">
+                    <time dateTime={post.date}>{post.dateLabel}</time>
+                    <span aria-hidden className="mx-2">
+                      |
+                    </span>
+                    <span className="sr-only">, </span>
+                    {post.readingTime}
+                  </p>
+                  <h3 className="text-body-lg font-bold">{post.title}</h3>
                   <p className="text-muted-foreground text-caption flex-1">{post.excerpt}</p>
-                  <OutOfScopeAction variant="link" label={`Ler mais: ${post.title}`} className="text-text-accent h-auto px-0">
-                    Ler mais
+                  <OutOfScopeAction
+                    variant="link"
+                    label={`Ler mais: ${post.title}`}
+                    className="text-text-accent text-caption h-auto px-0 font-bold opacity-100"
+                  >
+                    Ler mais <span aria-hidden>→</span>
                   </OutOfScopeAction>
                 </div>
               </article>
