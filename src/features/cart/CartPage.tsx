@@ -2,7 +2,6 @@ import { useQueries } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LoaderCircle, ShoppingCart } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { nftDetailQuery } from '@/api/nfts'
 import { useSession } from '@/auth/useSession'
 import type { Cart } from '@/contracts'
@@ -15,8 +14,7 @@ import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from './layout'
 import { QuoteErrorState } from './QuoteErrorState'
 import { QUOTE_ISSUES_MESSAGE, useCartQuote } from './useCartQuote'
 import { useCart } from './useCart'
-
-export const COUPON_FAILURE_MESSAGE = 'Não foi possível atualizar o cupom.'
+import { useCouponActions } from './useCouponActions'
 
 /**
  * Carrinho (`/cart`, rota pública). Visitante: linhas com o preço do catálogo, sem total nem cupom, com o
@@ -93,7 +91,7 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
   const cart = useCart()
   const { account } = useSession()
   const accountId = account?.id
-  const [couponSubmitting, setCouponSubmitting] = useState(false)
+  const coupon = useCouponActions(cart)
   const issuesId = useId()
   const blockId = useId()
 
@@ -102,28 +100,6 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
   const cartForQuote: Cart = { items: [...cart.items], couponCode: cart.couponCode }
   const quote = useCartQuote(accountId, cartForQuote)
   const { quote: quoteData, recalculating, staleAfterError } = quote
-
-  const applyCoupon = async (code: string) => {
-    setCouponSubmitting(true)
-    try {
-      await cart.applyCoupon(code)
-    } catch {
-      toast.error(COUPON_FAILURE_MESSAGE)
-    } finally {
-      setCouponSubmitting(false)
-    }
-  }
-  const removeCoupon = async () => {
-    setCouponSubmitting(true)
-    try {
-      await cart.removeCoupon()
-    } catch {
-      toast.error(COUPON_FAILURE_MESSAGE)
-    } finally {
-      setCouponSubmitting(false)
-    }
-  }
-
 
   return (
     <div className={GRID_CLASS}>
@@ -159,14 +135,14 @@ function CartContent({ onRemoved }: { onRemoved: (name: string) => void }) {
           <>
             <CouponInput
               status={couponStatus({
-                submitting: couponSubmitting,
+                submitting: coupon.submitting,
                 couponCode: cart.couponCode,
                 quote: quoteData,
                 quoteError: quote.isError,
               })}
               appliedCode={quoteData?.coupon?.code ?? cart.couponCode}
-              onApply={(code) => void applyCoupon(code)}
-              onRemove={() => void removeCoupon()}
+              onApply={coupon.apply}
+              onRemove={coupon.remove}
             />
             {quote.isError && !quoteData ? (
               <QuoteErrorState quote={quote} />

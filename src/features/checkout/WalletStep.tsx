@@ -1,19 +1,9 @@
-import { Link } from '@tanstack/react-router'
-import { CircleCheck, LoaderCircle, Wallet as WalletIcon } from 'lucide-react'
+import { CircleCheck, LoaderCircle } from 'lucide-react'
 import { useId, useRef } from 'react'
 import { flushSync } from 'react-dom'
-import type { Id, Wallet } from '@/contracts'
-import {
-  EmptyState,
-  ErrorState,
-  WalletCard,
-  WalletCardGroup,
-  WalletOption,
-  WalletOptionGroup,
-  type WalletOptionStatus,
-} from '@/components/kurio'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import type { Wallet } from '@/contracts'
+import { WalletOption, WalletOptionGroup, type WalletOptionStatus } from '@/components/kurio'
+import { Button } from '@/components/ui/button'
 import { WALLET_PROVIDERS, walletProviderLabel, type WalletProvider } from '@/lib/wallets'
 
 export type WalletConnection =
@@ -25,12 +15,8 @@ export type WalletConnection =
   | { status: 'disconnected' }
 
 export interface WalletStepProps {
-  wallets: readonly Wallet[] | undefined
-  isError: boolean
-  retrying: boolean
-  onRetry: () => void
-  selectedId: Id | undefined
-  onSelect: (walletId: Id) => void
+  /** A carteira cadastrada escolhida no "Perfil do colecionador"; `undefined` enquanto carregam ou sem carteira. */
+  selected: Wallet | undefined
   connection: WalletConnection
   /** O provedor da conexão simulada (`draft.provider`). */
   provider: WalletProvider | undefined
@@ -47,77 +33,19 @@ export interface WalletStepProps {
 }
 
 /**
- * Etapa "Carteira": as carteiras cadastradas (`WalletCard selectable`, a principal pré-selecionada) e, em
- * "Carteira e rede", o provedor (`WalletOption`) com que a conexão da escolhida é simulada
- * (`POST /wallets/:id/connect`), mais Conectar / Desconectar. Trocar a carteira ou o provedor desconecta.
+ * "Carteira e rede" (no resumo do Pagamento): o provedor (`WalletOption`) com que a conexão da carteira escolhida
+ * é simulada (`POST /wallets/:id/connect`), mais Conectar / Desconectar. A carteira cadastrada (e a rede dela) é
+ * escolhida no formulário (`CollectorForm`). Trocar a carteira ou o provedor desconecta.
  */
-export function WalletStep({
-  wallets,
-  isError,
-  retrying,
-  onRetry,
-  selectedId,
-  onSelect,
-  connection,
-  provider,
-  onSelectProvider,
-  onConnect,
-  onDisconnect,
-  locked,
-}: WalletStepProps) {
+export function WalletStep({ selected, connection, provider, onSelectProvider, onConnect, onDisconnect, locked }: WalletStepProps) {
   const headingId = useId()
   const connectRef = useRef<HTMLButtonElement>(null)
-  if (isError && !wallets) {
-    return (
-      <ErrorState
-        title="Não foi possível carregar suas carteiras."
-        retrying={retrying}
-        onRetry={onRetry}
-        className="py-6"
-      />
-    )
-  }
-  if (!wallets) {
-    return (
-      <div aria-busy className="flex flex-col gap-3">
-        <Skeleton aria-hidden className="h-20 rounded-lg motion-reduce:animate-none" />
-        <p role="status" className="sr-only">
-          Carregando as carteiras…
-        </p>
-      </div>
-    )
-  }
-  if (wallets.length === 0) {
-    return (
-      <EmptyState
-        icon={<WalletIcon />}
-        title="Você ainda não tem uma carteira cadastrada."
-        description="Cadastre uma carteira para pagar."
-        action={
-          <Link to="/wallets" className={buttonVariants({ variant: 'default' })}>
-            Cadastrar carteira
-          </Link>
-        }
-      />
-    )
-  }
 
-  const selected = wallets.find((w) => w.id === selectedId)
   return (
-    <div className="flex flex-col gap-3">
-      <WalletCardGroup value={selectedId} onValueChange={onSelect} label="Carteira de pagamento" disabled={locked}>
-        {wallets.map((wallet) => (
-          <WalletCard key={wallet.id} wallet={wallet} />
-        ))}
-      </WalletCardGroup>
-      {locked && (
-        <p className="text-muted-foreground text-caption">
-          A carteira fica fixa até o pedido anterior ser resolvido.
-        </p>
-      )}
-      <h3 id={headingId} className="text-body font-medium">
+    <section aria-labelledby={headingId} className="flex flex-col gap-3">
+      <h2 id={headingId} className="text-body-lg font-medium lg:text-center">
         Carteira e rede
-      </h3>
+      </h2>
       <WalletOptionGroup value={provider} onValueChange={onSelectProvider} labelledBy={headingId} disabled={locked}>
         {WALLET_PROVIDERS.map((option) => (
           <WalletOption
@@ -170,7 +98,7 @@ export function WalletStep({
           )}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
