@@ -2,9 +2,9 @@
 
 Front-end do marketplace Kurio (desafio Jungle Gaming). Stack: React 19, Vite, TypeScript, TanStack Router/Query, Tailwind v4 + shadcn/ui, Axios, Socket.IO, MSW.
 
-> Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT) + M3 (Conta e sessão) + M4 (Carrinho, checkout e tempo real)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. O M3 trouxe **login e cadastro** (modais em `/login` e `/signup`), o menu da conta com **sair**, rotas protegidas que voltam ao lugar de origem, o **Perfil** (nome, avatar e troca de senha), as **Carteiras** (cadastrar, definir principal, renomear e remover) e o ciclo de vida da sessão (expiração, troca de conta, várias abas). O M4 trouxe o **carrinho** (do visitante em `localStorage` e da conta no servidor, com cupom e cotação), o **Pagamento** (formulário "Perfil do colecionador" validado no cliente, carteira cadastrada e rede, provedor com conexão, recusa e desconexão simuladas, revisão em diálogo, revalidação antes de confirmar e pedido idempotente), a **Confirmação** com o recibo e o **cache ligado ao tempo real** (`nft.updated` e `order.updated` com dedupe por `eventId` e descarte por `version`). Para entrar, use o [login pela interface](#entrar-e-sair); as receitas do M4 estão em [Falhas do carrinho, pagamento e tempo real](#falhas-do-carrinho-pagamento-e-tempo-real-m4). As telas do M2, do M3 e do M4 **não foram conferidas contra o Figma** (sem cota no MCP), exceto o **Pagamento**, conferido contra os PNGs exportados do Figma; ver "Desvios do Figma" no `ARCHITECTURE.md`. Tudo o que falta (M5 em diante) está marcado com `TODO`.
+**Demo publicada:** https://kurio-nft-marketplace-bruno-cabral.vercel.app (produção, a partir da `main`, com a API mockada no navegador; ver [Deploy](#deploy-vercel)).
 
-> TODO: a URL pública da Vercel ainda não existe. O projeto já faz deploy a cada push (ver [Deploy](#deploy-vercel)), mas os domínios da Vercel pedem login. Esta seção deve receber o link quando houver um domínio público.
+> Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT) + M3 (Conta e sessão) + M4 (Carrinho, checkout e tempo real) + M5 (E2E, Lighthouse e deploy)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. O M3 trouxe **login e cadastro** (modais em `/login` e `/signup`), o menu da conta com **sair**, rotas protegidas que voltam ao lugar de origem, o **Perfil** (nome, avatar e troca de senha), as **Carteiras** (cadastrar, definir principal, renomear e remover) e o ciclo de vida da sessão (expiração, troca de conta, várias abas). O M4 trouxe o **carrinho** (do visitante em `localStorage` e da conta no servidor, com cupom e cotação), o **Pagamento** (formulário "Perfil do colecionador" validado no cliente, carteira cadastrada e rede, provedor com conexão, recusa e desconexão simuladas, revisão em diálogo, revalidação antes de confirmar e pedido idempotente), a **Confirmação** com o recibo e o **cache ligado ao tempo real** (`nft.updated` e `order.updated` com dedupe por `eventId` e descarte por `version`). Para entrar, use o [login pela interface](#entrar-e-sair); as receitas do M4 estão em [Falhas do carrinho, pagamento e tempo real](#falhas-do-carrinho-pagamento-e-tempo-real-m4). O M5 trouxe os [testes E2E com Playwright](#testes-e2e-playwright), a [medição com Lighthouse](#lighthouse) e o deploy público. As artes dos NFTs são as 4 fotos exportadas do Figma, em AVIF e WebP (ver "Substituição de assets" no `ARCHITECTURE.md`). As telas foram conferidas contra os PNGs exportados do Figma em 390, 768 e 1440 (o MCP do Figma ficou sem cota); o que diverge, e o que ficou sem conferir por não ter frame, está em "Desvios do Figma" no `ARCHITECTURE.md`.
 
 ## Requisitos
 
@@ -43,19 +43,23 @@ Versionadas em `.env.development` e `.env.production`, com os mesmos valores, e 
 | `pnpm preview` | Serve o build de produção localmente. |
 | `pnpm typecheck` | `tsc -b`. |
 | `pnpm lint` | `eslint .`. |
+| `pnpm test` | `vitest run`: testes de unidade e de componente. O ambiente padrão é node; os testes de componente declaram `@vitest-environment jsdom` (Testing Library). |
+| `pnpm test:coverage` | `vitest run --coverage` (v8). Os limites mínimos ficam em `vite.config.ts` (`coverage.thresholds`); o CI roda este comando. |
+| `pnpm e2e` | Playwright contra o build de produção (ver [Testes E2E](#testes-e2e-playwright)). |
+| `pnpm e2e:report` | Abre o relatório HTML do último `pnpm e2e`. |
 | `pnpm lighthouse` | `pnpm build` + Lighthouse 3x em Início e Detalhe, mobile e desktop, sobre o `vite preview` (porta 5210). Relatórios e medianas em `lighthouse/reports/`. |
-| `pnpm test` | `vitest run` (ambiente node, sem jsdom: `EthAmount`/`big.js`, interceptor do Axios e sessão, ciclo de vida da sessão, camada de mocks, estado do catálogo na URL, faixa de preço, edição, cache de favoritos e validação de contas, avatar e carteiras). |
 
 ## Fluxo de branches e CI
 
 PRs de feature têm como base `develop`. Depois de validada em `develop`, uma PR `develop` -> `main` leva a entrega para a `main`.
 
-O workflow `.github/workflows/ci.yml` roda em toda PR para `develop`/`main` e em todo push nelas, com dois checks:
+O workflow `.github/workflows/ci.yml` roda em toda PR para `develop`/`main` e em todo push nelas, com três checks:
 
 | Check | O que roda |
 | -- | -- |
 | `lint` | `pnpm lint` e `pnpm typecheck` |
-| `test` | `pnpm test` |
+| `test` | `pnpm test:coverage` (falha se a cobertura ficar abaixo dos limites) |
+| `e2e` | `pnpm exec playwright install --with-deps chromium` e `pnpm e2e`; publica `playwright-report/` e `test-results/` como artefato |
 
 O build não roda no CI: o check **Vercel** (abaixo) já executa o `pnpm build` (que inclui o `tsc -b`) e fica vermelho se ele falhar.
 
