@@ -53,7 +53,9 @@ export function PriceTag({ price, previousPrice, changed = false, size = 'md', t
         className={cn(
           'tabular-nums transition-colors',
           tone === 'accent' ? 'text-text-accent font-bold' : 'text-foreground font-medium',
-          changed && 'text-text-accent',
+          // "Alterado" tem destaque próprio além da cor: com `accent` o preço já é laranja, então o
+          // fundo realçado é o que distingue o preço que acabou de mudar
+          changed && 'text-text-accent bg-primary/15 -mx-1 rounded-sm px-1',
         )}
       >
         <span className="sr-only">Preço: </span>

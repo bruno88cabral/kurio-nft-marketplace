@@ -17,8 +17,11 @@ import { AccountMenu } from './AccountMenu'
 const navItem =
   'text-foreground text-body lg:text-body-lg -mb-px flex h-full items-center border-b-2 border-transparent px-1 outline-none hover:text-text-accent focus-visible:ring-ring focus-visible:ring-3 focus-visible:ring-inset aria-[current=page]:border-text-accent aria-[current=page]:font-bold aria-[current=page]:text-text-accent'
 
-/** Os "Em breve" da navegação: mesma cara dos links (branco, sem a opacidade de desabilitado). */
-const outOfScopeNavItem = cn(navItem, 'h-full rounded-none p-0 px-1 font-normal opacity-100')
+/**
+ * Os "Em breve" da navegação: mesma cara dos links (branco, sem a opacidade de desabilitado), mas
+ * sem o laranja no hover, que é o sinal de link ativo/clicável.
+ */
+const outOfScopeNavItem = cn(navItem, 'hover:text-foreground h-full rounded-none p-0 px-1 font-normal opacity-100')
 
 export function SiteHeader() {
   const cartCount = useCartCount()
