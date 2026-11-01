@@ -7,8 +7,11 @@ export interface FavoriteButtonProps {
   onToggle: () => void
   /** Nome do NFT, para o nome acessível "Favoritar <nome>". */
   nftName: string
-  /** `overlay` = 28px sobre a arte do card (Figma `15:5465`); `default` = botão com texto (Detalhe). */
-  variant?: 'overlay' | 'default'
+  /**
+   * `overlay` = 28px sobre a arte do card (Figma `15:5465`); `default` = botão com texto e contorno
+   * laranja (Detalhe desktop); `round` = botão redondo de 44 px, só o coração (Detalhe mobile).
+   */
+  variant?: 'overlay' | 'default' | 'round'
   disabled?: boolean
   className?: string
 }
@@ -26,25 +29,25 @@ export function FavoriteButton({
   disabled,
   className,
 }: FavoriteButtonProps) {
-  const overlay = variant === 'overlay'
+  const iconOnly = variant !== 'default'
   return (
     <button
       type="button"
       aria-pressed={favorited}
-      aria-label={overlay ? `Favoritar ${nftName}` : undefined}
+      aria-label={iconOnly ? `Favoritar ${nftName}` : undefined}
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        'focus-visible:ring-ring/50 focus-visible:border-ring inline-flex items-center justify-center gap-2 border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50',
-        overlay
-          ? 'bg-background/70 border-border-soft size-7 rounded-full backdrop-blur-sm hover:bg-background'
-          : 'border-border hover:bg-muted h-9 rounded-md px-3 text-sm font-medium',
-        favorited ? 'text-text-accent' : 'text-foreground',
+        'focus-visible:ring-ring focus-visible:border-ring inline-flex items-center justify-center gap-2 border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50',
+        variant === 'overlay' && 'bg-background/70 border-border-soft size-7 rounded-full backdrop-blur-sm hover:bg-background',
+        variant === 'round' && 'bg-card border-border-soft hover:bg-muted text-text-accent size-11 rounded-full',
+        variant === 'default' && 'border-primary text-text-accent hover:bg-muted h-10 rounded-md px-4 text-sm font-medium',
+        variant === 'overlay' && (favorited ? 'text-text-accent' : 'text-foreground'),
         className,
       )}
     >
-      <Heart aria-hidden className={cn('size-4', favorited && 'fill-current')} />
-      {!overlay && (
+      <Heart aria-hidden className={cn(variant === 'round' ? 'size-5' : 'size-4', favorited && 'fill-current')} />
+      {!iconOnly && (
         <span>
           Favoritar<span className="sr-only"> {nftName}</span>
         </span>

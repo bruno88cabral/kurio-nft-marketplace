@@ -7,10 +7,12 @@ import { mergeCart } from '@/api/cart'
 import { onUnauthorized } from '@/api/client'
 import { queryClient } from '@/app/queryClient'
 import { router } from '@/app/router'
+import { focusAfterNavigation, noteNavigationStart } from '@/components/layout/routeFocus'
 import { isSessionStorageEvent, sessionLifecycle } from '@/auth/sessionLifecycle'
 import { clearAnonymousCart, readAnonymousCart } from '@/features/cart/anonymousCart'
 import { mergeAnonymousCartOnLogin } from '@/features/cart/mergeOnLogin'
-import { dropWalletConnections } from '@/features/checkout/checkoutDraft'
+import { dropCollectorForms, dropWalletConnections } from '@/features/checkout/checkoutDraft'
+import { clearAnnouncement } from '@/lib/announcer'
 import { bindRealtime } from '@/realtime/bindRealtime'
 import { createReconciler } from '@/realtime/reconcile'
 import { socket } from '@/realtime/socket'
@@ -43,9 +45,16 @@ sessionLifecycle.onSessionEstablished((auth) =>
   }),
 )
 
+// Troca de usuário sem logout (A expira e B entra na mesma aba): o formulário do colecionador das outras contas é
+// dado privado e cai; o da conta que entrou fica para a retomada (MYK-1114 D7)
+sessionLifecycle.onSessionEstablished((auth) => dropCollectorForms(undefined, auth.account.id))
+
 // A conexão da carteira no checkout é da sessão: cai em todo reset privado (logout incluído). A tentativa de pedido
 // pendente (chave + corpo) fica no rascunho: apagá-la abriria caminho para um pedido duplicado (R4, MYK-1103)
 sessionLifecycle.onPrivateReset(() => dropWalletConnections())
+
+// A região `aria-live` única não guarda o último anúncio da sessão anterior (ex.: "Adicionado aos favoritos.")
+sessionLifecycle.onPrivateReset(clearAnnouncement)
 
 // Tempo real no cache (MYK-1091): `nft.updated`/`order.updated` passam pelo reconciliador (dedupe por `eventId`,
 // descarte por `version`); a reconexão por queda refaz `nfts`, `cart` e `orders`. Ligado antes do primeiro connect
@@ -53,6 +62,14 @@ sessionLifecycle.onPrivateReset(() => dropWalletConnections())
 const reconciler = createReconciler()
 bindRealtime({ socket, queryClient, reconciler })
 sessionLifecycle.onPrivateReset(reconciler.reset)
+
+// Foco depois de navegar (§8, MYK-1080): o link clicado some e o foco cairia no `<body>`. Um quadro depois do
+// `onResolved`, para a tela nova já estar no DOM (e um diálogo que abriu já ter tomado o foco). O início da
+// navegação anota se ela sai de um modal (o Radix devolve o foco ao gatilho, que fica onde está)
+router.subscribe('onBeforeNavigate', noteNavigationStart)
+router.subscribe('onResolved', (event) => {
+  requestAnimationFrame(() => focusAfterNavigation(event))
+})
 
 // Carregado por main.tsx só depois do enableMocks(); ver o comentário lá.
 // Socket com o token guardado (refresh logado não fica anônimo) e timer de expiração armado

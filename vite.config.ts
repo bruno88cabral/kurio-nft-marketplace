@@ -1,9 +1,9 @@
-/// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,8 +21,8 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
-    // Worktrees do Claude ficam em .claude/ e trariam cópias dos testes
-    exclude: ['**/node_modules/**', '.claude/**'],
+    // Worktrees (.claude/) e E2E (Playwright, `pnpm e2e`) ficam fora do Vitest
+    exclude: [...configDefaults.exclude, '.claude/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

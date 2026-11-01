@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useRef } from 'react'
 import { ChevronDown, LogOut, UserRound, Wallet } from 'lucide-react'
 import { useSession } from '@/auth/useSession'
 import { Button } from '@/components/ui/button'
@@ -10,12 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { focusMainContent, useSignOut } from '@/features/account/useSignOut'
+import { useSignOut } from '@/features/account/useSignOut'
+import { focusMainContent } from './routeFocus'
 import { cn } from '@/lib/utils'
 import { SessionLink } from './SessionLink'
 
 interface AccountMenuProps {
   className?: string
+  /** Classes do "Entrar" do visitante (no header, o botão laranja sólido do Figma); padrão: `className`. */
+  visitorClassName?: string
   loadingClassName?: string
 }
 
@@ -23,12 +27,14 @@ interface AccountMenuProps {
  * Conta no header: visitante e carregando delegam ao `SessionLink` ("Entrar" / skeleton);
  * logado abre um menu com Perfil, Carteiras e Sair. A tab bar mobile continua com o `SessionLink`.
  */
-export function AccountMenu({ className, loadingClassName }: AccountMenuProps) {
+export function AccountMenu({ className, visitorClassName, loadingClassName }: AccountMenuProps) {
   const { account, isAuthenticated } = useSession()
   const { signOut, pending } = useSignOut()
+  // Perfil ou Carteiras escolhidos: a tela muda e o foco vai para o conteúdo (§8), não de volta ao gatilho
+  const navigating = useRef(false)
 
   if (!isAuthenticated || !account) {
-    return <SessionLink className={className} loadingClassName={loadingClassName} />
+    return <SessionLink className={visitorClassName ?? className} loadingClassName={loadingClassName} />
   }
 
   return (
@@ -46,7 +52,8 @@ export function AccountMenu({ className, loadingClassName }: AccountMenuProps) {
         onCloseAutoFocus={(event) => {
           // Saindo, o menu desmonta junto com o gatilho (o foco cairia no `<body>`); o Radix chama
           // isto depois do unmount, quando ele já não prende o foco
-          if (!pending) return
+          if (!pending && !navigating.current) return
+          navigating.current = false
           event.preventDefault()
           focusMainContent()
         }}
@@ -56,13 +63,13 @@ export function AccountMenu({ className, loadingClassName }: AccountMenuProps) {
           <span className="text-muted-foreground truncate text-xs font-normal">{account.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild onSelect={() => (navigating.current = true)}>
           <Link to="/profile">
             <UserRound aria-hidden />
             Perfil
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild onSelect={() => (navigating.current = true)}>
           <Link to="/wallets">
             <Wallet aria-hidden />
             Carteiras

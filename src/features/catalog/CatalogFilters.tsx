@@ -2,10 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { nftFacetsQuery } from '@/api/nfts'
 import type { NftFacets } from '@/contracts'
+import { Check } from 'lucide-react'
+import { Checkbox as CheckboxPrimitive, RadioGroup as RadioGroupPrimitive } from 'radix-ui'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Slider } from '@/components/ui/slider'
 import { activeFilterCount, CLEAR_SIDEBAR_FILTERS, type CatalogSearch } from '@/lib/catalogSearch'
@@ -17,7 +16,28 @@ import { useCatalogSearch } from './useCatalogSearch'
 
 const ALL_NETWORKS = 'all'
 
-const groupTitle = 'text-caption text-muted-foreground font-bold uppercase tracking-wide'
+const groupTitle = 'text-body-lg text-foreground font-bold'
+
+/**
+ * Item de filtro sem checkbox nem rádio visíveis (Figma): a linha inteira é o controle
+ * (`role="checkbox"`/`role="radio"` do Radix, com o nome vindo do texto). O ativo fica em laranja
+ * e, para não depender só de cor (§8), em negrito e com um ✓ no recuo à esquerda.
+ */
+const optionRow = cn(
+  'group/option text-muted-foreground text-body flex w-full items-center gap-1.5 rounded-sm py-1.5 text-left tracking-wide',
+  'hover:text-foreground focus-visible:ring-ring outline-none focus-visible:ring-3',
+  'data-[state=checked]:text-text-accent data-[state=checked]:font-bold',
+)
+
+function OptionMark() {
+  return (
+    <Check
+      aria-hidden
+      className="size-3.5 shrink-0 opacity-0 group-data-[state=checked]/option:opacity-100"
+      strokeWidth={3}
+    />
+  )
+}
 
 export interface CatalogFiltersProps {
   className?: string
@@ -34,7 +54,7 @@ export function CatalogFilters({ className }: CatalogFiltersProps) {
   const count = activeFilterCount(search)
 
   return (
-    <div data-slot="catalog-filters" className={cn('flex flex-col gap-6', className)}>
+    <div data-slot="catalog-filters" className={cn('flex flex-col gap-8', className)}>
       {facets.isPending ? (
         <FiltersSkeleton />
       ) : facets.isError ? (
@@ -79,7 +99,6 @@ interface FilterProps {
 }
 
 function CollectionFilter({ facets, search, onChange }: FilterProps) {
-  const id = useId()
   const selected = new Set(search.collections ?? [])
   const toggle = (name: string, checked: boolean) => {
     const next = new Set(selected)
@@ -89,21 +108,22 @@ function CollectionFilter({ facets, search, onChange }: FilterProps) {
   }
 
   return (
-    <fieldset className="flex flex-col gap-3">
-      <legend className={cn(groupTitle, 'mb-3')}>Coleções</legend>
+    <fieldset className="flex flex-col">
+      <legend className={cn(groupTitle, 'mb-2')}>Coleções</legend>
       {facets.collections.length === 0 && <p className="text-muted-foreground text-caption">Nenhuma coleção.</p>}
-      {facets.collections.map(({ name, count }, i) => (
-        <div key={name} className="flex items-center gap-2">
-          <Checkbox
-            id={`${id}-${i}`}
-            checked={selected.has(name)}
-            onCheckedChange={(checked) => toggle(name, checked === true)}
-          />
-          <Label htmlFor={`${id}-${i}`} className="text-body flex flex-1 justify-between gap-2 font-normal">
-            <span className="truncate">{name}</span>
-            <span className="text-muted-foreground tabular-nums">({count})</span>
-          </Label>
-        </div>
+      {facets.collections.map(({ name, count }) => (
+        <CheckboxPrimitive.Root
+          key={name}
+          checked={selected.has(name)}
+          onCheckedChange={(checked) => toggle(name, checked === true)}
+          className={optionRow}
+        >
+          <OptionMark />
+          <span className="min-w-0 flex-1 truncate">{name}</span>
+          <span className="text-foreground font-bold tabular-nums group-data-[state=checked]/option:text-text-accent">
+            ({count})
+          </span>
+        </CheckboxPrimitive.Root>
       ))}
     </fieldset>
   )
@@ -121,26 +141,29 @@ function PriceFilter({ facets, search, onApply }: Omit<FilterProps, 'onChange'> 
       <p id={labelId} className={groupTitle}>
         Faixa de preço
       </p>
-      <Slider
-        min={bounds[0]}
-        max={bounds[1]}
-        step={1}
-        minStepsBetweenThumbs={0}
-        value={draft}
-        disabled={disabled}
-        onValueChange={(v) => setDraft([v[0] ?? bounds[0], v[1] ?? bounds[1]])}
-        getThumbProps={(i) => ({
-          'aria-label': i === 0 ? 'Preço mínimo' : 'Preço máximo',
-          'aria-valuetext': `${formatEth(stepsToEth(draft[i] ?? 0))} ETH`,
-        })}
-        className="py-2"
-      />
-      <div className="flex items-center justify-between gap-2">
+      <div className="pl-5">
+        <Slider
+          min={bounds[0]}
+          max={bounds[1]}
+          step={1}
+          minStepsBetweenThumbs={0}
+          value={draft}
+          disabled={disabled}
+          onValueChange={(v) => setDraft([v[0] ?? bounds[0], v[1] ?? bounds[1]])}
+          getThumbProps={(i) => ({
+            'aria-label': i === 0 ? 'Preço mínimo' : 'Preço máximo',
+            'aria-valuetext': `${formatEth(stepsToEth(draft[i] ?? 0))} ETH`,
+          })}
+          className="py-2"
+        />
+      </div>
+      <div className="flex flex-col items-start gap-2 pl-5">
         <p className="text-body tabular-nums">{text}</p>
         <Button
           type="button"
           size="sm"
           disabled={disabled}
+          className="font-bold"
           onClick={() => onApply(priceRangePatch(draft, facets.price))}
         >
           Aplicar
@@ -151,7 +174,7 @@ function PriceFilter({ facets, search, onApply }: Omit<FilterProps, 'onChange'> 
 }
 
 function NetworkFilter({ facets, search, onChange }: FilterProps) {
-  const id = useId()
+  const legendId = useId()
   const total = facets.networks.reduce((sum, n) => sum + n.count, 0)
   const options = [
     { value: ALL_NETWORKS, label: 'Todas', count: total },
@@ -160,35 +183,39 @@ function NetworkFilter({ facets, search, onChange }: FilterProps) {
 
   return (
     <fieldset className="flex flex-col">
-      <legend className={cn(groupTitle, 'mb-3')}>Rede</legend>
-      <RadioGroup
+      <legend id={legendId} className={cn(groupTitle, 'mb-2')}>
+        Rede
+      </legend>
+      {/* O `radiogroup` também ganha o nome (não só o `fieldset`) */}
+      <RadioGroupPrimitive.Root
+        aria-labelledby={legendId}
         value={search.network ?? ALL_NETWORKS}
         onValueChange={(value) =>
           onChange({ network: value === ALL_NETWORKS ? undefined : (value as NonNullable<CatalogSearch['network']>) })
         }
+        className="flex flex-col"
       >
-        {options.map((o, i) => (
-          <div key={o.value} className="flex items-center gap-2">
-            <RadioGroupItem id={`${id}-${i}`} value={o.value} />
-            <Label htmlFor={`${id}-${i}`} className="text-body flex flex-1 justify-between gap-2 font-normal">
-              <span>{o.label}</span>
-              <span className="text-muted-foreground tabular-nums">({o.count})</span>
-            </Label>
-          </div>
+        {options.map((o) => (
+          <RadioGroupPrimitive.Item key={o.value} value={o.value} className={optionRow}>
+            <OptionMark />
+            <span className="min-w-0 flex-1 truncate">{o.label}</span>
+            <span className="tabular-nums">({o.count})</span>
+          </RadioGroupPrimitive.Item>
         ))}
-      </RadioGroup>
+      </RadioGroupPrimitive.Root>
     </fieldset>
   )
 }
 
 function FiltersSkeleton() {
+  // Mesmas linhas do conteúdo pronto: título (24 px + 8) e itens de 33 px (texto de 21 + py-1.5)
   return (
-    <div aria-hidden className="flex flex-col gap-6">
-      {[5, 2, 5].map((rows, g) => (
-        <div key={g} className="flex flex-col gap-3">
-          <Skeleton className="h-3 w-24 motion-reduce:animate-none" />
+    <div aria-hidden className="flex flex-col gap-8">
+      {[5, 3, 5].map((rows, g) => (
+        <div key={g} className="flex flex-col">
+          <Skeleton className="mb-2 h-6 w-28" />
           {Array.from({ length: rows }, (_, i) => (
-            <Skeleton key={i} className="h-5 w-full motion-reduce:animate-none" />
+            <Skeleton key={i} className="my-1.5 h-[21px] w-full" />
           ))}
         </div>
       ))}

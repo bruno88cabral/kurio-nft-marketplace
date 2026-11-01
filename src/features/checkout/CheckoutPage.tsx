@@ -1,28 +1,41 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate } from '@tanstack/react-router'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
-import { useId, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { profileQuery } from '@/api/profile'
 import { walletsQuery } from '@/api/wallets'
 import { useSession } from '@/auth/useSession'
 import type { Account, Cart } from '@/contracts'
-import { ErrorState, PriceSummary } from '@/components/kurio'
+import { CouponInput, ErrorState, PriceSummary } from '@/components/kurio'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CHECKOUT_BLOCK_MESSAGE, lineKey } from '@/features/cart/cartView'
-import { BLOCKED_CTA_CLASS, GRID_CLASS, PAGE_CLASS } from '@/features/cart/layout'
+import { hasErrors } from '@/features/account/validation'
+import { CHECKOUT_BLOCK_MESSAGE, couponStatus, lineKey } from '@/features/cart/cartView'
+import { BLOCKED_CTA_CLASS, PAGE_CLASS } from '@/features/cart/layout'
 import { QuoteErrorState } from '@/features/cart/QuoteErrorState'
 import { useCart } from '@/features/cart/useCart'
+import { useCouponActions } from '@/features/cart/useCouponActions'
 import { QUOTE_ISSUES_MESSAGE, useCartQuote } from '@/features/cart/useCartQuote'
 import { sortWallets } from '@/lib/wallets'
 import { cn } from '@/lib/utils'
 import { pendingAttempt, pendingAttemptSnapshot } from './checkoutDraft'
-import { ReviewSection, Step } from './CheckoutStep'
+import { CollectorForm } from './CollectorFormSection'
 import { AttemptReview, OrderInProgressAlert, PendingOrderAlert, RecoverPendingOrder, type OrderInProgress } from './PendingAttempt'
 import { REQUOTE_FAILED_MESSAGE, VALUES_CHANGED_MESSAGE } from './placeOrder'
-import { attemptLines } from './reviewSource'
-import { changeMessages } from './reviewSnapshot'
+import { ReviewDialog } from './ReviewDialog'
+import { ReviewStep } from './ReviewStep'
+import { ATTEMPT_REVIEW_MESSAGE, attemptLines } from './reviewSource'
+import { changeMessages, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
+import { useCollectorForm } from './useCollectorForm'
 import { useNftDetails } from './useNftDetails'
 import { usePendingOrder } from './usePendingOrder'
 import { useCheckoutOrder } from './usePlaceOrder'
@@ -32,11 +45,17 @@ import { WalletStep } from './WalletStep'
 export { ATTEMPT_CONFLICT_MESSAGE, ORDER_IN_PROGRESS_MESSAGE, ORDER_LOAD_FAILED_MESSAGE } from './PendingAttempt'
 
 const CONNECT_WALLET_MESSAGE = 'Conecte uma carteira para confirmar.'
+export const FORM_INVALID_MESSAGE = 'Revise os campos destacados.'
+/** Formulário à esquerda e o resumo (mais largo que o do Carrinho, como no Figma) à direita; empilhado até `lg`. */
+const CHECKOUT_GRID_CLASS = 'grid grid-cols-[minmax(0,1fr)] items-start gap-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-12'
 
 /**
- * Pagamento (`/checkout`, sob `_authenticated`): dados do colecionador, carteira (seleção + conexão) e
- * revisão com o resumo da cotação. "Confirmar compra" recota e compara com o revisado antes de enviar (R3);
- * o envio é idempotente, com a chave guardada no rascunho (R4). Nenhum valor é somado aqui.
+ * Pagamento (`/checkout`, sob `_authenticated`), no layout do Figma (MYK-1114): o "Perfil do colecionador"
+ * (`CollectorForm`, com a carteira cadastrada e a rede) à esquerda; "Seus NFTs", o cupom, o resumo da cotação,
+ * "Carteira e rede" (provedor e conexão) e o CTA à direita. "Confirmar compra" valida o formulário no cliente e
+ * abre a revisão (`ReviewDialog`, com o diff do que mudou desde o último revisado); confirmar nela recota e compara
+ * com o revisado antes de enviar (R3), e o envio
+ * é idempotente, com a chave guardada no rascunho (R4). Nenhum valor é somado aqui.
  *
  * As partes: o envio e o revisado em `usePlaceOrder.ts` (`usePlaceOrder`, `useCheckoutOrder`), a carteira em
  * `useWalletConnection.ts` e os avisos da tentativa pendente em `PendingAttempt.tsx`.
@@ -49,7 +68,29 @@ export function CheckoutPage() {
 function Page({ children }: { children: ReactNode }) {
   return (
     <div className={PAGE_CLASS}>
-      <h1 className="text-heading">Pagamento</h1>
+      <Breadcrumb aria-label="Trilha de navegação">
+        <BreadcrumbList className="text-caption text-foreground font-medium">
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/">Início</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/" hash="catalogo">
+                Mercado
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="font-medium">Pagamento</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      {/* O Figma não mostra um título: a trilha diz onde se está, e o <h1> fica para leitores de tela */}
+      <h1 className="sr-only">Pagamento</h1>
       {children}
     </div>
   )
@@ -102,36 +143,70 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   const profile = useQuery(profileQuery(accountId))
   const wallets = useQuery(walletsQuery(accountId))
   const quote = useCartQuote(accountId, cart)
-  const { submitting, resending, source, reviewed, notice, confirm: confirmOrder, resend } = useCheckoutOrder({
+  const coupon = useCouponActions(useCart())
+  const { submitting, resending, source, reviewed, notice, confirm: confirmOrder, markReviewed, resend } = useCheckoutOrder({
     accountId,
     cartItems: cart.items,
     draft,
     quote,
   })
   const attempt = source.kind === 'attempt' ? source.snapshot : undefined
-  // Nome e arte dos NFTs do carrinho e da tentativa: com a união, quando a tentativa termina e a Revisão volta ao
+  // Nome e arte dos NFTs do carrinho e da tentativa: com a união, quando a tentativa termina e a lista volta ao
   // carrinho, as artes já estão carregadas (nada pisca em skeleton)
   const nftOf = useNftDetails([...cart.items, ...(attempt?.items ?? [])].map((item) => item.nftId))
 
   const sortedWallets = wallets.data ? sortWallets(wallets.data) : undefined
-  const { selectedId, connected, connection, selectWallet, connect } = useWalletConnection({ draft, drafts, wallets: sortedWallets })
+  const wallet = useWalletConnection({ draft, drafts, wallets: sortedWallets })
+  const { selectedId, selected, connected, connection, provider } = wallet
   const pending = pendingAttempt(draft)
+
+  // Nome de exibição e e-mail vêm da conta até serem editados (editar aqui não altera o Perfil, D6)
+  const collector = useCollectorForm({
+    draft,
+    drafts,
+    prefill: { displayName: profile.data?.displayName ?? (profile.isError ? account.name : undefined), email: account.email },
+  })
+  const [reviewOpen, setReviewOpen] = useState(false)
+  // O diff que o diálogo mostra: o que mudou entre o último revisado e a cotação exibida ao abri-lo (R-23)
+  const [reviewChanges, setReviewChanges] = useState<readonly SnapshotChange[]>([])
+  const ctaRef = useRef<HTMLButtonElement>(null)
+  // O último "Confirmar compra" achou erros no formulário; o aviso some quando os erros somem
+  const [formInvalid, setFormInvalid] = useState(false)
+  const showFormAlert = formInvalid && hasErrors(collector.errors)
 
   const { quote: quoteData, recalculating, staleAfterError, issues, hasIssues } = quote
   const messages = notice?.kind === 'changed' ? changeMessages(notice.changes) : undefined
 
   const canConfirm = quote.canCheckout && connected && reviewed !== undefined && !pending
-  // Motivos do "Confirmar compra" bloqueado, ligados a ele por `aria-describedby`
+  // Motivos do "Confirmar compra" bloqueado (e o aviso do formulário), ligados a ele por `aria-describedby`
   const issuesId = useId()
   const blockId = useId()
   const connectId = useId()
+  const formAlertId = useId()
   const showIssues = !attempt && (hasIssues || notice?.kind === 'blocked')
   const blockReason = quote.block !== undefined && quote.block !== 'issues' ? CHECKOUT_BLOCK_MESSAGE[quote.block] : undefined
-  const describedBy = canConfirm
-    ? undefined
-    : [!connected && connectId, showIssues && issuesId, blockReason && blockId].filter(Boolean).join(' ') || undefined
+  const describedBy =
+    [showFormAlert && formAlertId, ...(canConfirm ? [] : [!connected && connectId, showIssues && issuesId, blockReason && blockId])]
+      .filter(Boolean)
+      .join(' ') || undefined
+  // "Confirmar compra" da página: valida o formulário sempre, mesmo com o CTA bloqueado (erros nos campos, foco no
+  // primeiro inválido; sem conexão aparecem os dois motivos, R-25), e só com tudo liberado abre a revisão. O envio
+  // só sai do "Confirmar compra" do diálogo
   const confirm = () => {
-    if (!canConfirm || !selectedId) return
+    if (submitting) return
+    const formValid = collector.validateAll()
+    setFormInvalid(!formValid)
+    if (!formValid || !canConfirm || !selectedId) return
+    // O diálogo mostra a cotação atual, e ela passa a ser o revisado (o envio compara com ela, R3). O que mudou desde
+    // o último revisado (evento, intervalo, cupom aplicado aqui) aparece no diálogo como diff, sem bloquear (R-23)
+    setReviewChanges(markReviewed())
+    setReviewOpen(true)
+  }
+  const confirmReviewed = () => {
+    setReviewOpen(false)
+    // O que bloqueia o envio pode ter surgido com o diálogo aberto (recotação, tentativa em outra aba): o diálogo
+    // fecha, o foco volta ao CTA e o motivo aparece ligado a ele
+    if (!canConfirm || submitting || !selectedId) return
     confirmOrder(selectedId)
   }
 
@@ -140,6 +215,8 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   // "Confirmando…" de uma confirmação nova (o `withOrderKey` grava a tentativa antes do POST). Senão, "Confirmar compra"
   const confirmingNew = submitting && !resending
   const cta = orderInProgress !== undefined && !submitting ? 'in-progress' : pending && !confirmingNew ? 'retry' : 'confirm'
+  // O diálogo sumiu por fora (tentativa em outra aba, carteira removida): fecha de vez, para não reabrir sozinho
+  if (reviewOpen && (cta !== 'confirm' || !selected)) setReviewOpen(false)
 
   const lines = attempt
     ? attemptLines(attempt, nftOf)
@@ -179,48 +256,57 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   else if (notice?.kind === 'quote') staleMessage = `${notice.message} Os valores foram atualizados; confirme de novo.`
 
   return (
-    <div className={GRID_CLASS}>
-      <div className="flex min-w-0 flex-col gap-6">
-        <Step number={1} title="Seus dados" action={<Link to="/profile" className={buttonVariants({ variant: 'link', size: 'sm' })}>Editar</Link>}>
-          <dl className="text-body grid gap-1 sm:grid-cols-[auto_1fr] sm:gap-x-4">
-            <dt className="text-muted-foreground">Nome</dt>
-            <dd>{profile.data?.displayName ?? (profile.isError ? account.name : <Skeleton className="h-4 w-32 motion-reduce:animate-none" />)}</dd>
-            <dt className="text-muted-foreground">E-mail</dt>
-            <dd className="break-all">{account.email}</dd>
-          </dl>
-        </Step>
+    <div className={CHECKOUT_GRID_CLASS}>
+      <CollectorForm
+        form={collector}
+        wallets={sortedWallets}
+        walletsError={wallets.isError}
+        walletsRetrying={wallets.isFetching}
+        onRetryWallets={() => void wallets.refetch()}
+        selected={selected}
+        selectWallet={wallet.selectWallet}
+        useOther={wallet.useOther}
+        setUseOther={wallet.setUseOther}
+        locked={pending !== undefined}
+      />
 
-        <Step number={2} title="Carteira">
-          <WalletStep
-            wallets={sortedWallets}
-            isError={wallets.isError}
-            retrying={wallets.isFetching}
-            onRetry={() => void wallets.refetch()}
-            selectedId={selectedId}
-            onSelect={selectWallet}
-            connection={connection}
-            onConnect={() => void connect()}
-            locked={pending !== undefined}
+      <aside aria-label="Resumo do pedido" className="flex min-w-0 flex-col gap-5">
+        <section aria-labelledby="checkout-seus-nfts" className="flex flex-col gap-3">
+          <h2 id="checkout-seus-nfts" className="text-body-lg font-medium">
+            Seus NFTs
+          </h2>
+          {attempt && <p className="text-muted-foreground text-caption">{ATTEMPT_REVIEW_MESSAGE}</p>}
+          <ReviewStep lines={lines} />
+        </section>
+
+        {/* Com a tentativa na tela, os valores são os do pedido enviado: o cupom vale para a próxima compra */}
+        {!attempt && (
+          <CouponInput
+            collapsible
+            status={couponStatus({ submitting: coupon.submitting, couponCode: cart.couponCode, quote: quoteData, quoteError: quote.isError })}
+            appliedCode={quoteData?.coupon?.code ?? cart.couponCode}
+            onApply={coupon.apply}
+            onRemove={coupon.remove}
           />
-        </Step>
+        )}
 
-        <ReviewSection number={3} title="Revisão" attempt={attempt !== undefined} lines={lines} />
-      </div>
-
-      <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
         {attempt ? (
-          <PriceSummary title="Resumo" quote={attempt} />
+          <PriceSummary quote={attempt} />
         ) : quote.isError && !quoteData ? (
           <QuoteErrorState quote={quote} />
         ) : (
-          <PriceSummary
-            title="Resumo"
-            quote={quoteData}
-            stale={staleMessage !== undefined}
-            staleMessage={staleMessage}
-            staleAction={staleAction}
-          />
+          <PriceSummary quote={quoteData} stale={staleMessage !== undefined} staleMessage={staleMessage} staleAction={staleAction} />
         )}
+
+        <WalletStep
+          selected={selected}
+          connection={connection}
+          provider={provider}
+          onSelectProvider={wallet.selectProvider}
+          onConnect={() => void wallet.connect()}
+          onDisconnect={wallet.disconnect}
+          locked={pending !== undefined}
+        />
 
         {showIssues && (
           <div role="alert" className="text-destructive text-caption flex flex-col gap-2">
@@ -232,6 +318,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
         )}
         {notice?.kind === 'requote-failed' && <Alert>{REQUOTE_FAILED_MESSAGE}</Alert>}
         {notice?.kind === 'fatal' && <Alert>{notice.message}</Alert>}
+        {showFormAlert && cta === 'confirm' && <Alert id={formAlertId}>{FORM_INVALID_MESSAGE}</Alert>}
 
         {cta === 'in-progress' && orderInProgress ? (
           <OrderInProgressAlert state={orderInProgress} />
@@ -245,6 +332,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
             aria-disabled={!canConfirm || submitting || undefined}
             aria-describedby={submitting ? undefined : describedBy}
             className={BLOCKED_CTA_CLASS}
+            ref={ctaRef}
             onClick={confirm}
           >
             {submitting && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
@@ -262,28 +350,60 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
           </p>
         )}
       </aside>
+
+      {selected && (
+        <ReviewDialog
+          // Só com "Confirmar compra" na tela: uma tentativa pendente nunca abre a revisão ("Tentar de novo")
+          open={reviewOpen && cta === 'confirm'}
+          onOpenChange={setReviewOpen}
+          onConfirm={confirmReviewed}
+          returnFocusTo={ctaRef}
+          collector={collector.values}
+          wallet={selected}
+          provider={provider}
+          lines={lines}
+          quote={quoteData}
+          changes={reviewChanges}
+        />
+      )}
     </div>
   )
 }
 
-function Alert({ children }: { children: ReactNode }) {
+function Alert({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p role="alert" className="text-destructive text-caption inline-flex items-start gap-1.5">
+    <p id={id} role="alert" className="text-destructive text-caption inline-flex items-start gap-1.5">
       <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
       {children}
     </p>
   )
 }
 
+/**
+ * Mesma grade do Pagamento pronto (formulário à esquerda; "Seus NFTs", cupom, resumo, carteira e CTA no
+ * `aside`), com as alturas medidas para um NFT no carrinho em 390 e 1440 (MYK-1112): o conteúdo não desloca.
+ */
 function CheckoutSkeleton() {
   return (
-    <div aria-busy className={GRID_CLASS}>
-      <div className="flex flex-col gap-6" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-36 rounded-lg motion-reduce:animate-none" />
-        ))}
+    <div aria-busy className={CHECKOUT_GRID_CLASS}>
+      <div className="flex min-w-0 flex-col gap-4" aria-hidden>
+        <Skeleton className="h-6 w-56" />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-4 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
+          {Array.from({ length: 7 }, (_, i) => (
+            <Skeleton key={i} className="h-[105px] rounded-lg last:max-sm:h-[104px] sm:h-[89px]" />
+          ))}
+        </div>
+        <Skeleton className="h-[21px] w-56" />
+        <Skeleton className="h-[184px] rounded-lg sm:w-1/2" />
       </div>
-      <Skeleton aria-hidden className="h-64 rounded-lg motion-reduce:animate-none" />
+      <div className="flex min-w-0 flex-col gap-5" aria-hidden>
+        <Skeleton className="h-[159px] rounded-lg" />
+        <Skeleton className="h-5 w-[283px] max-w-full" />
+        <Skeleton className="h-[113px] rounded-lg" />
+        <Skeleton className="h-[223px] rounded-lg" />
+        <Skeleton className="h-10 rounded-lg" />
+        <Skeleton className="h-[18px] w-3/4" />
+      </div>
       <p role="status" className="sr-only">
         Carregando o pagamento…
       </p>

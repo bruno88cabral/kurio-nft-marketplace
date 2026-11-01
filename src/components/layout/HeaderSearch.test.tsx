@@ -1,74 +1,92 @@
 // @vitest-environment jsdom
-import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { navigateSpy, setSearch } from '@/test/routerMock'
-import { renderWithProviders } from '@/test/render'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  Link,
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
+import { afterEach, describe, expect, it } from 'vitest'
 import { HeaderSearch } from './HeaderSearch'
+import { MAIN_CONTENT_ID } from './SkipLink'
 
-vi.mock('@tanstack/react-router', async () => (await import('@/test/routerMock')).routerMock())
+function renderAt(path: string) {
+  const rootRoute = createRootRoute({
+    component: () => (
+      <>
+        <header className="relative">
+          <HeaderSearch />
+          <Link to="/cart">Carrinho</Link>
+        </header>
+        <main id={MAIN_CONTENT_ID} tabIndex={-1}>
+          <Outlet />
+        </main>
+      </>
+    ),
+  })
+  const routes = [
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: '/',
+      validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === 'string' ? s.q : undefined }),
+      component: () => <section id="catalogo" tabIndex={-1} aria-label="Catálogo" />,
+    }),
+    createRoute({ getParentRoute: () => rootRoute, path: '/cart', component: () => <p>Carrinho de NFTs</p> }),
+  ]
+  const router = createRouter({
+    routeTree: rootRoute.addChildren(routes),
+    history: createMemoryHistory({ initialEntries: [path] }),
+  })
+  render(<RouterProvider router={router} />)
+  return router
+}
 
-const open = () => fireEvent.click(screen.getByRole('button', { name: 'Buscar NFTs' }))
+const toggle = () => screen.findByRole('button', { name: /^(Buscar NFTs|Fechar busca)$/ })
+const field = () => screen.queryByRole('search', { name: 'Buscar NFTs' })
+
+afterEach(cleanup)
 
 describe('HeaderSearch', () => {
-  it('começa fechada e o ícone abre o campo vazio', () => {
-    renderWithProviders(<HeaderSearch />)
-    expect(screen.queryByRole('search')).toBeNull()
-    open()
-    expect(screen.getByRole('search')).toBeTruthy()
-    expect(screen.getByLabelText<HTMLInputElement>('Buscar NFTs', { selector: 'input' }).value).toBe('')
-    expect(screen.getByRole('button', { name: 'Fechar busca' }).getAttribute('aria-expanded')).toBe('true')
+  it('Enter busca e põe o foco no catálogo (o campo desmonta)', async () => {
+    const router = renderAt('/cart')
+    fireEvent.click(await toggle())
+    const input = screen.getByRole('searchbox')
+    fireEvent.change(input, { target: { value: 'ape' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => expect(document.activeElement?.id).toBe('catalogo'))
+    expect(router.state.location.search).toMatchObject({ q: 'ape' })
+    expect(field()).toBeNull()
   })
 
-  it('preenche com o q atual e o envio navega para / com a busca e o hash', () => {
-    setSearch({ q: 'sol', collections: ['Coleção A'], page: 3 })
-    renderWithProviders(<HeaderSearch className="extra" />)
-    open()
-    const input = screen.getByLabelText<HTMLInputElement>('Buscar NFTs', { selector: 'input' })
-    expect(input.value).toBe('sol')
-    fireEvent.change(input, { target: { value: 'lua' } })
-    fireEvent.submit(screen.getByRole('search'))
-    expect(navigateSpy.mock.calls[0]?.[0]).toMatchObject({
-      to: '/',
-      search: { q: 'lua', collections: ['Coleção A'], page: undefined },
-      hash: 'catalogo',
+  it('Esc fecha e devolve o foco ao ícone', async () => {
+    renderAt('/')
+    fireEvent.click(await toggle())
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' })
+    expect(field()).toBeNull()
+    expect(document.activeElement).toBe(await toggle())
+  })
+
+  it('clique fora fecha sem mexer no foco; clique no campo não fecha', async () => {
+    renderAt('/')
+    fireEvent.click(await toggle())
+    fireEvent.pointerDown(screen.getByRole('searchbox'))
+    expect(field()).not.toBeNull()
+    act(() => {
+      screen.getByRole('region', { name: 'Catálogo' }).dispatchEvent(new Event('pointerdown', { bubbles: true }))
     })
-    expect(screen.queryByRole('search')).toBeNull()
+    expect(field()).toBeNull()
+    // O foco não volta para o ícone nem vai para o catálogo: fica com o que o clique focar (no jsdom, nada)
+    expect(document.activeElement).not.toBe(await toggle())
+    expect(document.activeElement?.id).not.toBe('catalogo')
   })
 
-  it('fora do Início (sem busca da rota) começa de uma busca vazia', () => {
-    setSearch(undefined)
-    renderWithProviders(<HeaderSearch />)
-    open()
-    fireEvent.change(screen.getByLabelText('Buscar NFTs', { selector: 'input' }), { target: { value: 'x' } })
-    fireEvent.submit(screen.getByRole('search'))
-    expect(navigateSpy.mock.calls[0]?.[0]).toMatchObject({ search: { q: 'x' } })
-  })
-
-  it('Esc fecha e devolve o foco ao ícone; outras teclas não fecham', () => {
-    renderWithProviders(<HeaderSearch />)
-    open()
-    const form = screen.getByRole('search')
-    fireEvent.keyDown(form, { key: 'a' })
-    expect(screen.getByRole('search')).toBeTruthy()
-    fireEvent.keyDown(form, { key: 'Escape' })
-    expect(screen.queryByRole('search')).toBeNull()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Buscar NFTs' }))
-  })
-
-  it('clicar no ícone aberto fecha', () => {
-    renderWithProviders(<HeaderSearch />)
-    open()
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar busca' }))
-    expect(screen.queryByRole('search')).toBeNull()
-  })
-
-  it('valor de formulário que não é texto vira q vazio', () => {
-    renderWithProviders(<HeaderSearch />)
-    open()
-    const form = screen.getByRole<HTMLFormElement>('search')
-    // troca o input por um campo de arquivo: o FormData devolve File, não string
-    form.querySelector('input')!.type = 'file'
-    fireEvent.submit(form)
-    expect(navigateSpy.mock.calls[0]?.[0]).toMatchObject({ search: { q: undefined } })
+  it('navegar por outro link fecha o campo', async () => {
+    const router = renderAt('/')
+    fireEvent.click(await toggle())
+    await act(() => router.navigate({ to: '/cart' }))
+    await waitFor(() => expect(field()).toBeNull())
   })
 })

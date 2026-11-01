@@ -77,7 +77,8 @@ export function validateNewPassword(password: string): string | undefined {
   return undefined
 }
 
-function compact<K extends string>(errors: Record<K, string | undefined>): FieldErrors<K> {
+/** Tira os campos válidos (`undefined`) do mapa de erros. */
+export function compact<K extends string>(errors: Record<K, string | undefined>): FieldErrors<K> {
   const out: FieldErrors<K> = {}
   for (const key of Object.keys(errors) as K[]) {
     if (errors[key] !== undefined) out[key] = errors[key]

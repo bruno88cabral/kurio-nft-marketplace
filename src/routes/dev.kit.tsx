@@ -43,7 +43,6 @@ const eth = parseEth
 const cardNft: NftCardProps['nft'] = {
   id: 'nft-013',
   name: 'Atlas Zero',
-  collection: 'Neon Atlas',
   imageUrl: '/nfts/atlas-zero.svg',
   price: eth('3.75'),
   editions: [{ kind: '1/1', available: 1, total: 1 }],
@@ -52,7 +51,6 @@ const cardNft: NftCardProps['nft'] = {
 const soldOutNft: NftCardProps['nft'] = {
   id: 'nft-006',
   name: 'Cold Ember',
-  collection: 'Aurora Drift',
   imageUrl: '/nfts/cold-ember.svg',
   price: eth('4.2'),
   editions: [{ kind: '1/1', available: 0, total: 1 }],
@@ -117,7 +115,7 @@ function KitPage() {
               onFavoriteToggle={() => setFavorited((f) => !f)}
             />
           </Labeled>
-          <Labeled label="preço riscado + selo">
+          <Labeled label="preço anterior + selo">
             <NftCard nft={{ ...cardNft, id: 'nft-014', name: 'Meridian Glow', imageUrl: '/nfts/meridian-glow.svg', price: eth('0.95') }} previousPrice={eth('1.2')} badge="Raro" />
           </Labeled>
           <Labeled label="preço alterado (tempo real)">
@@ -150,8 +148,15 @@ function KitPage() {
               <PriceTag price={eth('0.125')} size="lg" />
             </div>
           </Labeled>
-          <Labeled label="com anterior riscado">
-            <PriceTag price={eth('0.95')} previousPrice={eth('1.2')} />
+          <Labeled label="accent (cards e Detalhe) sm/md/lg">
+            <div className="flex items-baseline gap-4">
+              <PriceTag price={eth('0.125')} size="sm" tone="accent" />
+              <PriceTag price={eth('0.125')} tone="accent" />
+              <PriceTag price={eth('0.125')} size="lg" tone="accent" />
+            </div>
+          </Labeled>
+          <Labeled label="com preço anterior">
+            <PriceTag price={eth('0.95')} previousPrice={eth('1.2')} tone="accent" />
           </Labeled>
           <Labeled label="alterado: subiu">
             <PriceTag price={eth('2.51')} previousPrice={eth('2.5')} changed size="lg" />
@@ -204,8 +209,11 @@ function KitPage() {
           <Labeled label="no máximo">
             <QuantityStepper value={5} onChange={() => undefined} max={5} />
           </Labeled>
-          <Labeled label="sm (carrinho)">
+          <Labeled label="sm (boxed)">
             <QuantityStepper value={2} onChange={() => undefined} max={5} size="sm" />
+          </Labeled>
+          <Labeled label="cart (Carrinho: contorno no celular, laranja a partir de md)">
+            <QuantityStepper value={2} onChange={() => undefined} max={5} appearance="cart" />
           </Labeled>
           <Labeled label="desabilitado">
             <QuantityStepper value={2} onChange={() => undefined} max={5} disabled />
@@ -238,6 +246,9 @@ function KitPage() {
           <Labeled label="skeleton">
             <PriceSummary loading />
           </Labeled>
+          <Labeled label="desconto sempre visível (Carrinho)">
+            <PriceSummary quote={quote} alwaysShowDiscount />
+          </Labeled>
         </div>
       </Section>
 
@@ -268,6 +279,12 @@ function KitPage() {
           </Labeled>
           <Labeled label="collapsible (Pagamento)">
             <CouponInput status="idle" collapsible onApply={() => undefined} />
+          </Labeled>
+          <Labeled label="attached (Carrinho; pílula abaixo de md)">
+            <CouponInput status="idle" appearance="attached" onApply={() => undefined} />
+          </Labeled>
+          <Labeled label="attached inválido">
+            <CouponInput status="invalid" appearance="attached" appliedCode="QUALQUER" onApply={() => undefined} onRemove={() => undefined} />
           </Labeled>
         </div>
       </Section>

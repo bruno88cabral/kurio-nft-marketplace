@@ -1,14 +1,26 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { DETAIL_ASIDE_CLASS, DETAIL_GRID_CLASS, DETAIL_PAGE_CLASS } from './layout'
+import { MobileBackButton } from './MobileDetailChrome'
+import {
+  DETAIL_GRID_CLASS,
+  DETAIL_HERO_CLASS,
+  DETAIL_PAGE_CLASS,
+  DETAIL_PANEL_CLASS,
+  DETAIL_TOP_CLASS,
+  GALLERY_ART_CLASS,
+  GALLERY_CLASS,
+  GALLERY_MAIN_CLASS,
+} from './layout'
 
 function Bar({ className }: { className?: string }) {
-  return <Skeleton className={cn('rounded-md motion-reduce:animate-none', className)} />
+  return <Skeleton aria-hidden className={cn('rounded-md', className)} />
 }
 
 /**
- * `pendingComponent` do Detalhe: mesma grade, arte quadrada e alturas de linha da tela pronta
- * (breadcrumb/header de tela, coleção, título, criador/rede, preço, chips, stepper, ações).
+ * `pendingComponent` do Detalhe: as mesmas caixas de `layout.ts` (topo do mobile com voltar e
+ * favoritar, galeria com a coluna de miniaturas no desktop, painel) e as alturas de linha da tela
+ * pronta (nome, preço, "Sobre este NFT:", edição, quantidade e ações, coleção e criador,
+ * compartilhar). As seções abaixo (detalhes, "Mais desta coleção") entram depois.
  */
 export function NftDetailSkeleton() {
   return (
@@ -16,37 +28,61 @@ export function NftDetailSkeleton() {
       <span className="sr-only" role="status">
         Carregando NFT…
       </span>
-      <div aria-hidden className="contents">
-        {/* header de tela (mobile) / breadcrumb (md+) */}
-        <div className="flex h-9 items-center gap-2 md:hidden">
-          <Bar className="size-9" />
-          <Bar className="h-5 w-40" />
-        </div>
-        <Bar className="hidden h-5 w-64 md:block" />
+      <div className={DETAIL_TOP_CLASS}>
+        <Bar className="hidden h-11 w-40 md:block lg:h-[1.3125rem]" />
         <div className={DETAIL_GRID_CLASS}>
-          <Skeleton className="aspect-square w-full rounded-xl motion-reduce:animate-none" />
-          <div className={DETAIL_ASIDE_CLASS}>
-            <div className="flex flex-col gap-3">
-              <Bar className="h-4 w-28" />
-              <Bar className="h-8 w-3/4 lg:h-12" />
-              <Bar className="h-10 w-48" />
-              <Bar className="h-8 w-32" />
+          <div className={DETAIL_HERO_CLASS}>
+            {/* No mobile não há header nesta rota: o "Voltar" é o de verdade, já funcional */}
+            <div className="flex items-center justify-between md:hidden">
+              <MobileBackButton />
+              <Bar className="size-11 rounded-full" />
             </div>
-            <div className="flex flex-col gap-5">
+            <div aria-hidden className={GALLERY_CLASS}>
+              <div className={GALLERY_MAIN_CLASS}>
+                <Skeleton className={cn(GALLERY_ART_CLASS, 'w-full')} />
+              </div>
+              <div className="hidden md:col-start-1 md:row-start-1 md:flex md:flex-col md:p-0.5">
+                <Skeleton className="aspect-square w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+          <div aria-hidden className={DETAIL_PANEL_CLASS}>
+            {/* nome e preço (o preço só no desktop) */}
+            <div className="flex flex-col gap-1 md:border-border-soft md:border-b md:pb-3">
+              <Bar className="h-[1.95rem] w-3/4 lg:h-[2.275rem]" />
+              <Bar className="hidden h-[1.95rem] w-32 md:block" />
+            </div>
+            {/* "Sobre este NFT:" e a descrição */}
+            <div className="flex flex-col gap-2">
+              <Bar className="hidden h-[1.3125rem] w-36 md:block" />
+              {/* 3 linhas abaixo de `lg`, 2 a partir dele (o texto das fixtures) */}
+              <Bar className="h-[4.265625rem] w-full lg:h-[2.84375rem]" />
+            </div>
+            {/* edição, disponíveis, quantidade e ações */}
+            <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <Bar className="h-4 w-14" />
+                <Bar className="h-[1.3125rem] w-20" />
                 <div className="flex gap-2">
-                  <Bar className="h-9 w-16" />
-                  <Bar className="h-9 w-16" />
+                  <Bar className="h-11 w-16 rounded-full lg:h-8" />
+                  <Bar className="h-11 w-16 rounded-full lg:h-8" />
+                </div>
+                <Bar className="h-[1.125rem] w-36" />
+              </div>
+              <div className="hidden flex-col items-start gap-3 md:flex lg:flex-row lg:items-center lg:gap-4">
+                <Bar className="h-12 w-[8.5rem]" />
+                <div className="flex gap-3 lg:ml-auto">
+                  <Bar className="h-11 w-32" />
+                  <Bar className="size-11" />
+                  <Bar className="h-11 w-32" />
                 </div>
               </div>
-              <Bar className="h-9 w-40" />
-              <div className="flex gap-2">
-                <Bar className="hidden h-10 w-52 md:block" />
-                <Bar className="h-10 w-28" />
-                <Bar className="size-10" />
-              </div>
             </div>
+            {/* coleção e criador */}
+            <div className="flex flex-col gap-2">
+              <Bar className="h-[1.3125rem] w-48" />
+              <Bar className="h-[1.3125rem] w-40" />
+            </div>
+            <Bar className="hidden h-11 w-72 md:block lg:h-9" />
           </div>
         </div>
       </div>

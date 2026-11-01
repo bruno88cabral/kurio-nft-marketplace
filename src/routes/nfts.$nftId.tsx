@@ -7,13 +7,21 @@ import { ApiError, type Nft, type NftEditionKind } from '@/contracts'
 import { EmptyState, ErrorState } from '@/components/kurio'
 import { buttonVariants } from '@/components/ui/button'
 import { isEditionKind } from '@/features/nft-detail/edition'
-import { DETAIL_ASIDE_CLASS, DETAIL_GRID_CLASS, DETAIL_PAGE_CLASS } from '@/features/nft-detail/layout'
-import { MobilePurchaseBar, MobileScreenHeader } from '@/features/nft-detail/MobileDetailChrome'
+import {
+  DETAIL_GRID_CLASS,
+  DETAIL_HERO_CLASS,
+  DETAIL_PAGE_CLASS,
+  DETAIL_PANEL_CLASS,
+  DETAIL_SECTION_CLASS,
+  DETAIL_TOP_CLASS,
+} from '@/features/nft-detail/layout'
+import { MobileDetailTopBar, MobilePurchaseBar } from '@/features/nft-detail/MobileDetailChrome'
 import { MoreFromCollection } from '@/features/nft-detail/MoreFromCollection'
+import { NftDetails } from '@/features/nft-detail/NftDetails'
 import { NftDetailSkeleton } from '@/features/nft-detail/NftDetailSkeleton'
 import { NftGallery } from '@/features/nft-detail/NftGallery'
-import { NftBreadcrumb, NftDescription, NftInfo } from '@/features/nft-detail/NftInfo'
-import { PurchasePanel } from '@/features/nft-detail/PurchasePanel'
+import { NftBreadcrumb, NftDescription, NftFacts, NftInfo } from '@/features/nft-detail/NftInfo'
+import { PurchasePanel, ShareNft } from '@/features/nft-detail/PurchasePanel'
 import { usePurchaseSelection } from '@/features/nft-detail/usePurchaseSelection'
 
 interface NftDetailSearch {
@@ -21,6 +29,9 @@ interface NftDetailSearch {
 }
 
 export const Route = createFileRoute('/nfts/$nftId')({
+  // Figma mobile: o Detalhe desenha a própria moldura (voltar, favoritar, barra de compra), sem o
+  // header do site nem a tab bar abaixo de `md` (ver `src/components/layout/routeChrome.ts`)
+  staticData: { hideMobileChrome: true },
   // A chave volta mesmo inválida: o router mescla o search cru com o validado
   validateSearch: (search: Record<string, unknown>): NftDetailSearch => ({
     edition: isEditionKind(search.edition) ? search.edition : undefined,
@@ -73,17 +84,24 @@ function NftDetailContent({
 
   return (
     <div className={DETAIL_PAGE_CLASS}>
-      <MobileScreenHeader title={nft.name} className="-mx-2" />
-      <NftBreadcrumb nft={nft} className="hidden md:block" />
-      <div className={DETAIL_GRID_CLASS}>
-        <NftGallery nft={nft} />
-        <div className={DETAIL_ASIDE_CLASS}>
-          <NftInfo nft={nft} />
-          <PurchasePanel nft={nft} selection={selection} onEditionChange={onEditionChange} />
-          <NftDescription description={nft.description} />
+      <div className={DETAIL_TOP_CLASS}>
+        <NftBreadcrumb className="hidden md:block" />
+        <div className={DETAIL_GRID_CLASS}>
+          <div className={DETAIL_HERO_CLASS}>
+            <MobileDetailTopBar nft={nft} />
+            <NftGallery nft={nft} />
+          </div>
+          <div className={DETAIL_PANEL_CLASS}>
+            <NftInfo nft={nft} />
+            <NftDescription description={nft.description} />
+            <PurchasePanel nft={nft} selection={selection} onEditionChange={onEditionChange} />
+            <NftFacts nft={nft} />
+            <ShareNft className="hidden md:flex" />
+          </div>
         </div>
       </div>
-      <MoreFromCollection nft={nft} className="mt-4" />
+      <NftDetails nft={nft} className={DETAIL_SECTION_CLASS} />
+      <MoreFromCollection nft={nft} className={DETAIL_SECTION_CLASS} />
       <MobilePurchaseBar nft={nft} selection={selection} />
     </div>
   )

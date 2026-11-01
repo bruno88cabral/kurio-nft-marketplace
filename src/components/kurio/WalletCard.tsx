@@ -89,7 +89,7 @@ export function WalletCard({ wallet, ens, actions = [], selectable = true, busy 
       data-slot="wallet-card"
       aria-busy={busy || undefined}
       className={cn(
-        'border-border bg-card has-data-[state=checked]:border-primary has-[button[role=radio]:focus-visible]:ring-ring/50 relative flex items-center gap-3 rounded-lg border p-3 has-[button[role=radio]:focus-visible]:ring-3',
+        'border-border bg-card has-data-[state=checked]:border-primary has-[button[role=radio]:focus-visible]:ring-ring relative flex items-center gap-3 rounded-lg border p-3 has-[button[role=radio]:focus-visible]:ring-3',
         className,
       )}
     >
