@@ -96,7 +96,7 @@ export function hrefOf({ to = '', params, search, hash }: Dest): string {
   const resolved = typeof search === 'function' ? search(currentSearch) : search === true ? currentSearch : search
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries((resolved ?? {}) as Record<string, unknown>)) {
-    if (v !== undefined && v !== null) qs.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
+    if (v !== undefined && v !== null) qs.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v as string))
   }
   const query = qs.toString()
   return `${path}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`
