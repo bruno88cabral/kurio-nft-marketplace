@@ -292,7 +292,31 @@ Nestas receitas, **"confirme"** é: "Confirmar compra" na página (que valida o 
 
 ## Testes E2E (Playwright)
 
-> TODO (M5/M6): ainda não há Playwright configurado.
+Os E2E rodam contra o build de produção (`pnpm build && pnpm preview --port 5210 --strictPort`, subido pelo próprio Playwright) com os mocks ligados. Cada teste usa um contexto novo do navegador, então banco do mock, sessão e carrinho começam do seed.
+
+```bash
+pnpm exec playwright install chromium   # uma vez (no CI: --with-deps)
+pnpm e2e                                # desktop (1440×900) + mobile (Pixel 7, só @main)
+pnpm e2e --project=desktop              # só um projeto
+pnpm e2e:report                         # abre o relatório HTML (playwright-report/)
+pnpm exec playwright show-trace test-results/<teste>/trace.zip   # trace de uma falha
+```
+
+Sem o Chromium do Playwright, `PW_CHANNEL=chrome pnpm e2e` usa o Chrome do sistema. Os traces ficam só para testes que falharam (`trace: 'retain-on-failure'`). No CI, o job `e2e` publica `playwright-report/` e `test-results/` como artefato.
+
+Fixtures em `e2e/fixtures.ts`: `openApp(page, path, scenario)` (espera `window.__kurioMock`), `login(page, user, redirect)` pela UI, `prepareCheckout`, `confirmPurchase`, `emitNftUpdated` (helper tipado do `__kurioMock`) e `countOrderPosts`.
+
+**Coberto:**
+
+- `catalogo`: busca + filtro de rede na URL e voltar restaura; aba "Em alta" e voltar (`@main`).
+- `detalhe`: acesso direto e `/nfts/nao-existe` ("NFT não encontrado").
+- `conta`: rota protegida → login com `redirect`; logout e troca Ana → Bruno sem as carteiras da Ana.
+- `carrinho`: adicionar, quantidade, cupom `KURIO10` e persistência após refresh (`@main`).
+- `compra`: Detalhe → Carrinho → Pagamento (formulário do colecionador, MetaMask, diálogo "Revise seu pedido") → Confirmação (`@main`).
+- `falhas`: `order-timeout` → "Tentar de novo" → um único pedido; `payment-declined` → "Pagamento recusado".
+- `tempo-real`: `nft.updated` recota o carrinho; com o diálogo aberto, a mudança de preço bloqueia o envio até revisar de novo (receitas 38 e 42).
+
+**Ficou fora:** regressão visual (screenshots) e, parcialmente, as suítes 8, 10, 11 e 12 do §9 (acessibilidade automatizada, sessão expirada, `price-changed`/`sold-out`/`wallet-rejected` e o restante das receitas de falha); seguem cobertas pelos testes de unidade e pelas receitas manuais acima.
 
 ## Lighthouse
 
