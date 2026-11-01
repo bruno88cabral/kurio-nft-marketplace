@@ -1,10 +1,9 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { UserRound } from 'lucide-react'
+import { LogIn, UserRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useSession } from '@/auth/useSession'
 import { Skeleton } from '@/components/ui/skeleton'
 import { visitorLoginRedirect } from '@/features/account/authRedirect'
-import { cn } from '@/lib/utils'
 
 interface SessionLinkProps {
   className?: string
@@ -24,14 +23,15 @@ export function SessionLink({ className, loadingClassName, children }: SessionLi
   const redirect = useLocation({ select: visitorLoginRedirect })
 
   if (isPending) {
-    return <Skeleton aria-hidden className={cn('motion-reduce:animate-none', loadingClassName)} />
+    return <Skeleton aria-hidden className={loadingClassName} />
   }
   const label = isAuthenticated && account ? account.name : 'Entrar'
   const content = children ? (
     children(label)
   ) : (
     <>
-      <UserRound aria-hidden />
+      {/* Visitante: ícone de login, como no "Entrar" do Figma */}
+      {isAuthenticated ? <UserRound aria-hidden /> : <LogIn aria-hidden />}
       <span className="truncate">{label}</span>
     </>
   )

@@ -3,16 +3,16 @@ import * as cartApi from '@/api/cart'
 import { cartKeys } from '@/api/cart'
 import { captureSession } from '@/auth/sessionGuard'
 import type { Cart, CartItem, Id, NftEditionKind } from '@/contracts'
-import type { AnonymousCartStore } from './anonymousCart'
+import type { AddResult, AnonymousCartStore } from './anonymousCart'
 
 export interface CartActions {
   /**
    * Soma `item.quantity` à linha. Visitante: local, limitado a `available`. Logado: `POST /cart/items`
    * (`available` é ignorado: o servidor decide e responde 409 acima do estoque). Rejeita com o erro da API.
-   * Resolve `true` se a linha mudou; `false` só no visitante, quando nada coube (a linha já está no `available`,
-   * o caso em que o logado recebe o 409).
+   * Resolve `added` quando a quantidade entrou inteira. Só no visitante: `partial` quando só parte coube (a linha
+   * ficou no `available`) e `unchanged` quando nada coube (a linha já estava nele), os casos em que o logado recebe o 409.
    */
-  add: (item: CartItem, opts: { available: number }) => Promise<boolean>
+  add: (item: CartItem, opts: { available: number }) => Promise<AddResult>
   /** Define a quantidade da linha. Visitante: local (menor que 1 remove). Logado: `PATCH` (o servidor valida). */
   setQuantity: (nftId: Id, edition: NftEditionKind, quantity: number) => Promise<void>
   remove: (nftId: Id, edition: NftEditionKind) => Promise<void>
@@ -69,7 +69,7 @@ export function accountCartActions(deps: CartActionsDeps & { accountId: Id }): C
   return {
     add: async (item) => {
       await run(() => api.addCartItem(item))
-      return true
+      return 'added'
     },
     setQuantity: (nftId, edition, quantity) => run(() => api.updateCartItem(nftId, edition, { quantity })),
     remove: (nftId, edition) => run(() => api.removeCartItem(nftId, edition)),

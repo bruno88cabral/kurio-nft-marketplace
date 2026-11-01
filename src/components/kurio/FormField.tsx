@@ -24,10 +24,12 @@ export interface FormFieldProps {
   description?: string
   disabled?: boolean
   /**
-   * Esconde o rótulo visualmente mas mantém o nome acessível (Login do Figma, `70381:242`/`243`,
-   * e `70390:253` não têm rótulo visível).
+   * Esconde o rótulo visualmente mas mantém o nome acessível. Evite: só placeholder some ao digitar
+   * (WCAG 3.3.2). Login e cadastro usam rótulo visível discreto (`labelClassName`, MYK-1101).
    */
   hideLabel?: boolean
+  /** Classes extras do rótulo (ex.: rótulo discreto no login e no cadastro). */
+  labelClassName?: string
   /** Render prop: recebe `id`, `aria-*` e `disabled` para ligar o controle ao rótulo e ao erro. */
   children: (control: FormFieldControlProps) => ReactNode
   className?: string
@@ -45,6 +47,7 @@ export function FormField({
   description,
   disabled,
   hideLabel = false,
+  labelClassName,
   children,
   className,
 }: FormFieldProps) {
@@ -61,7 +64,7 @@ export function FormField({
       data-disabled={disabled || undefined}
       className={cn('flex flex-col gap-1.5', className)}
     >
-      <Label htmlFor={id} className={cn('text-caption', hideLabel && 'sr-only')}>
+      <Label htmlFor={id} className={cn('text-caption', labelClassName, hideLabel && 'sr-only')}>
         {label}
         {required && (
           <span aria-hidden className="text-text-accent">

@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
 import { toast } from 'sonner'
 import { addFavorite, favoriteKeys, favoritesQuery, removeFavorite } from '@/api/favorites'
 import { captureSession } from '@/auth/sessionGuard'
 import { useSession } from '@/auth/useSession'
 import type { Favorite, Id } from '@/contracts'
+import { announce } from '@/lib/announcer'
 import { favoriteMutationOptions, isFavorited, shouldToastFavoriteFailure } from './favoriteCache'
 
 export const FAVORITE_FAILURE_MESSAGE = 'Não foi possível atualizar os favoritos.'
+export const FAVORITE_ADDED_MESSAGE = 'Adicionado aos favoritos.'
+export const FAVORITE_REMOVED_MESSAGE = 'Removido dos favoritos.'
 
 const request = (nftId: Id, on: boolean) => (on ? addFavorite(nftId) : removeFavorite(nftId))
 const now = () => new Date().toISOString()
@@ -20,18 +22,18 @@ export interface ToggleFavorite {
   toggle: () => void
   /** Sessão ainda sendo confirmada (token existe): o botão espera. */
   pending: boolean
-  /** Resultado do último clique concluído, para a região `aria-live` ("" até haver um). */
-  announcement: string
 }
 
-/** Favoritar otimista com rollback; mesmo hook no Detalhe e no card mobile do Início. */
+/**
+ * Favoritar otimista com rollback; mesmo hook no Detalhe e no card mobile do Início. O resultado vai para a região
+ * `aria-live` única do app (`announce`, MYK-1113), não para uma região por card; a falha só pelo toast.
+ */
 export function useToggleFavorite(nftId: Id): ToggleFavorite {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const href = useLocation({ select: (l) => l.href })
   const { account, isPending } = useSession()
   const accountId = account?.id ?? ''
-  const [announcement, setAnnouncement] = useState('')
 
   const favorites = useQuery({ ...favoritesQuery(accountId), enabled: account !== undefined })
   const mutation = useMutation(
@@ -63,10 +65,7 @@ export function useToggleFavorite(nftId: Id): ToggleFavorite {
     const sameSession = captureSession()
     mutation.mutate(on, {
       onSuccess: () => {
-        if (sameSession()) setAnnouncement(on ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.')
-      },
-      onError: () => {
-        if (sameSession()) setAnnouncement('')
+        if (sameSession()) announce(on ? FAVORITE_ADDED_MESSAGE : FAVORITE_REMOVED_MESSAGE)
       },
     })
   }
@@ -75,6 +74,5 @@ export function useToggleFavorite(nftId: Id): ToggleFavorite {
     favorited: account !== undefined && isFavorited(favorites.data, nftId),
     toggle,
     pending,
-    announcement,
   }
 }

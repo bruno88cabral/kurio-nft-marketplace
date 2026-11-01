@@ -4,6 +4,7 @@ import { SearchX } from 'lucide-react'
 import { nftListQuery } from '@/api/nfts'
 import { EmptyState, ErrorState } from '@/components/kurio'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CATALOG_PAGE_SIZE, CLEAR_SIDEBAR_FILTERS, pageCount, toListParams } from '@/lib/catalogSearch'
 import { CatalogPagination } from './CatalogPagination'
 import { NftGrid, NftGridSkeleton } from './NftGrid'
@@ -36,9 +37,15 @@ export function CatalogGrid() {
     )
   } else if (!data) {
     body = (
-      <div aria-busy="true">
+      <div aria-busy="true" className="flex flex-col gap-8">
         <span className="sr-only">Carregando NFTs…</span>
-        <NftGridSkeleton count={CATALOG_PAGE_SIZE} />
+        <NftGridSkeleton count={CATALOG_PAGE_SIZE} staggered />
+        {/* Reserva a linha da paginação (size-9), para o grid pronto não empurrar o que vem depois */}
+        <div aria-hidden className="flex h-9 justify-end gap-2">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="size-9" />
+          ))}
+        </div>
       </div>
     )
   } else if (data.total === 0) {
@@ -75,7 +82,7 @@ export function CatalogGrid() {
   } else {
     body = (
       <div className="flex flex-col gap-8">
-        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" favoritable />
+        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" favoritable staggered />
         <CatalogPagination page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     )

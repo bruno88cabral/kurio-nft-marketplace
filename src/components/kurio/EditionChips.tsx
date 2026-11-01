@@ -16,7 +16,7 @@ export interface EditionChipsProps {
 }
 
 /**
- * Seleção de edição (single). Edição com `available` 0 fica indisponível: desabilitada,
+ * Seleção de edição (single), em pílulas com contorno (Figma). Edição com `available` 0 fica indisponível: desabilitada,
  * riscada e com o texto "Esgotada" visível (não depende só de cor). Clicar no chip já
  * selecionado não desmarca (o Radix permitiria; aqui sempre há uma edição escolhida).
  */
@@ -50,11 +50,13 @@ export function EditionChips({
             disabled={disabled || unavailable}
             data-unavailable={unavailable || undefined}
             className={cn(
-              'h-auto min-h-9 min-w-16 flex-col gap-0 rounded-md px-3 py-1.5 text-caption',
-              'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary',
+              // Figma: pílulas com contorno; a escolhida tem o contorno e o texto laranja (mais grosso e em
+              // negrito, para não depender só da cor), sem preenchimento. 44 px de alvo no toque (celular e tablet), 32 a partir de `lg`
+              'border-border-soft text-foreground h-auto min-h-11 min-w-14 flex-col gap-0 rounded-full px-3 py-1 text-caption lg:min-h-8',
+              'data-[state=on]:border-text-accent data-[state=on]:text-text-accent data-[state=on]:bg-transparent data-[state=on]:hover:bg-muted data-[state=on]:font-bold data-[state=on]:ring-text-accent data-[state=on]:ring-1',
             )}
           >
-            <span className={cn('font-bold', unavailable && 'line-through')}>{editionLabel(edition.kind)}</span>
+            <span className={cn(unavailable && 'line-through')}>{editionLabel(edition.kind)}</span>
             {unavailable && ' '}
             {unavailable && <span className="text-tiny font-normal">Esgotada</span>}
           </ToggleGroupItem>

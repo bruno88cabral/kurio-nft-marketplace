@@ -4,13 +4,16 @@ import {
   checkoutDraftKey,
   checkoutDraftStore,
   createDraftStore,
+  dropCollectorForms,
   dropWalletConnections,
   draftOwnsOrder,
   parseCheckoutDraft,
   pendingAttempt,
   readCheckoutDraft,
   settleCheckoutDraft,
+  withCollector,
   withConnectedWallet,
+  withoutCollector,
   withoutConnection,
   withOrderId,
   withOrderKey,
@@ -266,5 +269,127 @@ describe('dropWalletConnections (reset da sessão)', () => {
     dropWalletConnections(null)
     expect(calls).toBe(1)
     store.clear()
+  })
+})
+
+describe('formulário do colecionador e provedor no rascunho (MYK-1117)', () => {
+  const collector = { displayName: 'Ana', username: 'ana_souza', email: 'ana@kurio.test', note: '' }
+  const withForm = { ...pendingDraft, collector, provider: 'metamask' as const }
+
+  it('parse aceita collector com as chaves conhecidas (string vazia vale) e provider da lista', () => {
+    expect(parseCheckoutDraft(JSON.stringify(withForm))).toEqual(withForm)
+  })
+
+  it('parse descarta chaves desconhecidas e valores não string do collector, e trunca a 500', () => {
+    const raw = JSON.stringify({
+      walletId: 'w1',
+      collector: { username: 'ana', email: 42, extra: 'x', note: 'a'.repeat(900), ensName: null },
+    })
+    expect(parseCheckoutDraft(raw)).toEqual({ walletId: 'w1', collector: { username: 'ana', note: 'a'.repeat(500) } })
+  })
+
+  it('o teto do parse é coerente com o limite depois do trim: uma observação válida volta inteira', () => {
+    const useful = 'b'.repeat(500)
+    // Válida no formulário (500 depois do trim), mas com 506 caracteres crus
+    const padded = `   ${useful}   `
+    const short = ` ${'c'.repeat(10)} `
+    const draft = parseCheckoutDraft(JSON.stringify({ collector: { note: padded, username: short } }))
+    expect(draft.collector?.note).toBe(useful)
+    // Dentro do teto, o valor cru fica como foi digitado (espaços inclusos)
+    expect(draft.collector?.username).toBe(short)
+  })
+
+  it('collector e provider malformados caem sem derrubar a carteira nem a tentativa', () => {
+    for (const bad of [{ collector: 'x', provider: 'phantom' }, { collector: ['a'], provider: 1 }, { collector: { extra: 'x' } }]) {
+      const draft = parseCheckoutDraft(JSON.stringify({ ...pendingDraft, ...bad }))
+      expect(draft).toEqual(pendingDraft)
+      expect(pendingAttempt(draft)?.key).toBe('key-1')
+    }
+  })
+
+  it('withCollector grava uma cópia; withoutCollector tira só o collector', () => {
+    const values = { username: 'ana' }
+    const next = withCollector(pendingDraft, values)
+    values.username = 'mudou'
+    expect(next).toEqual({ ...pendingDraft, collector: { username: 'ana' } })
+    expect(withoutCollector({ ...next, provider: 'coinbase' })).toEqual({ ...pendingDraft, provider: 'coinbase' })
+    expect(next.collector).toEqual({ username: 'ana' })
+  })
+
+  it('o formulário não entra na chave nem no corpo da tentativa', () => {
+    const { key, draft } = withOrderKey(withForm, { quoteId: 'q1', walletId: 'w1' }, keys())
+    expect(key).toBe('key-1')
+    expect(draft.attempt).toEqual({ quoteId: 'q1', walletId: 'w1' })
+    expect(draft.keyFingerprint).toBe('q1:w1')
+  })
+
+  it('dropWalletConnections (reset, inclusive expiração) preserva collector e provider', () => {
+    const storage = memory()
+    writeCheckoutDraft(storage, 'ana', withForm)
+    dropWalletConnections(storage)
+    const after = readCheckoutDraft(storage, 'ana')
+    expect(after.connectedWalletId).toBeUndefined()
+    expect(after.collector).toEqual(collector)
+    expect(after.provider).toBe('metamask')
+  })
+
+  it('dropCollectorForms (logout) tira só o collector: tentativa (R4), walletId e provider ficam', () => {
+    const storage = memory()
+    writeCheckoutDraft(storage, 'ana', withForm)
+    writeCheckoutDraft(storage, 'bruno', { walletId: 'w9', collector: { username: 'bruno' } })
+    writeCheckoutDraft(storage, 'carla', { walletId: 'w5' })
+    storage.setItem('kurio:session', 'x')
+    const carlaRaw = storage.getItem(checkoutDraftKey('carla'))
+    dropCollectorForms(storage)
+    const ana = readCheckoutDraft(storage, 'ana')
+    expect(ana).toEqual({ ...pendingDraft, provider: 'metamask' })
+    expect(pendingAttempt(ana)).toEqual({ key: 'key-1', body: { quoteId: 'q1', walletId: 'w1' } })
+    expect(readCheckoutDraft(storage, 'bruno')).toEqual({ walletId: 'w9' })
+    expect(storage.getItem(checkoutDraftKey('carla'))).toBe(carlaRaw)
+    expect(storage.getItem('kurio:session')).toBe('x')
+  })
+
+  it('dropCollectorForms com keep (login): tira o formulário das outras contas e mantém o da conta que entrou', () => {
+    const storage = memory()
+    writeCheckoutDraft(storage, 'ana-keep', withForm)
+    writeCheckoutDraft(storage, 'bruno-keep', { walletId: 'w9', collector: { username: 'bruno' } })
+    const memAna = checkoutDraftStore('ana-keep')
+    const memBruno = checkoutDraftStore('bruno-keep')
+    memAna.set({ collector: { username: 'ana' } })
+    memBruno.set({ collector: { username: 'bruno' } })
+    dropCollectorForms(storage, 'bruno-keep')
+    const ana = readCheckoutDraft(storage, 'ana-keep')
+    expect(ana.collector).toBeUndefined()
+    expect(pendingAttempt(ana)?.key).toBe('key-1')
+    expect(readCheckoutDraft(storage, 'bruno-keep')).toEqual({ walletId: 'w9', collector: { username: 'bruno' } })
+    expect(memAna.get().collector).toBeUndefined()
+    expect(memBruno.get().collector).toEqual({ username: 'bruno' })
+    memAna.clear()
+    memBruno.clear()
+  })
+
+  it('dropCollectorForms limpa a cópia em memória, avisa os ouvintes e não lança', () => {
+    const store = checkoutDraftStore('ana-collector')
+    store.set(withForm)
+    let calls = 0
+    store.subscribe(() => calls++)
+    dropCollectorForms(null)
+    expect(store.get().collector).toBeUndefined()
+    expect(pendingAttempt(store.get())?.key).toBe('key-1')
+    expect(calls).toBe(1)
+    dropCollectorForms(null)
+    expect(calls).toBe(1)
+    store.clear()
+    const broken = memory()
+    broken.map.set(checkoutDraftKey('ana'), '{nao-json')
+    expect(() => dropCollectorForms(broken)).not.toThrow()
+    const throwing = {
+      ...memory(),
+      key: () => {
+        throw new Error('bloqueado')
+      },
+      length: 1,
+    }
+    expect(() => dropCollectorForms(throwing)).not.toThrow()
   })
 })

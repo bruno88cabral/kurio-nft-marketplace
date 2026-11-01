@@ -69,18 +69,31 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
 
   const submitting = mutation.isPending || (busyAfterSuccess && mutation.isSuccess)
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (submitting) return
+  /**
+   * Valida no cliente e limpa os erros do envio anterior, sem enviar. Devolve os erros do cliente
+   * (vazio = pode enviar). Usado por `onSubmit` e por telas que juntam dois formulários num único
+   * "Salvar" (Perfil: dados e senha, MYK-1102).
+   */
+  const check = (): FieldErrors<K> => {
     const clientErrors = validate(values)
     setErrors(clientErrors)
     setApiErrors({})
     setFormError(undefined)
+    return clientErrors
+  }
+
+  /** Envia os valores atuais (chame depois de `check` sem erros). */
+  const send = () => mutation.mutate(values)
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (submitting) return
+    const clientErrors = check()
     if (hasErrors(clientErrors)) {
       focusFirstInvalid(clientErrors)
       return
     }
-    mutation.mutate(values)
+    send()
   }
 
   /** Volta aos valores dados e limpa todos os erros (ex.: depois de salvar). */
@@ -106,5 +119,5 @@ export function useAccountForm<K extends string, V extends Record<K, string>, R>
     },
   })
 
-  return { values, errors, apiErrors, formError, submitting, onSubmit, field, reset }
+  return { values, errors, apiErrors, formError, submitting, onSubmit, check, send, focusFirstInvalid, field, reset }
 }
