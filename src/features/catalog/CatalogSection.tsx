@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useId } from 'react'
 import { featuredNftsQuery } from '@/api/nfts'
 import type { NftListTab } from '@/contracts'
+import { CATALOG_ANCHOR_ID } from '@/components/layout/routeFocus'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { nftArtSize } from '@/lib/nftArt'
@@ -11,8 +12,6 @@ import { CatalogGrid } from './CatalogGrid'
 import { CatalogToolbar } from './CatalogToolbar'
 import { useCatalogSearch } from './useCatalogSearch'
 
-/** Âncora do "Mercado" do header, das trilhas, das buscas (header e topo mobile), da paginação e do EXPLORAR do hero. */
-const CATALOG_ANCHOR_ID = 'catalogo'
 
 /**
  * Catálogo do Início: sidebar de filtros (lg+) + abas/ordenação + grade paginada. Abaixo de `lg`
@@ -28,21 +27,24 @@ export function CatalogSection() {
     <section
       id={CATALOG_ANCHOR_ID}
       aria-labelledby={titleId}
+      // Alvo do foco depois da busca e da navegação para `#catalogo` (`focusCatalog`), sem entrar no Tab
+      tabIndex={-1}
       // scroll-mt: a partir de `md` o header é sticky (h-16); abaixo de `md` o Início não tem header
       // (`hideMobileChrome: 'header'`), então só uma folga pequena
-      className="mx-auto w-full max-w-7xl scroll-mt-2 px-4 md:scroll-mt-20 pt-2 pb-10 md:px-6 md:pt-10"
+      className="mx-auto w-full max-w-7xl scroll-mt-2 outline-none px-4 md:scroll-mt-20 pt-2 pb-10 md:px-6 md:pt-10"
     >
       <h2 id={titleId} className="sr-only">
         Catálogo
       </h2>
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[16.5rem_minmax(0,1fr)]">
-        {/* Sem título visível (Figma): o painel começa em "Coleções"; o nome fica no aria-label */}
-        <aside aria-label="Filtros" className="hidden flex-col gap-6 lg:flex">
+        {/* Sem título visível (Figma): o painel começa em "Coleções"; o nome fica no aria-label. É uma `section`
+            (região), não `aside`: um complementary dentro da região do catálogo não é landmark de topo (axe) */}
+        <section aria-label="Filtros" className="hidden flex-col gap-6 lg:flex">
           <div className="bg-card p-5">
             <CatalogFilters />
           </div>
           <FeaturedSpotlight />
-        </aside>
+        </section>
         <Tabs
           value={tab}
           onValueChange={(value) => update({ tab: value as NftListTab })}

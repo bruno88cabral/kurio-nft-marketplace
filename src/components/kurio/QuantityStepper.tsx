@@ -61,9 +61,9 @@ export function QuantityStepper({
   const accent = appearance === 'accent'
   const cart = appearance === 'cart'
   const buttonClass = cart
-    ? 'group/step focus-visible:ring-ring/50 inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
+    ? 'group/step focus-visible:ring-ring inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
     : cn(
-    'focus-visible:ring-ring/50 focus-visible:border-ring inline-flex shrink-0 items-center justify-center border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40',
+    'focus-visible:ring-ring focus-visible:border-ring inline-flex shrink-0 items-center justify-center border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40',
     accent
       ? 'bg-primary text-primary-foreground hover:bg-primary/80 focus-visible:ring-offset-background h-12 w-11 rounded-full border-transparent focus-visible:ring-offset-2 aria-disabled:hover:bg-primary'
       : 'border-border-soft text-foreground hover:bg-muted aria-disabled:hover:bg-transparent',
@@ -129,7 +129,7 @@ export function QuantityStepper({
               }
             }}
             className={cn(
-              'focus-visible:ring-ring/50 rounded-sm bg-transparent text-center font-medium tabular-nums outline-none focus-visible:ring-3 disabled:opacity-50',
+              'focus-visible:ring-ring rounded-sm bg-transparent text-center font-medium tabular-nums outline-none focus-visible:ring-3 disabled:opacity-50',
               cart ? 'text-body h-8 w-7' : sm ? 'h-6 w-7 text-caption' : accent ? 'text-body-lg h-11 w-11' : 'h-9 w-9 text-body',
             )}
           />

@@ -76,7 +76,7 @@ export function WalletOption({ provider, status = 'idle', rejectedMessage, disab
       data-status={status}
       className={cn(
         'border-border bg-card hover:bg-muted flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors',
-        'has-data-[state=checked]:border-primary has-focus-visible:ring-ring/50 has-focus-visible:ring-3',
+        'has-data-[state=checked]:border-primary has-focus-visible:ring-ring has-focus-visible:ring-3',
         status === 'rejected' && 'border-destructive/60',
         disabled && 'cursor-not-allowed opacity-60',
         className,

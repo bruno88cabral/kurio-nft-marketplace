@@ -2,15 +2,10 @@ import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { sessionLifecycle } from '@/auth/sessionLifecycle'
-import { MAIN_CONTENT_ID } from '@/components/layout/SkipLink'
+import { focusMainContent } from '@/components/layout/routeFocus'
 import { dropCollectorForms } from '@/features/checkout/checkoutDraft'
 
 export const SIGNED_OUT_MESSAGE = 'Você saiu da conta.'
-
-/** Foco no `<main id="conteudo">`: depois de "Sair" o controle que tinha o foco sumiu. */
-export function focusMainContent() {
-  document.getElementById(MAIN_CONTENT_ID)?.focus()
-}
 
 /**
  * "Sair": encerra a sessão pelo ciclo de vida (logout na API, reset do estado privado, socket

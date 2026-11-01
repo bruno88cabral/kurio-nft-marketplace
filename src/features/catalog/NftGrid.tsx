@@ -13,6 +13,12 @@ const NFT_GRID_CLASS = 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-6'
  */
 const STAGGERED_CLASS = 'max-md:pb-8 max-md:[&>:nth-child(even)]:translate-y-8'
 
+/**
+ * Cards da 1ª linha do mobile (2 colunas): acima da dobra, são o LCP do Início no celular
+ * (Lighthouse, MYK-1116). Carregam `eager` com `fetchpriority="high"` em vez de `lazy`.
+ */
+const ABOVE_THE_FOLD = 2
+
 export interface NftGridProps {
   items: Nft[]
   /** Refetch com o dado anterior na tela (`isPlaceholderData`): opacidade reduzida + `aria-busy`. */
@@ -49,12 +55,24 @@ export function NftGrid({
         className,
       )}
     >
-      {items.map((nft) => (
+      {items.map((nft, i) => (
         <li key={nft.id} className="min-w-0">
           {favoritable ? (
-            <FavoritableNftCard nft={nft} previousPrice={nft.previousPrice} size={size} className="h-full" />
+            <FavoritableNftCard
+              nft={nft}
+              previousPrice={nft.previousPrice}
+              size={size}
+              priority={i < ABOVE_THE_FOLD}
+              className="h-full"
+            />
           ) : (
-            <NftCard nft={nft} previousPrice={nft.previousPrice} size={size} className="h-full" />
+            <NftCard
+              nft={nft}
+              previousPrice={nft.previousPrice}
+              size={size}
+              priority={i < ABOVE_THE_FOLD}
+              className="h-full"
+            />
           )}
         </li>
       ))}
