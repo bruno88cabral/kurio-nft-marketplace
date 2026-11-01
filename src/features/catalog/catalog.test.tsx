@@ -15,6 +15,7 @@ import type { NftFacets } from '@/contracts'
 import { validateCatalogSearch } from '@/lib/catalogSearch'
 import { parseEth } from '@/lib/eth'
 import { CatalogFilters } from './CatalogFilters'
+import { CatalogMobileTopBar } from './CatalogMobileTopBar'
 import { CatalogPagination } from './CatalogPagination'
 
 // O Slider da faixa de preço (Radix) mede o tamanho com ResizeObserver, que o jsdom não tem
@@ -90,5 +91,30 @@ describe('CatalogFilters: sem checkbox e rádio visíveis, com a semântica', ()
     fireEvent.click(within(group).getByRole('radio', { name: /Polygon/ }))
     await waitFor(() => expect(router.state.location.search).toMatchObject({ network: 'polygon' }))
     expect(within(group).getByRole('radio', { name: /Polygon/ }).getAttribute('aria-checked')).toBe('true')
+  })
+})
+
+describe('CatalogMobileTopBar: busca e filtros no topo do Início mobile', () => {
+  it('a busca grava `q`, volta à página 1 e mantém os filtros (mesma `?q=` do header)', async () => {
+    const router = renderAt('/?network=polygon&page=3', <CatalogMobileTopBar />)
+    const form = await screen.findByRole('search', { name: 'Buscar NFTs' })
+    const input = within(form).getByRole('searchbox', { name: 'Explorar coleções' })
+    fireEvent.change(input, { target: { value: 'reef' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(router.state.location.search).toEqual({ network: 'polygon', q: 'reef' }))
+    expect(router.state.location.hash).toBe('catalogo')
+  })
+
+  it('o campo começa com o `q` da URL', async () => {
+    renderAt('/?q=neon', <CatalogMobileTopBar />)
+    const input = await screen.findByRole<HTMLInputElement>('searchbox', { name: 'Explorar coleções' })
+    expect(input.value).toBe('neon')
+  })
+
+  it('o botão laranja abre o drawer de filtros e diz quantos filtros estão ativos', async () => {
+    renderAt('/?network=polygon', <CatalogMobileTopBar />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Filtros (1 ativo)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Filtros' })
+    expect(within(dialog).getByRole('radiogroup')).toBeTruthy()
   })
 })

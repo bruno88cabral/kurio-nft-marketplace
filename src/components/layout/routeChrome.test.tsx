@@ -18,7 +18,7 @@ function Probe() {
   const hidden = useHideMobileChrome()
   return (
     <>
-      <p data-testid="chrome">{hidden ? 'escondida' : 'visível'}</p>
+      <p data-testid="chrome">{hidden === true ? 'escondida' : hidden === 'header' ? 'sem header' : 'visível'}</p>
       <Outlet />
     </>
   )
@@ -33,6 +33,12 @@ function renderAt(path: string) {
       path: '/imersiva',
       staticData: { hideMobileChrome: true },
       component: () => <p>imersiva</p>,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: '/sem-header',
+      staticData: { hideMobileChrome: 'header' },
+      component: () => <p>página sem header</p>,
     }),
     createRoute({
       getParentRoute: () => rootRoute,
@@ -65,6 +71,12 @@ describe('useHideMobileChrome (staticData.hideMobileChrome)', () => {
     renderAt('/imersiva')
     await screen.findByText('imersiva')
     expect(screen.getByTestId('chrome').textContent).toBe('escondida')
+  })
+
+  it("rota com 'header': esconde só o header (a tab bar fica)", async () => {
+    renderAt('/sem-header')
+    await screen.findByText('página sem header')
+    expect(screen.getByTestId('chrome').textContent).toBe('sem header')
   })
 
   it('rota com a flag que deu "não encontrado": a moldura volta', async () => {

@@ -1,5 +1,5 @@
 import { SlidersHorizontal, X } from 'lucide-react'
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { NftListSort, NftListTab } from '@/contracts'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -31,8 +31,32 @@ const SORTS: ReadonlyArray<{ value: NftListSort; label: string }> = [
 ]
 
 /**
- * Abas, ordenação, chip da busca do header e (abaixo de `lg`) o botão "Filtros (n)" que abre o
- * drawer. Precisa estar dentro do `<Tabs>` da seção do catálogo.
+ * Drawer de filtros (abaixo de `lg`): o `children` é o gatilho (`SheetTrigger asChild`). O foco
+ * fica preso no drawer (Radix Dialog) e volta ao gatilho ao fechar.
+ */
+export function CatalogFiltersSheet({ children }: { children: ReactNode }) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>{children}</SheetTrigger>
+      <SheetContent side="left" aria-describedby={undefined} className="w-[85%] max-w-sm gap-0 overflow-y-auto">
+        <SheetHeader className="border-border border-b">
+          <SheetTitle className="text-body-lg">Filtros</SheetTitle>
+        </SheetHeader>
+        <CatalogFilters className="p-4" />
+        <SheetFooter className="border-border bg-popover sticky bottom-0 border-t">
+          <SheetClose asChild>
+            <Button type="button">Ver resultados</Button>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/**
+ * Abas, ordenação, chip da busca e, entre `md` e `lg`, o botão "Filtros (n)" que abre o drawer
+ * (abaixo de `md` o drawer abre pelo botão laranja do `CatalogMobileTopBar`). Precisa estar dentro
+ * do `<Tabs>` da seção do catálogo.
  */
 export function CatalogToolbar() {
   const { search, update } = useCatalogSearch()
@@ -48,33 +72,21 @@ export function CatalogToolbar() {
               key={t.value}
               value={t.value}
               // Figma: as abas são brancas; a ativa fica laranja com o sublinhado laranja
-              className="text-caption sm:text-body text-foreground dark:text-foreground data-active:text-text-accent dark:data-active:text-text-accent after:bg-primary flex-none px-2 sm:px-3"
+              className="text-body text-foreground dark:text-foreground data-active:text-text-accent dark:data-active:text-text-accent after:bg-primary flex-none px-1 sm:px-3"
             >
               {t.label}
             </TabsTrigger>
           ))}
         </TabsList>
         <div className="flex items-center justify-between gap-2 lg:justify-end">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button type="button" variant="outline" className="lg:hidden">
-                <SlidersHorizontal aria-hidden />
-                Filtros{count > 0 ? ` (${count})` : ''}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" aria-describedby={undefined} className="w-[85%] max-w-sm gap-0 overflow-y-auto">
-              <SheetHeader className="border-border border-b">
-                <SheetTitle className="text-body-lg">Filtros</SheetTitle>
-              </SheetHeader>
-              <CatalogFilters className="p-4" />
-              <SheetFooter className="border-border bg-popover sticky bottom-0 border-t">
-                <SheetClose asChild>
-                  <Button type="button">Ver resultados</Button>
-                </SheetClose>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
-          <div className="flex min-w-0 items-center gap-2">
+          {/* Abaixo de `md` o drawer abre pelo botão laranja ao lado da busca, no topo do Início */}
+          <CatalogFiltersSheet>
+            <Button type="button" variant="outline" className="max-md:hidden lg:hidden">
+              <SlidersHorizontal aria-hidden />
+              Filtros{count > 0 ? ` (${count})` : ''}
+            </Button>
+          </CatalogFiltersSheet>
+          <div className="ml-auto flex min-w-0 items-center gap-2">
             <Label htmlFor={sortId} className="text-foreground text-body sr-only shrink-0 font-normal sm:not-sr-only">
               Ordenar por:
             </Label>

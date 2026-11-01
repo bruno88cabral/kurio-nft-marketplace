@@ -52,7 +52,8 @@ export function FavoritableNftCard(props: Omit<ComponentProps<typeof NftCard>, '
         favorited={favorited}
         onFavoriteToggle={toggle}
         favoriteDisabled={pending}
-        favoriteClassName="md:hidden"
+        // Alvo de 44 px (§8) sem mudar o círculo de 28 px do Figma: o ::after estende a área de toque
+        favoriteClassName="md:hidden after:absolute after:-inset-2"
       />
       <FavoriteAnnouncement message={announcement} />
     </>

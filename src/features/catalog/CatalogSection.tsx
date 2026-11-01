@@ -16,7 +16,8 @@ const CATALOG_ANCHOR_ID = 'catalogo'
 
 /**
  * Catálogo do Início: sidebar de filtros (lg+) + abas/ordenação + grade paginada. Abaixo de `lg`
- * os filtros vão para o drawer aberto pela toolbar.
+ * os filtros vão para o drawer, aberto pela toolbar (`md` a `lg`) ou pelo botão ao lado da busca
+ * no topo da página (abaixo de `md`, `CatalogMobileTopBar`).
  */
 export function CatalogSection() {
   const { search, update } = useCatalogSearch()
@@ -28,7 +29,7 @@ export function CatalogSection() {
       id={CATALOG_ANCHOR_ID}
       aria-labelledby={titleId}
       // scroll-mt: o header é sticky (h-16)
-      className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 py-10 md:px-6"
+      className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 pt-2 pb-10 md:px-6 md:pt-10"
     >
       <h2 id={titleId} className="sr-only">
         Catálogo

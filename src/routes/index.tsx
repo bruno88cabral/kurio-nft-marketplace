@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { featuredNftsQuery, nftFacetsQuery, nftListQuery } from '@/api/nfts'
+import { CatalogMobileTopBar } from '@/features/catalog/CatalogMobileTopBar'
 import { CatalogSection } from '@/features/catalog/CatalogSection'
 import { HeroFeatured } from '@/features/catalog/HeroFeatured'
 import { MintJournal } from '@/features/catalog/MintJournal'
@@ -18,12 +19,16 @@ export const Route = createFileRoute('/')({
     void queryClient.prefetchQuery(nftListQuery(deps))
   },
   head: () => ({ meta: [{ title: 'Início · Kurio' }] }),
+  // Figma mobile: sem o header do site (a busca e os filtros ficam no topo da página); a tab bar
+  // continua e o "Conta" dela dá acesso a "Entrar" e ao Perfil
+  staticData: { hideMobileChrome: 'header' },
   component: HomePage,
 })
 
 function HomePage() {
   return (
     <div className="flex flex-col">
+      <CatalogMobileTopBar className="md:hidden" />
       <HeroFeatured />
       <CatalogSection />
       <PromoCards />

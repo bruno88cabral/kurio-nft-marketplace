@@ -22,14 +22,16 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootLayout() {
-  // Rota com `staticData.hideMobileChrome` (ex.: Detalhe): abaixo de `md` ela desenha a própria moldura
+  // Rota com `staticData.hideMobileChrome`: abaixo de `md` ela desenha a própria moldura, sem o
+  // header e a tab bar (`true`, Detalhe) ou só sem o header (`'header'`, Início)
   const hideMobileChrome = useHideMobileChrome()
+  const showTabBar = hideMobileChrome !== true
   return (
     <TooltipProvider>
       <HeadContent />
       <div
-        data-mobile-chrome={hideMobileChrome ? 'hidden' : undefined}
-        className={cn('bg-background text-foreground font-sans flex min-h-dvh flex-col', !hideMobileChrome && TAB_BAR_PADDING_CLASS)}
+        data-mobile-chrome={hideMobileChrome === true ? 'hidden' : hideMobileChrome || undefined}
+        className={cn('bg-background text-foreground font-sans flex min-h-dvh flex-col', showTabBar && TAB_BAR_PADDING_CLASS)}
       >
         <SkipLink />
         <SiteHeader className={hideMobileChrome ? 'max-md:hidden' : undefined} />
@@ -37,7 +39,7 @@ function RootLayout() {
           <Outlet />
         </main>
         <SiteFooter />
-        {!hideMobileChrome && <MobileTabBar />}
+        {showTabBar && <MobileTabBar />}
       </div>
       <Toaster />
     </TooltipProvider>
