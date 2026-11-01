@@ -4,8 +4,6 @@ Front-end do marketplace Kurio (desafio Jungle Gaming). Stack: React 19, Vite, T
 
 **Demo publicada:** https://kurio-nft-marketplace-bruno-cabral.vercel.app (produção, a partir da `main`, com a API mockada no navegador; ver [Deploy](#deploy-vercel)).
 
-> Estado atual: **M0 (Fundação) + camada de mocks do M1 + M2 (Início e Detalhe do NFT) + M3 (Conta e sessão) + M4 (Carrinho, checkout e tempo real) + M5 (E2E, Lighthouse e deploy)**. Existem o app shell (header, footer, tab bar mobile), o design system e o kit de componentes, os contratos tipados, a API mockada completa (MSW + Socket.IO, ver [Cenários](#cenários-de-mock-e-reset)), o **Início** (destaques, catálogo com busca, filtros, ordenação e paginação na URL), o **Detalhe do NFT** (galeria, edição, quantidade, "Mais desta coleção") e **favoritos** otimistas. O M3 trouxe **login e cadastro** (modais em `/login` e `/signup`), o menu da conta com **sair**, rotas protegidas que voltam ao lugar de origem, o **Perfil** (nome, avatar e troca de senha), as **Carteiras** (cadastrar, definir principal, renomear e remover) e o ciclo de vida da sessão (expiração, troca de conta, várias abas). O M4 trouxe o **carrinho** (do visitante em `localStorage` e da conta no servidor, com cupom e cotação), o **Pagamento** (formulário "Perfil do colecionador" validado no cliente, carteira cadastrada e rede, provedor com conexão, recusa e desconexão simuladas, revisão em diálogo, revalidação antes de confirmar e pedido idempotente), a **Confirmação** com o recibo e o **cache ligado ao tempo real** (`nft.updated` e `order.updated` com dedupe por `eventId` e descarte por `version`). Para entrar, use o [login pela interface](#entrar-e-sair); as receitas do M4 estão em [Falhas do carrinho, pagamento e tempo real](#falhas-do-carrinho-pagamento-e-tempo-real-m4). O M5 trouxe os [testes E2E com Playwright](#testes-e2e-playwright), a [medição com Lighthouse](#lighthouse) e o deploy público. As artes dos NFTs são as 4 fotos exportadas do Figma, em AVIF e WebP (ver "Substituição de assets" no `ARCHITECTURE.md`). As telas foram conferidas contra os PNGs exportados do Figma em 390, 768 e 1440 (o MCP do Figma ficou sem cota); o que diverge, e o que ficou sem conferir por não ter frame, está em "Desvios do Figma" no `ARCHITECTURE.md`.
-
 ## Requisitos
 
 - Node 24.x (desenvolvido com 24.22)
@@ -20,7 +18,7 @@ pnpm dev
 
 O dev server sobe em `http://localhost:5173` (porta padrão do Vite). Para outra porta: `pnpm dev --port 5201 --strictPort`.
 
-Com os mocks ligados, a rota `/` abre o Início com o catálogo do mock (30 NFTs, 12 por página). O painel de debug do spike do R1 foi removido na MYK-1075.
+Com os mocks ligados, a rota `/` abre o Início com o catálogo do mock (30 NFTs, 12 por página).
 
 **Os mocks precisam de `VITE_ENABLE_MOCKS=true`**, e esse valor já vem versionado. O `.env.development` (usado pelo `pnpm dev`) e o `.env.production` (usado pelo `pnpm build`, inclusive na Vercel) trazem as três variáveis abaixo; nenhuma é secreta. Sem mocks, o app abre sem API e o catálogo mostra o erro "Não foi possível carregar os NFTs.".
 
@@ -73,11 +71,11 @@ Configuração esperada do projeto na Vercel:
 
 1. Framework preset **Vite**, build command `pnpm build`, output directory `dist`. O `vercel.json` já tem o rewrite de SPA e o `pnpm-workspace.yaml` evita o erro de postinstall do `msw` no install.
 2. Nenhuma variável precisa ser cadastrada no painel: o build lê o `.env.production` versionado. Uma variável cadastrada em Settings -> Environment Variables **sobrescreve** o arquivo, então o painel deve ficar sem `VITE_*` (ou com os mesmos valores).
-3. Com o domínio público, conferir em aba anônima: o Início carregando o catálogo (30 NFTs, "Filtros" e paginação); refresh direto em `/nfts/nft-001` e `/cart` carregando a SPA; `/nfts/nao-existe` mostrando "NFT não encontrado"; `/mockServiceWorker.js` respondendo JavaScript. **A checagem do socket mudou:** o painel que mostrava `socket: connected` e o `nft.updated` saiu na MYK-1075. Desde o M4 o cache consome os eventos, então a prova é a tela: abra `/nfts/nft-001`, rode `__kurioMock.emit.nftUpdated('nft-001', { price: '7.77' })` no console e veja o preço do Detalhe mudar sem recarregar (receita 41). Depois de conferir isso no domínio público, o R1 deixa de ser só parcialmente mitigado. Em produção, verifique também que o console do navegador não mostra erro de WebSocket (`wss://realtime.kurio.mock`).
+3. Com o domínio público, conferir em aba anônima: o Início carregando o catálogo (30 NFTs, "Filtros" e paginação); refresh direto em `/nfts/nft-001` e `/cart` carregando a SPA; `/nfts/nao-existe` mostrando "NFT não encontrado"; `/mockServiceWorker.js` respondendo JavaScript. Para conferir o tempo real: abra `/nfts/nft-001`, rode `__kurioMock.emit.nftUpdated('nft-001', { price: '7.77' })` no console e veja o preço do Detalhe mudar sem recarregar (receita 41). Em produção, verifique também que o console do navegador não mostra erro de WebSocket (`wss://realtime.kurio.mock`).
 
 ## Documentação
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md): estrutura, decisões do M0, a camada de mocks (contratos de cada endpoint, sessão, carrinho, socket), o M2 (catálogo na URL, Detalhe, cache e favoritos otimistas, base da sessão no cliente), o M3 (ciclo de vida da sessão, login e cadastro em modal, rotas protegidas, Perfil e Carteiras, isolamento do cache por conta), o M4 (carrinho do visitante e da conta, cotação, Pagamento com formulário do colecionador, carteira e rede, revisão, revalidação e pedido idempotente, Confirmação e recibo, reconciliação de eventos no cache), os desvios do Figma, as decisões de UX e acessibilidade e o esqueleto das seções que serão preenchidas.
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md): estrutura de pastas, valores em ETH, transporte de tempo real, a camada de mocks (contratos de cada endpoint, sessão, carrinho, socket), o catálogo na URL, o Detalhe, o cache e os favoritos otimistas, o ciclo de vida da sessão (login e cadastro em modal, rotas protegidas, Perfil e Carteiras, isolamento do cache por conta), o carrinho do visitante e da conta, a cotação, o Pagamento (formulário do colecionador, carteira e rede, revisão, revalidação e pedido idempotente), a Confirmação e o recibo, a reconciliação de eventos no cache, o desempenho, os desvios do Figma, as decisões de UX, a substituição de assets e os ajustes de acessibilidade.
 
 ## Credenciais fictícias
 
@@ -96,7 +94,7 @@ Os dois começam com carrinho vazio e nenhum pedido. Cupons: `KURIO10` (válido,
 2. Abrir uma rota protegida sem sessão (`/profile`, `/wallets`) leva a `/login?redirect=<rota>` e volta para ela depois de entrar. Fechar esse modal (X ou Esc) leva ao Início.
 3. **Sair:** menu da conta no header (nome > "Sair"). No celular e no tablet (abaixo de 1024 px), o botão **Sair** fica no topo de Perfil e Carteiras. O toast é "Você saiu da conta.".
 4. **Trocar de usuário (Ana → Bruno):** saia e entre com o outro e-mail, na **mesma aba**. O cache de favoritos, perfil e carteiras é zerado a cada troca; o Bruno vê as 2 carteiras dele e nenhuma da Ana.
-5. Perfil (`/profile`) e Carteiras (`/wallets`): ver o roteiro em [Falhas de conta e sessão (M3)](#falhas-de-conta-e-sessão-m3).
+5. Perfil (`/profile`) e Carteiras (`/wallets`): ver o roteiro em [Falhas de conta e sessão](#falhas-de-conta-e-sessão).
 
 **A sessão do mock vive no banco do mock:** trocar de cenário ou chamar `__kurioMock.reset()` reinicia o banco e **apaga as sessões**. Depois de trocar de cenário, entre de novo pela interface. O cenário também fica salvo: depois de abrir `?scenario=slow`, as próximas cargas sem a query continuam em `slow`; volte com `?scenario=default`.
 
@@ -152,7 +150,7 @@ __kurioMock.reset('default')          // volta ao seed e troca para o default
 
 Nome de cenário inválido lança `Error` e não altera nada. Para zerar tudo na mão: apague `kurio:mock-db:v1` e `kurio:mock-scenario` do `localStorage` e recarregue.
 
-**Eventos de tempo real** (cada um gera `eventId` e `version`; desde o M4 o cache os consome: o Detalhe, as listas e o carrinho reagem, e a Confirmação do pedido muda sozinha; o console do MSW também mostra a entrega. Receitas em [Falhas do carrinho, pagamento e tempo real](#falhas-do-carrinho-pagamento-e-tempo-real-m4)):
+**Eventos de tempo real** (cada um gera `eventId` e `version`; o cache os consome: o Detalhe, as listas e o carrinho reagem, e a Confirmação do pedido muda sozinha; o console do MSW também mostra a entrega. Receitas em [Falhas do carrinho, pagamento e tempo real](#falhas-do-carrinho-pagamento-e-tempo-real)):
 
 ```js
 __kurioMock.emit.nftUpdated('nft-001', { price: '3' })  // novo preço/estoque, version maior
@@ -212,7 +210,7 @@ const order = (n = 'k1') => api('POST', '/orders', { token, key: n, body: { quot
 14. **Evento duplicado.** Com a rota `/` aberta, rode `__kurioMock.emit.nftUpdated('nft-001', { price: '3' })` e depois `__kurioMock.duplicateLast()`: o mock publica o mesmo `eventId` e `version` duas vezes (visível no console do MSW). O app aplica o primeiro e descarta o duplicado (receita 41). Cada `emit` seguinte traz uma `version` maior.
 15. **Pedido de outra conta e sem autenticação.** Sem `token`, `await api('GET', '/orders')` devolve 401; com o token do Bruno (`await login('bruno@kurio.test')`), `GET /orders/<id de pedido da Ana>` devolve 403.
 
-### Falhas do Início e do Detalhe (M2)
+### Falhas do Início e do Detalhe
 
 Estas receitas são pela **interface** (não precisam do helper acima). Todas com mocks ligados. Cenário novo = banco do mock reiniciado, então as que precisam de login pedem [entrar de novo](#entrar-e-sair) pela interface.
 
@@ -225,7 +223,7 @@ Estas receitas são pela **interface** (não precisam do helper acima). Todas co
 22. **Favorito com rollback (`favorite-fail`).** Abra `/nfts/nft-002?scenario=favorite-fail`, entre como Ana pelo modal (o cenário apagou a sessão) e clique em "Favoritar Solar Veil" (a nft-002 já vem favoritada no seed da Ana, então `aria-pressed` passa de `true` para `false` na hora). A requisição falha com 503: o botão volta para `true` e aparece o toast "Não foi possível atualizar os favoritos.". Como visitante, o mesmo clique leva a `/login?redirect=%2Fnfts%2Fnft-002`. No Início em 390 px de largura, o coração fica no canto do card (no desktop o card não tem coração).
 23. **`?redirect=` externo.** Abra `/login?redirect=https://evil.example`: o valor é descartado (a URL fica `/login`). Só caminho interno (começando com `/`) é aceito.
 
-### Falhas de conta e sessão (M3)
+### Falhas de conta e sessão
 
 Pela **interface**, com mocks ligados. Lembre que trocar de cenário apaga as sessões: entre de novo depois.
 
@@ -244,7 +242,7 @@ Pela **interface**, com mocks ligados. Lembre que trocar de cenário apaga as se
     * **`/profile?scenario=offline` ou `server-error`**, estando logado: esses cenários falham **toda** rota antes do handler (erro de rede ou 503 `transient`), então `GET /auth/session` nunca devolve 401. A sessão guardada **não** é apagada e a guarda mostra o erro "Não foi possível confirmar sua sessão." ("Verifique sua conexão e tente de novo.") com "Tentar novamente". O retry continua falhando enquanto o cenário valer; abrir `?scenario=default` troca o cenário, reinicia o banco e cai no caso anterior (login com `redirect`).
     * Os erros "Não foi possível carregar seu perfil." / "suas carteiras." só aparecem se o `GET` falhar com a sessão viva (por exemplo, interceptando a request nas ferramentas do navegador); o formulário de senha e o de carteira continuam disponíveis.
 
-### Falhas do carrinho, pagamento e tempo real (M4)
+### Falhas do carrinho, pagamento e tempo real
 
 Pela **interface**, com mocks ligados, mais o console para os eventos. Trocar de cenário reinicia o banco do mock: apaga as sessões **e esvazia o carrinho**, então cada receita começa de novo (entrar e adicionar o NFT). Valores de referência: o Solar Veil (`nft-002`, edição `1/10`) custa 0.35 ETH e a taxa de rede é 0.002 ETH.
 
