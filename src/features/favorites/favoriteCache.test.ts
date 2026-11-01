@@ -57,7 +57,7 @@ describe('shouldToastFavoriteFailure', () => {
 describe('favoriteMutationOptions (QueryClient real em memória)', () => {
   const KEY = ['favorites', 'acc-1']
 
-  function setup(request: (nftId: string, on: boolean) => Promise<void>) {
+  function setup(request: (nftId: string, on: boolean) => Promise<void>, captureSession: () => () => boolean = () => () => true) {
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
     const snapshot = [fav('a')]
     queryClient.setQueryData(KEY, snapshot)
@@ -69,8 +69,8 @@ describe('favoriteMutationOptions (QueryClient real em memória)', () => {
       request,
       now: () => NOW,
       onFailure,
-      // sessão que não muda (a troca de conta é coberta em src/auth/sessionGuard.test.ts)
-      captureSession: () => () => true,
+      // por padrão a sessão não muda; os testes de troca de conta passam a própria captura
+      captureSession,
     })
     return { queryClient, snapshot, onFailure, observer: new MutationObserver(queryClient, options) }
   }
@@ -128,5 +128,49 @@ describe('favoriteMutationOptions (QueryClient real em memória)', () => {
     const { observer } = setup(request)
     await observer.mutate(false)
     expect(request).toHaveBeenCalledWith('b', false)
+  })
+
+  it('sessão trocada durante o cancelamento: não aplica o otimista, não avisa e não invalida', async () => {
+    let same = true
+    const { queryClient, snapshot, onFailure, observer } = setup(
+      () => Promise.reject(new Error('503')),
+      () => () => same,
+    )
+    const cancel = vi.spyOn(queryClient, 'cancelQueries').mockImplementation(() => {
+      same = false
+      return Promise.resolve()
+    })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    await expect(observer.mutate(true)).rejects.toThrow('503')
+    expect(cancel).toHaveBeenCalled()
+    expect(queryClient.getQueryData(KEY)).toEqual(snapshot)
+    expect(onFailure).not.toHaveBeenCalled()
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it('sessão trocada com a request em voo: a falha não desfaz nem avisa e o sucesso não invalida', async () => {
+    let same = true
+    let release: (fail: boolean) => void = () => {}
+    const { queryClient, onFailure, observer } = setup(
+      () => new Promise<void>((resolve, reject) => (release = (fail) => (fail ? reject(new Error('503')) : resolve()))),
+      () => () => same,
+    )
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    const failing = observer.mutate(true)
+    await vi.waitFor(() => expect(queryClient.getQueryData(KEY)).toEqual([fav('a'), fav('b', NOW)]))
+    same = false
+    release(true)
+    await expect(failing).rejects.toThrow('503')
+    expect(queryClient.getQueryData(KEY)).toEqual([fav('a'), fav('b', NOW)])
+    expect(onFailure).not.toHaveBeenCalled()
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it('falha antes do contexto existir (cancelamento rejeita): avisa sem tentar desfazer', async () => {
+    const { queryClient, snapshot, onFailure, observer } = setup(() => Promise.resolve())
+    vi.spyOn(queryClient, 'cancelQueries').mockRejectedValue(new Error('cancel'))
+    await expect(observer.mutate(true)).rejects.toThrow('cancel')
+    expect(queryClient.getQueryData(KEY)).toEqual(snapshot)
+    expect(onFailure).toHaveBeenCalledTimes(1)
   })
 })
