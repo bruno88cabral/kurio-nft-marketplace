@@ -22,7 +22,7 @@ const BUY_CLASS = 'h-11 px-8 text-body font-bold uppercase'
 
 /**
  * Área de compra (Figma desktop): "Edição:" em pílulas, quantidade com botões laranja redondos e,
- * na mesma linha, "COMPRAR" e "Favoritar". A seleção (edição + quantidade) vem da rota, que
+ * na mesma linha, "COMPRAR", o carrinho (só ícone, R-27: adiciona sem sair) e "Favoritar". A seleção (edição + quantidade) vem da rota, que
  * remonta com `key={nft.id}` ao trocar de NFT.
  *
  * No mobile a quantidade, o "Comprar NFT" e o carrinho ficam na barra fixa (`MobilePurchaseBar`)
@@ -98,6 +98,16 @@ export function PurchasePanel({ nft, selection, onEditionChange, className }: Pu
                 className={BUY_CLASS}
               />
             )
+          )}
+          {/* Desvio do Figma (R-27): adicionar sem sair do Detalhe, como o carrinho redondo da barra
+              mobile (mesmo toast; o 409 também vira toast) */}
+          {!soldOut && edition && (
+            <AddToCartButton
+              iconOnly
+              item={{ nftId: nft.id, edition: edition.kind, quantity }}
+              available={edition.available}
+              className="border-primary text-text-accent hover:bg-muted size-11 bg-transparent"
+            />
           )}
           <NftFavoriteButton nft={nft} className="h-11" />
         </div>

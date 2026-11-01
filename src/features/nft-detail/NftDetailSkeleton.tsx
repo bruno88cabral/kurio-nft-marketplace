@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { MobileBackButton } from './MobileDetailChrome'
 import {
   DETAIL_GRID_CLASS,
   DETAIL_HERO_CLASS,
@@ -12,7 +13,7 @@ import {
 } from './layout'
 
 function Bar({ className }: { className?: string }) {
-  return <Skeleton className={cn('rounded-md', className)} />
+  return <Skeleton aria-hidden className={cn('rounded-md', className)} />
 }
 
 /**
@@ -27,15 +28,16 @@ export function NftDetailSkeleton() {
       <span className="sr-only" role="status">
         Carregando NFT…
       </span>
-      <div aria-hidden className={DETAIL_TOP_CLASS}>
+      <div className={DETAIL_TOP_CLASS}>
         <Bar className="hidden h-11 w-40 md:block lg:h-[1.3125rem]" />
         <div className={DETAIL_GRID_CLASS}>
           <div className={DETAIL_HERO_CLASS}>
+            {/* No mobile não há header nesta rota: o "Voltar" é o de verdade, já funcional */}
             <div className="flex items-center justify-between md:hidden">
-              <Bar className="size-11 rounded-full" />
+              <MobileBackButton />
               <Bar className="size-11 rounded-full" />
             </div>
-            <div className={GALLERY_CLASS}>
+            <div aria-hidden className={GALLERY_CLASS}>
               <div className={GALLERY_MAIN_CLASS}>
                 <Skeleton className={cn(GALLERY_ART_CLASS, 'w-full')} />
               </div>
@@ -44,7 +46,7 @@ export function NftDetailSkeleton() {
               </div>
             </div>
           </div>
-          <div className={DETAIL_PANEL_CLASS}>
+          <div aria-hidden className={DETAIL_PANEL_CLASS}>
             {/* nome e preço (o preço só no desktop) */}
             <div className="flex flex-col gap-1 md:border-border-soft md:border-b md:pb-3">
               <Bar className="h-[1.95rem] w-3/4 lg:h-[2.275rem]" />
@@ -70,6 +72,7 @@ export function NftDetailSkeleton() {
                 <Bar className="h-12 w-[8.5rem]" />
                 <div className="flex gap-3 lg:ml-auto">
                   <Bar className="h-11 w-32" />
+                  <Bar className="size-11" />
                   <Bar className="h-11 w-32" />
                 </div>
               </div>

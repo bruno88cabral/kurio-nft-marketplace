@@ -20,7 +20,7 @@ const NEXT_KEYS: Record<string, 1 | -1> = { ArrowRight: 1, ArrowDown: 1, ArrowLe
  *   página) não muda com a quantidade de imagens, e o skeleton tem a mesma caixa.
  * - No mobile (Figma: só a arte) as miniaturas flutuam sobre a base da arte e só aparecem com mais
  *   de 1 imagem; por serem sobrepostas, não mudam a altura.
- * - Miniaturas são botões com `aria-pressed`; ←/→ (e ↑/↓ na coluna) trocam a imagem, com volta
+ * - Miniaturas são botões "Imagem i de N" (a arte delas é decorativa) com `aria-pressed`; ←/→ (e ↑/↓ na coluna) trocam a imagem, com volta
  *   circular, e levam o foco junto.
  * - A lupa abre a arte maior num diálogo (a partir de `md`).
  *
@@ -97,6 +97,7 @@ export function NftGallery({ nft, className }: { nft: Pick<Nft, 'name' | 'images
                   thumbs.current[i] = el
                 }}
                 type="button"
+                aria-label={`Imagem ${i + 1} de ${total}`}
                 aria-pressed={i === index}
                 onClick={() => setSelected(i)}
                 className={cn(
@@ -106,7 +107,7 @@ export function NftGallery({ nft, className }: { nft: Pick<Nft, 'name' | 'images
               >
                 <img
                   src={src}
-                  alt={imageAlt(nft.name, i, total)}
+                  alt=""
                   width={size.width}
                   height={size.height}
                   loading="lazy"

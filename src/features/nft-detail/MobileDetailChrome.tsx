@@ -19,23 +19,33 @@ const ROUND_CLASS =
  * histórico) vai para o Início.
  */
 export function MobileDetailTopBar({ nft, className }: { nft: Pick<Nft, 'id' | 'name'>; className?: string }) {
+  return (
+    <div data-slot="detail-top-bar" className={cn('flex items-center justify-between md:hidden', className)}>
+      <MobileBackButton />
+      <NftFavoriteButton nft={nft} variant="round" />
+    </div>
+  )
+}
+
+/**
+ * "Voltar" redondo do topo mobile. Também aparece no skeleton: sem o header do site, é a única
+ * navegação da tela enquanto o NFT carrega.
+ */
+export function MobileBackButton({ className }: { className?: string }) {
   const router = useRouter()
   const navigate = useNavigate()
   const canGoBack = useCanGoBack()
   return (
-    <div data-slot="detail-top-bar" className={cn('flex items-center justify-between md:hidden', className)}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label="Voltar"
-        className={ROUND_CLASS}
-        onClick={() => (canGoBack ? router.history.back() : void navigate({ to: '/' }))}
-      >
-        <ChevronLeft aria-hidden className="size-6" />
-      </Button>
-      <NftFavoriteButton nft={nft} variant="round" />
-    </div>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Voltar"
+      className={cn(ROUND_CLASS, className)}
+      onClick={() => (canGoBack ? router.history.back() : void navigate({ to: '/' }))}
+    >
+      <ChevronLeft aria-hidden className="size-6" />
+    </Button>
   )
 }
 

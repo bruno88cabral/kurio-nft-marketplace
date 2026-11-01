@@ -60,8 +60,12 @@ const increase = () => fireEvent.click(screen.getAllByRole('button', { name: 'Au
 const buyPanel = () => screen.getByRole('button', { name: 'Comprar' })
 /** "Comprar NFT" da barra mobile. */
 const buyBar = () => screen.getByRole('button', { name: 'Comprar NFT' })
+// "Adicionar ao carrinho" (só ícone): o do painel (a partir de `md`) vem antes do carrinho redondo da barra
+const addButtons = () => screen.getAllByRole('button', { name: 'Adicionar ao carrinho' })
+/** Carrinho (ícone) ao lado do COMPRAR, no painel. */
+const addPanel = () => addButtons()[0]
 /** Botão redondo do carrinho da barra mobile. */
-const addBar = () => screen.getByRole('button', { name: 'Adicionar ao carrinho' })
+const addBar = () => addButtons()[1]
 
 beforeEach(() => {
   cartState = { isPending: false, isAuthenticated: false }
@@ -80,7 +84,7 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
     increase()
     expect(quantityInputs().map((i) => i.value)).toEqual(['3', '3'])
 
-    for (const [button, calls] of [[addBar, 1], [buyBar, 2], [buyPanel, 3]] as const) {
+    for (const [button, calls] of [[addBar, 1], [buyBar, 2], [buyPanel, 3], [addPanel, 4]] as const) {
       fireEvent.click(button())
       await waitFor(() => expect(add).toHaveBeenCalledTimes(calls))
       expect(add).toHaveBeenLastCalledWith({ nftId: 'nft-023', edition: '1/10', quantity: 3 }, { available: 7 })
@@ -106,6 +110,19 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
     fireEvent.click(buyBar())
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Só restam 7 unidade(s).'))
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('o carrinho do painel (só ícone, ao lado do COMPRAR) adiciona sem sair, com o toast; o 409 também vira toast', async () => {
+    render(<Detail />)
+    expect(addButtons()).toHaveLength(2)
+    fireEvent.click(addPanel())
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Adicionado ao carrinho', expect.anything()))
+    expect(navigate).not.toHaveBeenCalled()
+
+    add.mockRejectedValue(new ApiError({ code: 'conflict', message: 'Só restam 7 unidade(s).' }, 409))
+    fireEvent.click(addPanel())
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Só restam 7 unidade(s).'))
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('o carrinho da barra mostra o toast com a ação "Ver carrinho" que leva a /cart', async () => {

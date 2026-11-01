@@ -6,7 +6,7 @@ import { NftGallery } from './NftGallery'
 afterEach(cleanup)
 
 const nft = (images: string[]) => ({ name: 'Slate Vine', imageUrl: images[0], images })
-const thumbs = () => screen.getAllByRole('button', { name: /^Slate Vine, imagem/ })
+const thumbs = () => screen.getAllByRole('button', { name: /^Imagem \d de \d$/ })
 const pressed = () => thumbs().map((b) => b.getAttribute('aria-pressed'))
 /** A arte principal é a primeira imagem (as miniaturas vêm depois no DOM). */
 const mainAlt = () => screen.getAllByRole('img')[0].getAttribute('alt')
@@ -14,7 +14,9 @@ const mainAlt = () => screen.getAllByRole('img')[0].getAttribute('alt')
 describe('NftGallery', () => {
   it('com N imagens: uma miniatura por imagem, a 1ª escolhida, e o clique troca a arte principal', () => {
     render(<NftGallery nft={nft(['/a.svg', '/b.svg', '/c.svg'])} />)
-    expect(thumbs()).toHaveLength(3)
+    expect(thumbs().map((b) => b.getAttribute('aria-label'))).toEqual(['Imagem 1 de 3', 'Imagem 2 de 3', 'Imagem 3 de 3'])
+    // A arte da miniatura é decorativa: o nome é o do botão, sem repetir o alt da arte principal
+    expect(screen.getAllByRole('img')).toHaveLength(1)
     expect(pressed()).toEqual(['true', 'false', 'false'])
     expect(mainAlt()).toBe('Slate Vine, imagem 1 de 3')
 
