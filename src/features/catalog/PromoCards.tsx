@@ -9,14 +9,14 @@ const PROMOS = [
     eyebrow: 'Acabou de chegar',
     title: 'Novos lançamentos',
     text: 'As obras listadas nas últimas duas semanas, direto dos ateliês.',
-    art: '/nfts/coral-byte.svg',
+    art: '/nfts/macaco-chapeu-960.webp',
   },
   {
     tab: 'trending',
     eyebrow: 'Mais procurados',
     title: 'Em alta',
     text: 'Edições limitadas que estão perto de esgotar.',
-    art: '/nfts/tide-glitch.svg',
+    art: '/nfts/macaco-fones-960.webp',
   },
 ] as const
 
