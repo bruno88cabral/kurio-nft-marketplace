@@ -40,10 +40,10 @@ export default defineConfig({
       ],
       reporter: ['text-summary', 'json-summary', 'html'],
       thresholds: {
-        lines: 75,
-        statements: 74,
-        functions: 73,
-        branches: 75,
+        lines: 79,
+        statements: 78,
+        functions: 77,
+        branches: 78,
         // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
         'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
@@ -60,6 +60,12 @@ export default defineConfig({
         'src/features/account/useAccountForm.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/kurio/{WalletCard,AccountSidebar,FormField}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/_authenticated/{profile,wallets}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // COV-10a: fluxo "Detalhe do NFT e favoritos" travado em 100%
+        'src/features/nft-detail/*.{ts,tsx}': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/favorites/*.{ts,tsx}': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/cart/AddToCartButton.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/components/kurio/{FavoriteButton,EditionChips,QuantityStepper}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/routes/nfts.$nftId.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         // WalletForm: `if (!isNetwork(network)) throw` é inalcançável (validateWallet já recusa rede vazia antes do request)
         'src/features/account/WalletForm.tsx': { lines: 100, statements: 94, functions: 100, branches: 90 },
         // avatar.ts: `Array.from(word)[0] ?? ''` em initials é inalcançável (o filter(Boolean) garante palavra não vazia)
