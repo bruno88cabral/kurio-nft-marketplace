@@ -47,6 +47,7 @@ export function WalletList({ accountId, wallets, error, form }: WalletListProps)
   const formRef = useRef<HTMLDivElement>(null)
   const primaryHeadingId = useId()
   const secondaryHeadingId = useId()
+  const addSecondaryHintId = useId()
   const removedRef = useRef(false)
   // `seq` remonta o `<p>` da região viva: a mesma mensagem duas vezes seguidas é anunciada de novo
   const [announcement, setAnnouncement] = useState({ message: '', seq: 0 })
@@ -150,7 +151,7 @@ export function WalletList({ accountId, wallets, error, form }: WalletListProps)
       tabIndex={-1}
       role="group"
       aria-label="Suas carteiras"
-      className="flex flex-col gap-12 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="flex flex-col gap-12 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring"
     >
       <div aria-live="polite" className="sr-only">
         <p key={announcement.seq}>{announcement.message}</p>
@@ -166,7 +167,8 @@ export function WalletList({ accountId, wallets, error, form }: WalletListProps)
         {sorted === undefined ? (
           (error ?? <Skeleton aria-hidden className="h-[83px] w-full rounded-lg" />)
         ) : primary ? (
-          <ul aria-label="Carteira principal" className="flex flex-col gap-3">
+          // Sem nome próprio: a seção já se chama "Carteira principal" (nome repetido, MYK-1102)
+          <ul className="flex flex-col gap-3">
             {card(primary)}
           </ul>
         ) : (
@@ -192,7 +194,11 @@ export function WalletList({ accountId, wallets, error, form }: WalletListProps)
                   <Circle aria-hidden className="text-text-accent" />
                   Igual à carteira principal
                 </OutOfScopeAction>
-                <AddButton onClick={focusForm} secondary />
+                <AddButton onClick={focusForm} secondary describedBy={addSecondaryHintId} />
+                {/* O formulário fica sob "Carteira principal" (Figma): o leitor de tela sabe antes para onde vai */}
+                <span id={addSecondaryHintId} className="sr-only">
+                  Leva ao formulário Nova carteira, acima. Com uma carteira principal, a nova entra como secundária.
+                </span>
               </>
             }
           />
@@ -252,9 +258,23 @@ function SectionHeader({ headingId, title, description, actions }: SectionHeader
 }
 
 /** "Adicionar" em laranja (Figma), com o nome acessível completo. */
-function AddButton({ onClick, secondary = false }: { onClick: () => void; secondary?: boolean }) {
+function AddButton({
+  onClick,
+  secondary = false,
+  describedBy,
+}: {
+  onClick: () => void
+  secondary?: boolean
+  describedBy?: string
+}) {
   return (
-    <Button type="button" variant="link" onClick={onClick} className="text-text-accent text-body-lg h-11 px-0 font-bold">
+    <Button
+      type="button"
+      variant="link"
+      onClick={onClick}
+      aria-describedby={describedBy}
+      className="text-text-accent text-body-lg h-11 px-0 font-bold"
+    >
       Adicionar{' '}<span className="sr-only">{secondary ? 'carteira secundária' : 'carteira'}</span>
     </Button>
   )

@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Link, Outlet, createRootRouteWithContext } from '@tanstack/react-router'
 import { EmptyState } from '@/components/kurio'
 import { MobileTabBar, TAB_BAR_PADDING_CLASS } from '@/components/layout/MobileTabBar'
+import { LiveAnnouncer } from '@/components/layout/LiveAnnouncer'
 import { useHideMobileChrome } from '@/components/layout/routeChrome'
 import { MAIN_CONTENT_ID, SkipLink } from '@/components/layout/SkipLink'
 import { SiteFooter } from '@/components/layout/SiteFooter'
@@ -42,6 +43,7 @@ function RootLayout() {
         {showTabBar && <MobileTabBar />}
       </div>
       <Toaster />
+      <LiveAnnouncer />
     </TooltipProvider>
   )
 }

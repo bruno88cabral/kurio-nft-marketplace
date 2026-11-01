@@ -1,10 +1,11 @@
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, X } from 'lucide-react'
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { withFilter } from '@/lib/catalogSearch'
 import { cn } from '@/lib/utils'
+import { focusCatalogIfLost } from './routeFocus'
 
 export interface HeaderSearchProps {
   className?: string
@@ -13,7 +14,8 @@ export interface HeaderSearchProps {
 /**
  * Busca do header (MYK-1075): o ícone abre um campo `role="search"` preenchido com o `q` atual.
  * Enter navega para `/` com `withFilter(search, { q })` (volta à página 1, mantém os filtros
- * quando já está no Início) e rola até `#catalogo`. Esc fecha e devolve o foco ao ícone.
+ * quando já está no Início), rola até `#catalogo` e põe o foco nele (o campo desmonta ao fechar). Esc fecha e
+ * devolve o foco ao ícone; clicar fora ou navegar por outro link fecha sem mexer no foco.
  */
 export function HeaderSearch({ className }: HeaderSearchProps) {
   // Fora do Início não há busca do catálogo: começa de uma busca vazia
@@ -21,8 +23,29 @@ export function HeaderSearch({ className }: HeaderSearchProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const inputId = useId()
   const formId = useId()
+  const pathname = useLocation({ select: (l) => l.pathname })
+
+  // Navegou por outro link (header, tab bar): o campo fecha sem roubar o foco
+  const [lastPathname, setLastPathname] = useState(pathname)
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname)
+    setOpen(false)
+  }
+
+  // Clique ou toque fora do campo e do ícone: fecha sem mexer no foco
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && (formRef.current?.contains(target) || toggleRef.current?.contains(target))) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
 
   const close = () => {
     setOpen(false)
@@ -33,8 +56,11 @@ export function HeaderSearch({ className }: HeaderSearchProps) {
     e.preventDefault()
     const value = new FormData(e.currentTarget).get('q')
     const q = typeof value === 'string' ? value : ''
-    void navigate({ to: '/', search: withFilter(catalog ?? {}, { q }), hash: 'catalogo' })
     setOpen(false)
+    // O campo desmonta: o foco vai para o catálogo com o resultado (não para o `<body>`)
+    void navigate({ to: '/', search: withFilter(catalog ?? {}, { q }), hash: 'catalogo' }).then(() =>
+      requestAnimationFrame(focusCatalogIfLost),
+    )
   }
 
   return (
@@ -53,6 +79,7 @@ export function HeaderSearch({ className }: HeaderSearchProps) {
       </Button>
       {open && (
         <form
+          ref={formRef}
           id={formId}
           role="search"
           aria-label="Buscar NFTs"

@@ -174,6 +174,7 @@ function PriceFilter({ facets, search, onApply }: Omit<FilterProps, 'onChange'> 
 }
 
 function NetworkFilter({ facets, search, onChange }: FilterProps) {
+  const legendId = useId()
   const total = facets.networks.reduce((sum, n) => sum + n.count, 0)
   const options = [
     { value: ALL_NETWORKS, label: 'Todas', count: total },
@@ -182,8 +183,12 @@ function NetworkFilter({ facets, search, onChange }: FilterProps) {
 
   return (
     <fieldset className="flex flex-col">
-      <legend className={cn(groupTitle, 'mb-2')}>Rede</legend>
+      <legend id={legendId} className={cn(groupTitle, 'mb-2')}>
+        Rede
+      </legend>
+      {/* O `radiogroup` também ganha o nome (não só o `fieldset`) */}
       <RadioGroupPrimitive.Root
+        aria-labelledby={legendId}
         value={search.network ?? ALL_NETWORKS}
         onValueChange={(value) =>
           onChange({ network: value === ALL_NETWORKS ? undefined : (value as NonNullable<CatalogSearch['network']>) })

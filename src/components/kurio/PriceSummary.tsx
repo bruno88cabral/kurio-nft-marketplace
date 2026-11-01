@@ -54,6 +54,7 @@ export function PriceSummary({
   className,
 }: PriceSummaryProps) {
   const showSkeleton = loading || !quote
+  const showStale = stale && !showSkeleton
 
   return (
     <section
@@ -63,12 +64,15 @@ export function PriceSummary({
       className={cn('flex flex-col gap-3', className)}
     >
       {title && <h2 className="text-body-lg font-medium">{title}</h2>}
-      {stale && !showSkeleton && (
-        <div
-          role="status"
-          className="border-text-accent/60 bg-text-accent/10 text-foreground flex flex-col gap-2 rounded-md border p-3 text-caption"
-        >
-          <p className="flex items-start gap-2">
+      {/* Região sempre montada (vazia até ficar desatualizada): inserir um `role="status"` já com o texto é
+          anunciado de forma irregular pelos leitores de tela. `sr-only` é absoluto: não ocupa o `gap` (MYK-1113) */}
+      <p role="status" className="sr-only">
+        {showStale ? `Cotação desatualizada. ${staleMessage}` : ''}
+      </p>
+      {showStale && (
+        <div className="border-text-accent/60 bg-text-accent/10 text-foreground flex flex-col gap-2 rounded-md border p-3 text-caption">
+          {/* O texto visível não é lido de novo: a região acima já o tem */}
+          <p aria-hidden className="flex items-start gap-2">
             <TriangleAlert aria-hidden className="text-text-accent mt-0.5 size-4 shrink-0" />
             <span>
               <strong className="font-medium">Cotação desatualizada.</strong> {staleMessage}
@@ -93,11 +97,12 @@ export function PriceSummary({
             value={formatEthLabel(quote.networkFee)}
             hint={mode === 'receipt' ? undefined : 'Taxa estimada'}
           />
-          <Separator className="my-1" />
+          {/* A linha acima do total é a borda da própria linha: um separador solto dentro do `<dl>` o invalida
+              (só `dt`/`dd`, axe `definition-list`); mesma altura de antes (my-1 + 1px) */}
           <Row
             label="Total"
             value={formatEthLabel(quote.total)}
-            className="text-body-lg font-bold"
+            className="border-border text-body-lg mt-1 border-t pt-3 font-bold"
             valueClassName="text-text-accent"
           />
         </dl>

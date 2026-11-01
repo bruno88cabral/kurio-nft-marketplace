@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lighthouse": "pnpm build && node lighthouse/run.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.105.0",
@@ -45,11 +46,13 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "chrome-launcher": "^1.2.2",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
     "jsdom": "^30.1.3",
+    "lighthouse": "^13.6.0",
     "msw": "^2.15.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",

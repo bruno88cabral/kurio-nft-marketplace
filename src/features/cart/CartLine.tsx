@@ -1,14 +1,16 @@
 import { Link } from '@tanstack/react-router'
 import { CircleAlert, LoaderCircle, Trash2, TriangleAlert } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, type CartItem, type EthAmount, type Nft, type QuoteIssue } from '@/contracts'
 import { QuantityStepper } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { editionLabel } from '@/lib/editions'
+import { announce } from '@/lib/announcer'
 import { formatEthLabel, mulEth } from '@/lib/eth'
 import { nftArtSize } from '@/lib/nftArt'
 import { cn } from '@/lib/utils'
+import { lineChangeAnnouncement, type LineSnapshot } from './cartView'
 import { CART_COLUMNS_CLASS } from './layout'
 
 export const LINE_FAILURE_MESSAGE = 'Não foi possível atualizar o carrinho.'
@@ -59,6 +61,16 @@ export function CartLine({ item, nft, nftFailed = false, unitPrice, issue, onQua
   const name = nft?.name ?? (nftFailed ? 'NFT indisponível' : undefined)
   const art = nft ? nftArtSize(nft.imageUrl) : undefined
   const editionText = `Edição ${editionLabel(item.edition)}`
+
+  // Tempo real (§7 "a interface informa a alteração", §8): o selo "Preço alterado"/"Indisponível" e o preço novo
+  // aparecem sem anúncio; a frase vai para a região `aria-live` única do app
+  const shown = useRef<LineSnapshot>({ unitPrice, issue })
+  useEffect(() => {
+    const next: LineSnapshot = { unitPrice, issue }
+    const message = name ? lineChangeAnnouncement(name, shown.current, next) : undefined
+    shown.current = next
+    if (message) announce(message)
+  }, [unitPrice, issue, name])
 
   return (
     <li

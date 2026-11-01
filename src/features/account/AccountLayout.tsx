@@ -76,7 +76,7 @@ function AccountMobileNav({ active, onLogout, loggingOut, className }: AccountMo
                   to={to}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'text-body focus-visible:ring-ring/50 flex h-9 items-center rounded-md px-4 outline-none transition-colors focus-visible:ring-3',
+                    'text-body focus-visible:ring-ring flex h-9 items-center rounded-md px-4 outline-none transition-colors focus-visible:ring-3',
                     isActive
                       ? 'bg-background text-foreground font-medium shadow-sm'
                       : 'text-muted-foreground hover:text-foreground',

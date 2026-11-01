@@ -279,7 +279,8 @@ describe('CheckoutPage', () => {
     renderPage()
     await connectAndWaitForConfirm()
     await confirmThroughReview()
-    await screen.findByText(/Os valores mudaram/)
+    // O aviso visível e a região role=status (sempre montada, MYK-1113) têm o mesmo texto: confere o anúncio
+    await screen.findByText(/Os valores mudaram/, { selector: '[role="status"]' })
     expect(orderCalls()).toHaveLength(0)
     const dialog = await openReview()
     expect(within(dialog).getAllByText('0.5 ETH').length).toBeGreaterThan(0)

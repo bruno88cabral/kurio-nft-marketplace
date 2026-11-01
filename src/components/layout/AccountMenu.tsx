@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useRef } from 'react'
 import { ChevronDown, LogOut, UserRound, Wallet } from 'lucide-react'
 import { useSession } from '@/auth/useSession'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { focusMainContent, useSignOut } from '@/features/account/useSignOut'
+import { useSignOut } from '@/features/account/useSignOut'
+import { focusMainContent } from './routeFocus'
 import { cn } from '@/lib/utils'
 import { SessionLink } from './SessionLink'
 
@@ -28,6 +30,8 @@ interface AccountMenuProps {
 export function AccountMenu({ className, visitorClassName, loadingClassName }: AccountMenuProps) {
   const { account, isAuthenticated } = useSession()
   const { signOut, pending } = useSignOut()
+  // Perfil ou Carteiras escolhidos: a tela muda e o foco vai para o conteúdo (§8), não de volta ao gatilho
+  const navigating = useRef(false)
 
   if (!isAuthenticated || !account) {
     return <SessionLink className={visitorClassName ?? className} loadingClassName={loadingClassName} />
@@ -48,7 +52,8 @@ export function AccountMenu({ className, visitorClassName, loadingClassName }: A
         onCloseAutoFocus={(event) => {
           // Saindo, o menu desmonta junto com o gatilho (o foco cairia no `<body>`); o Radix chama
           // isto depois do unmount, quando ele já não prende o foco
-          if (!pending) return
+          if (!pending && !navigating.current) return
+          navigating.current = false
           event.preventDefault()
           focusMainContent()
         }}
@@ -58,13 +63,13 @@ export function AccountMenu({ className, visitorClassName, loadingClassName }: A
           <span className="text-muted-foreground truncate text-xs font-normal">{account.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild onSelect={() => (navigating.current = true)}>
           <Link to="/profile">
             <UserRound aria-hidden />
             Perfil
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild onSelect={() => (navigating.current = true)}>
           <Link to="/wallets">
             <Wallet aria-hidden />
             Carteiras

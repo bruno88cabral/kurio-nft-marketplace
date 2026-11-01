@@ -38,7 +38,7 @@ export function FavoriteButton({
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        'focus-visible:ring-ring/50 focus-visible:border-ring inline-flex items-center justify-center gap-2 border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50',
+        'focus-visible:ring-ring focus-visible:border-ring inline-flex items-center justify-center gap-2 border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-50',
         variant === 'overlay' && 'bg-background/70 border-border-soft size-7 rounded-full backdrop-blur-sm hover:bg-background',
         variant === 'round' && 'bg-card border-border-soft hover:bg-muted text-text-accent size-11 rounded-full',
         variant === 'default' && 'border-primary text-text-accent hover:bg-muted h-10 rounded-md px-4 text-sm font-medium',
