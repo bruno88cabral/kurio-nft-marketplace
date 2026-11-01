@@ -30,7 +30,7 @@ const WALLET: Wallet = { id: 'w1', address: '0x1234567890abcdef1234567890abcdef1
 
 describe('WalletList: callbacks dos diálogos', () => {
   it('abrir pelo próprio diálogo marca o tipo; confirmar sem alvo não remove; fechar sem alvo foca a lista', () => {
-    renderWithProviders(<WalletList accountId="user-ana" wallets={[WALLET]} />)
+    renderWithProviders(<WalletList accountId="user-ana" wallets={[WALLET]} form={null} />)
     fireEvent.click(screen.getByRole('button', { name: 'abrir rename' }))
     expect(screen.getByText('rename true')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'abrir remove' }))

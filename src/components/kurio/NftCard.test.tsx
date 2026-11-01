@@ -12,11 +12,11 @@ vi.mock('@tanstack/react-router', async () => (await import('@/test/routerMock')
 const SOLD_OUT = [{ kind: '1/1' as const, available: 0, total: 1 }]
 
 describe('NftCard', () => {
-  it('link para o detalhe, coleção, nome e preço', () => {
+  it('link para o detalhe, nome e preço (sem eyebrow da coleção)', () => {
     renderWithProviders(<NftCard nft={makeNft(1)} />)
     const link = screen.getByRole('link')
     expect(link.getAttribute('href')).toBe('/nfts/nft-001')
-    expect(screen.getByText('Coleção A')).toBeTruthy()
+    expect(screen.queryByText('Coleção A')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Obra 1' })).toBeTruthy()
     expect(link.textContent).toContain('0.35 ETH')
     expect(screen.queryByText('Esgotado')).toBeNull()
@@ -51,7 +51,7 @@ describe('NftCard', () => {
 
   it('favorito no carrossel usa outra posição', () => {
     renderWithProviders(<NftCard nft={makeNft(1)} onFavoriteToggle={() => {}} size="carousel" />)
-    expect(screen.getByRole('button', { name: /Favoritar/ }).className).toContain('top-4')
+    expect(screen.getByRole('button', { name: /Favoritar/ }).className).toContain('top-5')
   })
 })
 

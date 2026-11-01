@@ -18,7 +18,7 @@ vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMoc
 const ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
 const field = (label: string) => screen.getByLabelText<HTMLInputElement>(new RegExp(`^${label}`))
 const type = (label: string, value: string) => fireEvent.change(field(label), { target: { value } })
-const submit = () => fireEvent.click(screen.getByRole('button', { name: /^Adicionar carteira|^Adicionando/ }))
+const submit = () => fireEvent.click(screen.getByRole('button', { name: /^Salvar carteira|^Salvando/ }))
 const pickNetwork = async (name: string) => {
   fireEvent.pointerDown(screen.getByRole('combobox'), { button: 0, ctrlKey: false, pointerType: 'mouse' })
   fireEvent.click(screen.getByRole('option', { name }))
@@ -32,13 +32,13 @@ beforeEach(() => {
 })
 
 describe('WalletForm', () => {
-  it('endereço inválido e rede vazia mostram erro, focam o endereço e não enviam', () => {
+  it('endereço inválido e rede vazia mostram erro, focam a rede (primeira na ordem visual) e não enviam', () => {
     renderWithProviders(<WalletForm accountId="user-ana" />)
     type('Endereço', '0x123')
     submit()
     expect(screen.getByText('Endereço inválido. Use 0x seguido de 40 hexadecimais.')).toBeTruthy()
     expect(screen.getByText('Selecione a rede.')).toBeTruthy()
-    expect(document.activeElement).toBe(field('Endereço'))
+    expect(document.activeElement).toBe(screen.getByRole('combobox'))
     expect(createWallet).not.toHaveBeenCalled()
   })
 
@@ -48,6 +48,15 @@ describe('WalletForm', () => {
     expect(screen.getByText(/^41 de 40 caracteres/)).toBeTruthy()
     submit()
     expect(screen.getByText('Use até 40 caracteres.')).toBeTruthy()
+  })
+
+  it('erro só no endereço foca o endereço', async () => {
+    renderWithProviders(<WalletForm accountId="user-ana" />)
+    await pickNetwork('Ethereum')
+    type('Endereço', '0x123')
+    submit()
+    expect(document.activeElement).toBe(field('Endereço'))
+    expect(createWallet).not.toHaveBeenCalled()
   })
 
   it('erro só na rede foca o seletor', () => {
@@ -70,7 +79,7 @@ describe('WalletForm', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: walletKeys.list('user-ana') })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: profileKeys.detail('user-ana') })
     expect(field('Endereço').value).toBe('')
-    expect(screen.getByRole('combobox').textContent).toContain('Selecione a rede')
+    expect(screen.getByRole('combobox').textContent).toContain('Selecione uma rede')
   })
 
   it('com apelido, envia o apelido sem espaços', async () => {
@@ -83,13 +92,13 @@ describe('WalletForm', () => {
     await waitFor(() => expect(createWallet).toHaveBeenCalledWith({ address: ADDRESS, network: 'ethereum', label: 'Minha' }))
   })
 
-  it('durante o envio mostra "Adicionando…" desabilitado', async () => {
+  it('durante o envio mostra "Salvando…" desabilitado', async () => {
     createWallet.mockReturnValue(new Promise(() => undefined))
     renderWithProviders(<WalletForm accountId="user-ana" />)
     type('Endereço', ADDRESS)
     await pickNetwork('Ethereum')
     submit()
-    const button = await screen.findByRole<HTMLButtonElement>('button', { name: /Adicionando/ })
+    const button = await screen.findByRole<HTMLButtonElement>('button', { name: /Salvando/ })
     expect(button.disabled).toBe(true)
     expect(button.getAttribute('aria-busy')).toBe('true')
   })

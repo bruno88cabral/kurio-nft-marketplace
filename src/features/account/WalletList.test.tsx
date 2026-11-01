@@ -5,7 +5,7 @@ import { walletKeys } from '@/api/wallets'
 import { ApiError, type Wallet } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
 import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
-import { WalletList, WalletListSkeleton } from './WalletList'
+import { WalletList } from './WalletList'
 import { WALLET_MESSAGES } from './validation'
 
 const { updateWallet, deleteWallet, success, error } = vi.hoisted(() => ({
@@ -34,7 +34,7 @@ const choose = (label: string, item: string) => {
 const live = () => document.querySelector('[aria-live="polite"]')?.textContent
 
 function setup(wallets: Wallet[] = [RESERVE, PRIMARY]) {
-  return renderWithProviders(<WalletList accountId="user-ana" wallets={wallets} />)
+  return renderWithProviders(<WalletList accountId="user-ana" wallets={wallets} form={null} />)
 }
 
 beforeEach(() => {
@@ -73,9 +73,29 @@ describe('WalletList: exibição', () => {
     expect(screen.queryByText('Você ainda não adicionou uma carteira secundária.')).toBeNull()
   })
 
-  it('skeleton é decorativo', () => {
-    const { container } = renderWithProviders(<WalletListSkeleton />)
-    expect(container.firstElementChild?.getAttribute('aria-hidden')).toBe('true')
+  it('carregando: skeletons decorativos nas duas seções, com o formulário', () => {
+    const { container } = renderWithProviders(<WalletList accountId="user-ana" wallets={undefined} form={<p>formulário</p>} />)
+    expect(container.querySelectorAll('[data-slot="skeleton"][aria-hidden="true"]')).toHaveLength(2)
+    expect(screen.getByRole('heading', { name: 'Carteira secundária' })).toBeTruthy()
+    expect(screen.getByText('formulário')).toBeTruthy()
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('erro de carregamento: mostra o erro no lugar da principal e esconde a secundária', () => {
+    renderWithProviders(<WalletList accountId="user-ana" wallets={undefined} error={<p>falhou</p>} form={null} />)
+    expect(screen.getByText('falhou')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Carteira secundária' })).toBeNull()
+  })
+
+  it('"Adicionar" (principal e secundária) leva o foco ao primeiro campo do formulário', () => {
+    renderWithProviders(
+      <WalletList accountId="user-ana" wallets={[PRIMARY]} form={<input aria-label="primeiro campo" />} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar carteira' }))
+    expect(document.activeElement).toBe(screen.getByLabelText('primeiro campo'))
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar carteira secundária' }))
+    expect(document.activeElement).toBe(screen.getByLabelText('primeiro campo'))
   })
 })
 

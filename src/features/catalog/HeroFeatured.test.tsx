@@ -17,8 +17,11 @@ describe('HeroFeatured', () => {
     api.get.mockImplementation(() => new Promise(() => {}))
     const { container } = renderWithProviders(<HeroFeatured />)
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Seja dono do futuro')
-    expect(screen.getByRole('link', { name: /Explorar/ }).getAttribute('href')).toBe('/#catalogo')
-    expect(container.querySelector('[aria-hidden] [data-slot="skeleton"]')).toBeTruthy()
+    // Dois CTAs "Explorar" (texto no mobile, botão no desktop), ambos para o catálogo mantendo a URL
+    const ctas = screen.getAllByRole('link', { name: /Explorar/ })
+    expect(ctas).toHaveLength(2)
+    for (const cta of ctas) expect(cta.getAttribute('href')).toBe('/#catalogo')
+    expect(container.querySelector('[data-slot="skeleton"][aria-hidden="true"]')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Destaques' })).toBeNull()
   })
 

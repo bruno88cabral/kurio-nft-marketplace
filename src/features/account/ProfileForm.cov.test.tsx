@@ -41,15 +41,6 @@ describe('ProfileForm', () => {
     expect(screen.getByText('6 de 60 caracteres')).toBeTruthy()
   })
 
-  it('nome vazio mostra o erro, foca o campo e não envia', () => {
-    renderWithProviders(<ProfileForm profile={PROFILE} email="ana@kurio.test" />)
-    type('   ')
-    fireEvent.click(save())
-    expect(screen.getByText('Informe um nome de exibição.')).toBeTruthy()
-    expect(document.activeElement).toBe(name())
-    expect(updateProfile).not.toHaveBeenCalled()
-  })
-
   it('sucesso: envia o nome sem espaços, grava no cache, avisa e fica sem alterações', async () => {
     const next: Profile = { ...PROFILE, displayName: 'Ana Lima' }
     updateProfile.mockResolvedValue(next)
@@ -71,6 +62,9 @@ describe('ProfileForm', () => {
     expect(save().disabled).toBe(true)
     expect(save().getAttribute('aria-busy')).toBe('true')
     expect(name().readOnly).toBe(true)
+    // Enter no campo com o envio em curso (o botão desabilitado não segura o submit do formulário)
+    fireEvent.submit(name().closest('form')!)
+    expect(updateProfile).toHaveBeenCalledTimes(1)
   })
 
   it('422 do servidor volta no campo; falha genérica vira alerta; sem toast', async () => {

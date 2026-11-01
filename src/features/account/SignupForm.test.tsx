@@ -62,7 +62,7 @@ describe('SignupForm', () => {
   it('sem conflito não mostra o link de entrar com o e-mail', () => {
     renderWithProviders(<SignupForm redirect={undefined} />)
     expect(screen.queryByRole('link', { name: 'Entrar com este e-mail' })).toBeNull()
-    expect(screen.getByRole('link', { name: 'Entrar' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: 'Entre' }).getAttribute('href')).toBe('/login')
   })
 
   it('sucesso: envia sem espaços, estabelece a sessão e navega ao redirect', async () => {

@@ -18,6 +18,7 @@ vi.mock('@/features/account/SignupForm', () => ({
 
 const options = Route.options as unknown as {
   head: () => { meta: { title: string }[] }
+  staticData: { hideMobileChrome?: boolean }
   validateSearch: (s: Record<string, unknown>) => { redirect?: string }
   beforeLoad: (ctx: { search: { redirect?: string } }) => void
   component: () => React.ReactNode
@@ -29,7 +30,8 @@ afterEach(() => {
 })
 
 describe('rota signup', () => {
-  it('head define o título', () => {
+  it('head define o título e a rota esconde o chrome do mobile', () => {
+    expect(options.staticData).toEqual({ hideMobileChrome: true })
     expect(options.head().meta).toEqual([{ title: 'Criar conta · Kurio' }])
   })
 
@@ -61,8 +63,9 @@ describe('rota signup', () => {
     vi.spyOn(Route, 'useSearch').mockReturnValue({ redirect: '/cart' })
     const Component = options.component
     renderWithProviders(<Component />)
-    expect(await screen.findByRole('heading', { name: 'Criar conta' })).toBeTruthy()
-    expect(screen.getByLabelText('dialogo').getAttribute('data-redirect')).toBe('/cart')
+    const dialog = await screen.findByLabelText('dialogo')
+    expect(dialog.getAttribute('data-mode')).toBe('signup')
+    expect(dialog.getAttribute('data-redirect')).toBe('/cart')
     expect(screen.getByTestId('form').textContent).toBe('/cart')
   })
 })

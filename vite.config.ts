@@ -45,7 +45,7 @@ export default defineConfig({
         functions: 77,
         branches: 78,
         // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
-        'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/account/{LoginForm,SignupForm,AuthDialog,AuthSwitchLink,SocialLogin,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/layout/{AccountMenu,SessionLink}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/{login,signup,_authenticated}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
@@ -56,12 +56,13 @@ export default defineConfig({
         'src/components/kurio/{NftCard,StateMessage,PriceTag}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/index.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         // COV-8: fluxo "Conta: perfil, senha, avatar e carteiras" travado em 100% (WalletForm e avatar: ver abaixo)
-        'src/features/account/{ProfileForm,PasswordForm,AvatarField,WalletList,WalletDialogs,AccountLayout,AccountPanel}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
-        'src/features/account/useAccountForm.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/account/{ProfileForm,PasswordForm,AvatarField,WalletList,WalletDialogs,AccountLayout}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/account/{useAccountForm,usePasswordForm}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/kurio/{WalletCard,AccountSidebar,FormField}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/_authenticated/{profile,wallets}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         // COV-10a: fluxo "Detalhe do NFT e favoritos" travado em 100%
-        'src/features/nft-detail/*.{ts,tsx}': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/nft-detail/{MobileDetailChrome,NftDetailSkeleton,NftDetails,NftGallery,NftInfo,PurchasePanel}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/nft-detail/{edition,layout,usePurchaseSelection}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/favorites/*.{ts,tsx}': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/cart/AddToCartButton.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/kurio/{FavoriteButton,EditionChips,QuantityStepper}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
@@ -70,8 +71,10 @@ export default defineConfig({
         'src/features/account/WalletForm.tsx': { lines: 100, statements: 94, functions: 100, branches: 90 },
         // avatar.ts: `Array.from(word)[0] ?? ''` em initials é inalcançável (o filter(Boolean) garante palavra não vazia)
         'src/features/account/avatar.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
-        // HeroFeatured: `if (!current) return null` em FeaturedCarousel é inalcançável (o pai já trata lista vazia)
+        // HeroFeatured: `if (!current) return null` em FeaturedSlide é inalcançável (o pai já trata lista vazia)
         'src/features/catalog/HeroFeatured.tsx': { lines: 100, statements: 95, functions: 100, branches: 94 },
+        // MoreFromCollection: em goTo, `if (!el) return` e `pages <= 1 ? 0` são inalcançáveis (os dots só existem com o trilho montado e mais de uma página)
+        'src/features/nft-detail/MoreFromCollection.tsx': { lines: 100, statements: 98, functions: 100, branches: 94 },
       },
     },
   },

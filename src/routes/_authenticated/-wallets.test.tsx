@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { queryOptions } from '@tanstack/react-query'
 import { act, fireEvent, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Wallet } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
@@ -18,8 +19,13 @@ vi.mock('@/api/wallets', () => ({
   walletsQuery: (accountId: string) => queryOptions({ queryKey: ['wallets', accountId], queryFn: fetchWallets }),
 }))
 vi.mock('@/features/account/WalletList', () => ({
-  WalletList: ({ accountId, wallets }: { accountId: string; wallets: Wallet[] }) => <p>lista de {accountId}: {wallets.length}</p>,
-  WalletListSkeleton: () => <p>skeleton das carteiras</p>,
+  WalletList: ({ accountId, wallets, error, form }: { accountId: string; wallets?: Wallet[]; error?: ReactNode; form: ReactNode }) => (
+    <div>
+      <p>{wallets ? `lista de ${accountId}: ${wallets.length}` : 'carregando as carteiras'}</p>
+      {error}
+      {form}
+    </div>
+  ),
 }))
 vi.mock('@/features/account/WalletForm', () => ({ WalletForm: ({ accountId }: { accountId: string }) => <p>form de {accountId}</p> }))
 
@@ -36,13 +42,12 @@ describe('rota /wallets', () => {
     expect(options.head().meta).toEqual([{ title: 'Carteiras · Kurio' }])
   })
 
-  it('carregando: skeleton da lista e o formulário de adicionar', () => {
+  it('carregando: h1 só para o leitor de tela, a lista sem dados e o formulário de adicionar', () => {
     fetchWallets.mockReturnValue(new Promise(() => undefined))
     const Component = options.component
     renderWithProviders(<Component />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Carteiras' })).toBeTruthy()
-    expect(screen.getByText('skeleton das carteiras')).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Adicionar carteira' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Carteiras' }).className).toContain('sr-only')
+    expect(screen.getByText('carregando as carteiras')).toBeTruthy()
     expect(screen.getByText('form de user-ana')).toBeTruthy()
   })
 
@@ -51,7 +56,7 @@ describe('rota /wallets', () => {
     const Component = options.component
     renderWithProviders(<Component />)
     expect(await screen.findByText('lista de user-ana: 1')).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Suas carteiras' })).toBeTruthy()
+    expect(screen.queryByText('Não foi possível carregar suas carteiras.')).toBeNull()
   })
 
   it('erro: mostra o estado de erro e "Tentar novamente" refaz a busca', async () => {
@@ -68,8 +73,9 @@ describe('rota /wallets', () => {
     useSession.mockReturnValue(sessionOf(null))
     const Component = options.component
     renderWithProviders(<Component />)
-    expect(screen.getByText('skeleton das carteiras')).toBeTruthy()
-    expect(screen.queryByRole('region', { name: 'Adicionar carteira' })).toBeNull()
+    expect(screen.getByRole('heading', { level: 1, name: 'Carteiras' })).toBeTruthy()
+    expect(screen.queryByText('carregando as carteiras')).toBeNull()
+    expect(screen.queryByText('form de user-ana')).toBeNull()
     await act(async () => {}) // deixa efeitos e microtarefas assentarem antes da asserção negativa
     expect(fetchWallets).not.toHaveBeenCalled()
   })

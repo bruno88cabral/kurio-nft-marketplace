@@ -9,18 +9,26 @@ import { createTestQueryClient } from '@/test/render'
 import { navigateSpy, setLocation } from '@/test/routerMock'
 import { ANA, sessionOf } from '@/test/session'
 import { bumpSession } from '@/test/sessionGuardMock'
-import { FAVORITE_FAILURE_MESSAGE, useToggleFavorite } from './useToggleFavorite'
+import {
+  FAVORITE_ADDED_MESSAGE,
+  FAVORITE_FAILURE_MESSAGE,
+  FAVORITE_REMOVED_MESSAGE,
+  useToggleFavorite,
+} from './useToggleFavorite'
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   put: vi.fn(),
   del: vi.fn(),
   error: vi.fn(),
+  announce: vi.fn(),
   session: ((): { current: unknown } => ({ current: null }))(),
 }))
 vi.mock('@/api/client', () => ({ apiClient: { get: mocks.get, put: mocks.put, delete: mocks.del } }))
 vi.mock('@/auth/useSession', () => ({ useSession: () => mocks.session.current }))
 vi.mock('sonner', () => ({ toast: { error: mocks.error } }))
+// O resultado vai para a região aria-live única do app (LiveAnnouncer): aqui só a chamada
+vi.mock('@/lib/announcer', () => ({ announce: mocks.announce }))
 vi.mock('@tanstack/react-router', async () => (await import('@/test/routerMock')).routerMock())
 vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
@@ -44,7 +52,7 @@ function deferred() {
 }
 
 beforeEach(() => {
-  for (const m of [mocks.get, mocks.put, mocks.del, mocks.error]) m.mockReset()
+  for (const m of [mocks.get, mocks.put, mocks.del, mocks.error, mocks.announce]) m.mockReset()
   mocks.put.mockResolvedValue({})
   mocks.del.mockResolvedValue({})
   mocks.session.current = sessionOf(ANA)
@@ -84,14 +92,14 @@ describe('useToggleFavorite', () => {
     const { result, queryClient } = setup()
     await waitFor(() => expect(result.current.pending).toBe(false))
     expect(result.current.favorited).toBe(false)
-    expect(result.current.announcement).toBe('')
     const gate = deferred()
     mocks.put.mockReturnValue(gate.promise)
     act(() => result.current.toggle())
     await waitFor(() => expect(result.current.favorited).toBe(true))
     expect(queryClient.getQueryData<Favorite[]>(favoriteKeys.list(ANA.id))?.map((f) => f.nftId)).toEqual(['nft-9', 'nft-1'])
+    expect(mocks.announce).not.toHaveBeenCalled()
     gate.resolve()
-    await waitFor(() => expect(result.current.announcement).toBe('Adicionado aos favoritos.'))
+    await waitFor(() => expect(mocks.announce).toHaveBeenCalledWith(FAVORITE_ADDED_MESSAGE))
     expect(mocks.put).toHaveBeenCalledWith('/favorites/nft-1')
   })
 
@@ -101,12 +109,12 @@ describe('useToggleFavorite', () => {
     await waitFor(() => expect(result.current.favorited).toBe(true))
     listOf([])
     act(() => result.current.toggle())
-    await waitFor(() => expect(result.current.announcement).toBe('Removido dos favoritos.'))
+    await waitFor(() => expect(mocks.announce).toHaveBeenCalledWith(FAVORITE_REMOVED_MESSAGE))
     expect(mocks.del).toHaveBeenCalledWith('/favorites/nft-1')
     await waitFor(() => expect(result.current.favorited).toBe(false))
   })
 
-  it('falha: desfaz o otimista, mostra o toast e limpa o anúncio', async () => {
+  it('falha: desfaz o otimista e mostra o toast, sem anúncio', async () => {
     listOf([])
     const { result, queryClient } = setup()
     await waitFor(() => expect(result.current.pending).toBe(false))
@@ -117,7 +125,7 @@ describe('useToggleFavorite', () => {
     gate.reject(new ApiError({ code: 'transient', message: 'x' }, 500))
     await waitFor(() => expect(mocks.error).toHaveBeenCalledWith(FAVORITE_FAILURE_MESSAGE))
     await waitFor(() => expect(result.current.favorited).toBe(false))
-    expect(result.current.announcement).toBe('')
+    expect(mocks.announce).not.toHaveBeenCalled()
     expect(queryClient.isMutating()).toBe(0)
   })
 
@@ -144,7 +152,7 @@ describe('useToggleFavorite', () => {
     gate.resolve()
     await waitFor(() => expect(queryClient.isMutating()).toBe(0))
     expect(mocks.get).toHaveBeenCalledTimes(1) // sem invalidação: a lista é da sessão anterior
-    expect(result.current.announcement).toBe('')
+    expect(mocks.announce).not.toHaveBeenCalled()
   })
 
   it('sessão trocada com a request em voo: falha não anuncia nem mostra toast', async () => {
@@ -160,6 +168,6 @@ describe('useToggleFavorite', () => {
     await waitFor(() => expect(queryClient.isMutating()).toBe(0))
     expect(mocks.get).toHaveBeenCalledTimes(1) // sem invalidação: a lista é da sessão anterior
     expect(mocks.error).not.toHaveBeenCalled()
-    expect(result.current.announcement).toBe('')
+    expect(mocks.announce).not.toHaveBeenCalled()
   })
 })

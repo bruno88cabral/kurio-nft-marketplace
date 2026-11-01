@@ -3,7 +3,6 @@ import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { AccountLayout } from './AccountLayout'
-import { AccountPanel } from './AccountPanel'
 
 const { useSignOut, signOut } = vi.hoisted(() => ({ useSignOut: vi.fn(), signOut: vi.fn() }))
 
@@ -16,24 +15,24 @@ beforeEach(() => {
 })
 
 describe('AccountLayout', () => {
-  it('mostra o título (único h1), a descrição e o conteúdo', () => {
+  it('mostra o título (único h1) e o conteúdo', () => {
     renderWithProviders(
-      <AccountLayout active="profile" title="Perfil" description="Seus dados.">
+      <AccountLayout active="profile" title="Perfil">
         <p>conteudo</p>
       </AccountLayout>,
     )
-    expect(screen.getByRole('heading', { level: 1, name: 'Perfil' })).toBeTruthy()
-    expect(screen.getByText('Seus dados.')).toBeTruthy()
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Perfil' })
+    expect(h1.className).not.toContain('sr-only')
     expect(screen.getByText('conteudo')).toBeTruthy()
   })
 
-  it('sem descrição não renderiza o parágrafo', () => {
-    const { container } = renderWithProviders(
-      <AccountLayout active="wallets" title="Carteiras">
+  it('hideTitle deixa o h1 só para o leitor de tela', () => {
+    renderWithProviders(
+      <AccountLayout active="wallets" title="Carteiras" hideTitle>
         <p>x</p>
       </AccountLayout>,
     )
-    expect(container.querySelector('header p')).toBeNull()
+    expect(screen.getByRole('heading', { level: 1, name: 'Carteiras' }).className).toContain('sr-only')
   })
 
   it('navegação: sidebar e abas apontam para Perfil e Carteiras, com a ativa marcada', () => {
@@ -42,11 +41,11 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    const navs = screen.getAllByRole('navigation', { name: 'Conta' })
-    expect(navs).toHaveLength(2)
-    const tabs = screen.getByRole('link', { name: 'Perfil' })
-    expect(tabs.getAttribute('href')).toBe('/profile')
-    expect(tabs.getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Meu perfil' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Conta' })).toBeTruthy()
+    const tab = screen.getByRole('link', { name: 'Perfil' })
+    expect(tab.getAttribute('href')).toBe('/profile')
+    expect(tab.getAttribute('aria-current')).toBeNull()
     expect(screen.getAllByRole('link', { name: 'Carteiras' }).map((l) => l.getAttribute('aria-current'))).toEqual([
       'page',
       'page',
@@ -59,7 +58,9 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    for (const button of screen.getAllByRole('button', { name: 'Sair' })) fireEvent.click(button)
+    const buttons = screen.getAllByRole('button', { name: 'Sair' })
+    expect(buttons).toHaveLength(2)
+    for (const button of buttons) fireEvent.click(button)
     expect(signOut).toHaveBeenCalledTimes(2)
   })
 
@@ -70,31 +71,11 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    const saindo = screen.getByRole<HTMLButtonElement>('button', { name: 'Saindo…' })
-    expect(saindo.disabled).toBe(true)
-    expect(saindo.getAttribute('aria-busy')).toBe('true')
-    expect((screen.getByRole<HTMLButtonElement>('button', { name: 'Sair' })).disabled).toBe(true)
-  })
-})
-
-describe('AccountPanel', () => {
-  it('seção nomeada pelo h2, com descrição opcional', () => {
-    renderWithProviders(
-      <AccountPanel title="Dados do perfil" description="Ajuda" className="x">
-        <p>filho</p>
-      </AccountPanel>,
-    )
-    const section = screen.getByRole('region', { name: 'Dados do perfil' })
-    expect(section.textContent).toContain('Ajuda')
-    expect(screen.getByText('filho')).toBeTruthy()
-  })
-
-  it('sem descrição só o título', () => {
-    renderWithProviders(
-      <AccountPanel title="Alterar senha">
-        <p>filho</p>
-      </AccountPanel>,
-    )
-    expect(screen.getByRole('region', { name: 'Alterar senha' }).querySelector('header p')).toBeNull()
+    const saindo = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Saindo…' })
+    expect(saindo).toHaveLength(2)
+    for (const b of saindo) {
+      expect(b.disabled).toBe(true)
+      expect(b.getAttribute('aria-busy')).toBe('true')
+    }
   })
 })

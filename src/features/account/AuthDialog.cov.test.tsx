@@ -21,9 +21,9 @@ vi.mock('@/features/catalog/MintJournal', () => ({ MintJournal: () => <p>journal
 const PROTEGIDA = [[{ id: '__root__' }, { id: '/_authenticated' }]]
 const PUBLICA = [[{ id: '__root__' }]]
 
-function open(redirect?: string) {
+function open(redirect?: string, mode: 'login' | 'signup' = 'login') {
   return renderWithProviders(
-    <AuthDialog title="Entrar" description="Acesse sua conta." redirect={redirect}>
+    <AuthDialog mode={mode} redirect={redirect}>
       <input aria-label="campo" />
     </AuthDialog>,
   )
@@ -38,7 +38,7 @@ describe('AuthDialog', () => {
   it('abre como diálogo com título, descrição, conteúdo e o fundo do Início', () => {
     open()
     const dialog = screen.getByRole('dialog', { name: 'Entrar' })
-    expect(dialog.textContent).toContain('Acesse sua conta.')
+    expect(dialog.textContent).toContain('Entre para gerenciar sua carteira, coleção e perfil de criador.')
     expect(screen.getByRole('heading', { level: 1, name: 'Entrar' })).toBeTruthy()
     expect(screen.getByLabelText('campo')).toBeTruthy()
     expect(document.body.textContent).toContain('hero')
@@ -72,12 +72,6 @@ describe('AuthDialog', () => {
     open('/profile')
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(navigateSpy).toHaveBeenCalledWith({ href: '/profile', replace: true })
-  })
-
-  it('o botão de fechar também navega', () => {
-    open()
-    fireEvent.click(screen.getByRole('button', { name: /fechar/i }))
-    expect(navigateSpy).toHaveBeenCalledWith({ href: '/', replace: true })
   })
 })
 

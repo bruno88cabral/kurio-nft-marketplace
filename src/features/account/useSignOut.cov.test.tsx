@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // Só pelo efeito colateral: registra o cleanup e a limpeza de storage do afterEach
 import '@/test/render'
 import { navigateSpy } from '@/test/routerMock'
-import { focusMainContent, SIGNED_OUT_MESSAGE, useSignOut } from './useSignOut'
+import { SIGNED_OUT_MESSAGE, useSignOut } from './useSignOut'
 
 const { endSession, success } = vi.hoisted(() => ({ endSession: vi.fn(), success: vi.fn() }))
 
@@ -24,15 +24,6 @@ beforeEach(() => {
   endSession.mockReset().mockResolvedValue(undefined)
   success.mockReset()
   document.body.innerHTML = ''
-})
-
-describe('focusMainContent', () => {
-  it('foca o main quando existe e não quebra quando não existe', () => {
-    expect(() => focusMainContent()).not.toThrow()
-    const main = addMain()
-    focusMainContent()
-    expect(document.activeElement).toBe(main)
-  })
 })
 
 describe('useSignOut', () => {

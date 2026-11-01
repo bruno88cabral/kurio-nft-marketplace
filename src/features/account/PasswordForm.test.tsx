@@ -3,7 +3,8 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
-import { PasswordForm } from './PasswordForm'
+import { PasswordFields } from './PasswordForm'
+import { usePasswordForm } from './usePasswordForm'
 import { PASSWORD_CHANGED_MESSAGE } from './validation'
 
 const { changePassword, success } = vi.hoisted(() => ({ changePassword: vi.fn(), success: vi.fn() }))
@@ -20,12 +21,33 @@ const fill = (current: string, next: string, confirm: string) => {
   type('Confirmar nova senha', confirm)
 }
 
+// O envio é do "Salvar" único do Perfil (ProfileForm); aqui um formulário mínimo liga os campos ao hook
+function PasswordForm({ email }: { email: string }) {
+  const form = usePasswordForm()
+  return (
+    <form noValidate onSubmit={form.onSubmit}>
+      <PasswordFields form={form} email={email} />
+      <button type="submit" disabled={form.submitting} aria-busy={form.submitting || undefined}>
+        {form.submitting ? 'Alterando…' : 'Alterar senha'}
+      </button>
+      <output data-testid="touched">{String(form.touched)}</output>
+    </form>
+  )
+}
+
 beforeEach(() => {
   changePassword.mockReset()
   success.mockReset()
 })
 
-describe('PasswordForm', () => {
+describe('PasswordFields + usePasswordForm', () => {
+  it('touched só com algum campo preenchido', () => {
+    renderWithProviders(<PasswordForm email="ana@kurio.test" />)
+    expect(screen.getByTestId('touched').textContent).toBe('false')
+    type('Nova senha', 'x')
+    expect(screen.getByTestId('touched').textContent).toBe('true')
+  })
+
   it('envio vazio mostra os três erros, foca a senha atual e não chama a API', () => {
     renderWithProviders(<PasswordForm email="ana@kurio.test" />)
     submit()
@@ -74,7 +96,9 @@ describe('PasswordForm', () => {
     submit()
     const button = await screen.findByRole<HTMLButtonElement>('button', { name: /Alterando/ })
     expect(button.disabled).toBe(true)
-    expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(field('Senha atual').readOnly).toBe(true)
+    expect(field('Nova senha').readOnly).toBe(true)
+    expect(field('Confirmar nova senha').readOnly).toBe(true)
   })
 
   it('o e-mail oculto ajuda o gerenciador de senhas', () => {

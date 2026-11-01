@@ -17,7 +17,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@/api/client', () => ({ apiClient: api }))
 vi.mock('@/features/nft-detail/MobileDetailChrome', () => ({
-  MobileScreenHeader: ({ title }: { title: string }) => <p>header:{title}</p>,
+  MobileDetailTopBar: ({ nft }: { nft: Nft }) => <p>topo:{nft.name}</p>,
+  MobileBackButton: () => <button type="button">Voltar</button>,
   MobilePurchaseBar: ({ selection }: { selection: { edition?: { kind: string } } }) => <p>barra:{selection.edition?.kind}</p>,
 }))
 vi.mock('@/features/nft-detail/MoreFromCollection', () => ({ MoreFromCollection: () => <p>mais</p> }))
@@ -26,6 +27,7 @@ vi.mock('@/features/nft-detail/NftInfo', () => ({
   NftBreadcrumb: () => <p>trilha</p>,
   NftInfo: ({ nft }: { nft: Nft }) => <h1>{nft.name}</h1>,
   NftDescription: ({ description }: { description: string }) => <p>{description}</p>,
+  NftFacts: ({ nft }: { nft: Nft }) => <p>fatos:{nft.creator}</p>,
 }))
 vi.mock('@/features/nft-detail/PurchasePanel', () => ({
   PurchasePanel: ({ onEditionChange }: { onEditionChange: (k: string) => void }) => (
@@ -33,6 +35,7 @@ vi.mock('@/features/nft-detail/PurchasePanel', () => ({
       trocar edição
     </button>
   ),
+  ShareNft: () => <p>compartilhar</p>,
 }))
 
 const nft = makeNft(7, {
@@ -105,7 +108,7 @@ describe('rota /nfts/$nftId', () => {
     const Component = options.component
     renderWithProviders(<Component />)
     expect(await screen.findByRole('heading', { name: 'Obra 7' })).toBeTruthy()
-    for (const text of ['header:Obra 7', 'trilha', 'galeria', 'desc', 'mais', 'barra:1/10']) expect(screen.getByText(text)).toBeTruthy()
+    for (const text of ['topo:Obra 7', 'trilha', 'galeria', 'desc', `fatos:${nft.creator}`, 'compartilhar', 'mais', 'barra:1/10']) expect(screen.getByText(text)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'trocar edição' }))
     const arg = navigateSpy.mock.calls[0][0] as { search: (p: unknown) => unknown; replace: boolean; resetScroll: boolean }
     expect(arg.search({ edition: '1/10' })).toEqual({ edition: 'open' })
@@ -120,10 +123,15 @@ describe('rota /nfts/$nftId', () => {
     expect(await screen.findByText('barra:open')).toBeTruthy()
   })
 
-  it('pendingComponent é o skeleton do Detalhe', () => {
+  it('pendingComponent é o skeleton do Detalhe, com o "Voltar" do mobile', () => {
     const Pending = options.pendingComponent
     renderWithProviders(<Pending />)
     expect(screen.getByRole('status').textContent).toBe('Carregando NFT…')
+    expect(screen.getByRole('button', { name: 'Voltar' })).toBeTruthy()
+  })
+
+  it('staticData esconde o chrome do mobile (o Detalhe desenha o próprio)', () => {
+    expect((Route.options as unknown as { staticData: unknown }).staticData).toEqual({ hideMobileChrome: true })
   })
 
   it('notFoundComponent explica e leva de volta ao Início', () => {

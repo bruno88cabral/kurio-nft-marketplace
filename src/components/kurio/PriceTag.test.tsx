@@ -14,17 +14,24 @@ describe('PriceTag', () => {
     const tag = container.querySelector('[data-slot="price-tag"]')
     expect(tag?.getAttribute('aria-live')).toBeNull()
     expect(tag?.hasAttribute('data-changed')).toBe(false)
-    expect(container.querySelector('s')).toBeNull()
+    expect(screen.queryByText(/Preço anterior/)).toBeNull()
   })
 
-  it('mostra o preço anterior riscado quando é diferente', () => {
+  it('mostra o preço anterior (sem riscado) quando é diferente', () => {
     renderWithProviders(<PriceTag price={eth('0.35')} previousPrice={eth('0.5')} size="sm" />)
-    expect(screen.getByText(/Preço anterior/).closest('s')?.textContent).toContain('0.5 ETH')
+    const previous = screen.getByText(/Preço anterior/).parentElement
+    expect(previous?.textContent).toContain('0.5 ETH')
+    expect(previous?.closest('s')).toBeNull()
   })
 
   it('ignora o preço anterior igual', () => {
-    const { container } = renderWithProviders(<PriceTag price={eth('0.5')} previousPrice={eth('0.5')} size="lg" />)
-    expect(container.querySelector('s')).toBeNull()
+    renderWithProviders(<PriceTag price={eth('0.5')} previousPrice={eth('0.5')} size="lg" />)
+    expect(screen.queryByText(/Preço anterior/)).toBeNull()
+  })
+
+  it('tom accent: preço em laranja e negrito', () => {
+    renderWithProviders(<PriceTag price={eth('0.5')} tone="accent" />)
+    expect(screen.getByText(/Preço:/).parentElement?.className).toContain('text-text-accent')
   })
 
   it('alterado: "Subiu" quando o preço aumentou', () => {

@@ -52,6 +52,24 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Carteiras' }).getAttribute('href')).toBe('/wallets')
   })
 
+  it.each(['Perfil', 'Carteiras'])('escolher "%s" fecha o menu e leva o foco ao conteúdo, não ao gatilho', async (name) => {
+    renderWithProviders(<AccountMenu />)
+    const main = document.createElement('main')
+    main.id = 'conteudo'
+    main.tabIndex = -1
+    document.body.append(main)
+    const trigger = openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name }))
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    expect(document.activeElement).toBe(main)
+    expect(document.activeElement).not.toBe(trigger)
+    // A marca de navegação é consumida: o próximo Escape volta a devolver o foco ao gatilho
+    openMenu()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('Escape fecha o menu e devolve o foco ao gatilho', async () => {
     renderWithProviders(<AccountMenu />)
     const trigger = openMenu()

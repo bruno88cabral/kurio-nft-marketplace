@@ -2,12 +2,10 @@
 import type { ReactNode } from 'react'
 import { SESSION_STORAGE_KEY } from '@/auth/sessionStorage'
 
-/** Substitui o `AuthDialog` real (que traz o fundo do Início): só expõe título, descrição e `redirect`. */
-export function AuthDialogStub({ title, description, redirect, children }: { title: string; description: string; redirect?: string; children: ReactNode }) {
+/** Substitui o `AuthDialog` real (que traz o fundo do Início): só expõe o `mode` e o `redirect`. */
+export function AuthDialogStub({ mode, redirect, children }: { mode: 'login' | 'signup'; redirect?: string; children: ReactNode }) {
   return (
-    <section aria-label="dialogo" data-redirect={redirect ?? ''}>
-      <h1>{title}</h1>
-      <p>{description}</p>
+    <section aria-label="dialogo" data-mode={mode} data-redirect={redirect ?? ''}>
       {children}
     </section>
   )

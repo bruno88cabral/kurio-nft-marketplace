@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
 import { navigateSpy } from '@/test/routerMock'
-import { LoginForm, SocialLogin } from './LoginForm'
+import { LoginForm } from './LoginForm'
+import { SocialLogin } from './SocialLogin'
 
 const { login, establishSession } = vi.hoisted(() => ({ login: vi.fn(), establishSession: vi.fn() }))
 
@@ -80,23 +81,23 @@ describe('LoginForm', () => {
     await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith({ href: '/', replace: true }))
   })
 
-  it('o link "Criar conta" leva ao cadastro preservando o redirect', () => {
+  it('o link "Crie uma conta" leva ao cadastro preservando o redirect', () => {
     renderWithProviders(<LoginForm redirect="/cart" />)
-    expect(screen.getByRole('link', { name: 'Criar conta' }).getAttribute('href')).toBe('/signup?redirect=%2Fcart')
+    expect(screen.getByRole('link', { name: 'Crie uma conta' }).getAttribute('href')).toBe('/signup?redirect=%2Fcart')
   })
 
   it('"Esqueceu a senha?" e o login social são ações "em breve"', () => {
     renderWithProviders(<LoginForm redirect={undefined} />)
     expect(screen.getByRole('button', { name: /Esqueceu a senha/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Continuar com Google/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Continuar com Apple/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Continuar com Facebook/ })).toBeTruthy()
   })
 })
 
 describe('SocialLogin', () => {
   it('renderiza o separador e as duas opções', () => {
     renderWithProviders(<SocialLogin />)
-    expect(screen.getByText('ou')).toBeTruthy()
+    expect(screen.getByText('Ou continue com')).toBeTruthy()
     expect(screen.getAllByRole('button')).toHaveLength(2)
   })
 })

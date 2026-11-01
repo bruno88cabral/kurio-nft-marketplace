@@ -21,7 +21,6 @@ vi.mock('@/features/account/ProfileForm', () => ({
   ProfileForm: ({ profile, email }: { profile: Profile; email: string }) => <p>form de {profile.displayName} ({email})</p>,
   ProfileFormSkeleton: () => <p>skeleton do perfil</p>,
 }))
-vi.mock('@/features/account/PasswordForm', () => ({ PasswordForm: ({ email }: { email: string }) => <p>senha de {email}</p> }))
 
 const options = Route.options as unknown as { head: () => { meta: { title: string }[] }; component: () => React.ReactNode }
 const PROFILE: Profile = { accountId: 'user-ana', displayName: 'Ana Souza', wallets: [] }
@@ -36,13 +35,13 @@ describe('rota /profile', () => {
     expect(options.head().meta).toEqual([{ title: 'Perfil · Kurio' }])
   })
 
-  it('carregando: skeleton do perfil e o painel de senha da conta', () => {
+  it('carregando: título da conta e skeleton do perfil', () => {
     fetchProfile.mockReturnValue(new Promise(() => undefined))
     const Component = options.component
     renderWithProviders(<Component />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Perfil' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Perfil do colecionador' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Dados do perfil' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByText('skeleton do perfil')).toBeTruthy()
-    expect(screen.getByText('senha de ana@kurio.test')).toBeTruthy()
   })
 
   it('com o perfil carregado mostra o formulário com o e-mail da sessão', async () => {
@@ -50,8 +49,7 @@ describe('rota /profile', () => {
     const Component = options.component
     renderWithProviders(<Component />)
     expect(await screen.findByText('form de Ana Souza (ana@kurio.test)')).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Dados do perfil' })).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Alterar senha' })).toBeTruthy()
+    expect(screen.queryByText('skeleton do perfil')).toBeNull()
   })
 
   it('erro: mostra o estado de erro e "Tentar novamente" refaz a busca', async () => {
@@ -64,12 +62,12 @@ describe('rota /profile', () => {
     expect(fetchProfile).toHaveBeenCalledTimes(2)
   })
 
-  it('sem conta na sessão (logout em curso) não busca nem mostra a senha', async () => {
+  it('sem conta na sessão (logout em curso) não busca nem mostra o formulário', async () => {
     useSession.mockReturnValue(sessionOf(null))
     const Component = options.component
     renderWithProviders(<Component />)
     expect(screen.getByText('skeleton do perfil')).toBeTruthy()
-    expect(screen.queryByRole('region', { name: 'Alterar senha' })).toBeNull()
+    expect(screen.queryByText(/^form de/)).toBeNull()
     await act(async () => {}) // deixa efeitos e microtarefas assentarem antes da asserção negativa
     expect(fetchProfile).not.toHaveBeenCalled()
   })

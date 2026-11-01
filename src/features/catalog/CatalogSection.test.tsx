@@ -17,7 +17,7 @@ vi.mock('@/features/favorites/useToggleFavorite', () => ({
 const items = [makeNft(1), makeNft(2)]
 const serve = (featured: () => unknown = () => [makeNft(9, { name: 'Destaque', previousPrice: parseEth('0.9') })]) =>
   api.get.mockImplementation(nftApiGet({ list: () => makePage(items), facets: () => FACETS, featured }))
-const spotlight = () => screen.getByText('NFT em destaque').parentElement!
+const spotlight = () => screen.getByText('NFT em destaque').closest('section')!
 
 describe('CatalogSection', () => {
   it('monta filtros, abas, grade e o destaque "Oferta limitada"', async () => {
@@ -25,11 +25,13 @@ describe('CatalogSection', () => {
     renderWithProviders(<CatalogSection />)
     expect(screen.getByRole('region', { name: 'Catálogo' }).id).toBe('catalogo')
     expect(await screen.findByRole('list', { name: 'Resultados do catálogo' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Filtros' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Filtros' })).toBeTruthy()
     expect(await screen.findByRole('checkbox', { name: /Coleção A/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Todos os NFTs' }).getAttribute('aria-selected')).toBe('true')
     expect(await within(spotlight()).findByText('Oferta limitada')).toBeTruthy()
-    expect(within(spotlight()).getByRole('heading', { name: 'Destaque' })).toBeTruthy()
+    expect(within(spotlight()).getByRole('heading', { name: /NFT em destaque\s*Oferta limitada/ })).toBeTruthy()
+    // Só a arte, sem nome nem preço visíveis: o nome fica para o leitor de tela no link
+    expect((await within(spotlight()).findByRole('link', { name: 'Destaque' })).getAttribute('href')).toBe('/nfts/nft-009')
   })
 
   it('a aba vem da URL e trocar de aba atualiza tab', async () => {
@@ -43,10 +45,11 @@ describe('CatalogSection', () => {
     await screen.findByRole('list', { name: 'Resultados do catálogo' })
   })
 
-  it('destaque carregando: skeleton do card', () => {
+  it('destaque carregando: skeleton da arte', () => {
     api.get.mockImplementation(() => new Promise(() => {}))
     renderWithProviders(<CatalogSection />)
-    expect(spotlight().querySelector('[data-slot="nft-card-skeleton"]')).toBeTruthy()
+    expect(spotlight().querySelector('[data-slot="skeleton"]')).toBeTruthy()
+    expect(within(spotlight()).queryByRole('link')).toBeNull()
   })
 
   it.each([

@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Favorite } from '@/contracts'
 import { makeNft } from '@/test/nftFixtures'
+import { LiveAnnouncer } from '@/components/layout/LiveAnnouncer'
 import { renderWithProviders } from '@/test/render'
 import { ANA, sessionOf } from '@/test/session'
 import { FavoritableNftCard, NftFavoriteButton } from './FavoriteButton'
@@ -22,13 +23,18 @@ beforeEach(() => {
 })
 
 describe('NftFavoriteButton', () => {
-  it('liga o botão do kit ao hook: reflete o cache, alterna e anuncia na região aria-live', async () => {
+  it('liga o botão do kit ao hook: reflete o cache, alterna e anuncia na região aria-live do app', async () => {
     list([])
     mocks.put.mockImplementation(() => {
       list([{ nftId: nft.id, createdAt: '2026-01-01T00:00:00.000Z' }])
       return Promise.resolve({})
     })
-    renderWithProviders(<NftFavoriteButton nft={nft} className="x" />)
+    renderWithProviders(
+      <>
+        <LiveAnnouncer />
+        <NftFavoriteButton nft={nft} className="x" />
+      </>,
+    )
     const button = await screen.findByRole('button', { name: /Favoritar/ })
     await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false))
     expect(button.getAttribute('aria-pressed')).toBe('false')
@@ -45,12 +51,12 @@ describe('NftFavoriteButton', () => {
 })
 
 describe('FavoritableNftCard', () => {
-  it('renderiza o card com o favorito ligado ao hook (só mobile) e a região aria-live', async () => {
+  it('renderiza o card com o favorito ligado ao hook (só mobile), sem região aria-live própria', async () => {
     list([{ nftId: nft.id, createdAt: '2026-01-01T00:00:00.000Z' }])
     renderWithProviders(<FavoritableNftCard nft={nft} />)
     const heart = await screen.findByRole('button', { name: 'Favoritar Obra 1' })
     await waitFor(() => expect(heart.getAttribute('aria-pressed')).toBe('true'))
     expect(heart.className).toContain('md:hidden')
-    expect(document.querySelector('[aria-live="polite"]')).toBeTruthy()
+    expect(document.querySelector('[aria-live]')).toBeNull()
   })
 })
