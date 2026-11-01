@@ -62,7 +62,7 @@ export function ReviewStep({ lines, announce = true }: { lines: readonly ReviewL
                   <span className="flex shrink-0 items-baseline gap-2">
                     <span className="text-muted-foreground text-caption">(x {item.quantity})</span>
                     {unitPrice ? (
-                      <PriceTag price={mulEth(unitPrice, item.quantity)} size="sm" />
+                      <PriceTag price={mulEth(unitPrice, item.quantity)} size="sm" tone="accent" />
                     ) : (
                       <Skeleton className="h-4 w-16" />
                     )}

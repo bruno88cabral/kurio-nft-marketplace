@@ -18,8 +18,9 @@ export interface PriceTagProps {
   /** `sm` = card do carrossel/carrinho, `md` = card do grid, `lg` = Detalhe. */
   size?: 'sm' | 'md' | 'lg'
   /**
-   * `accent` = laranja e negrito, o preço dos cards e do Detalhe no Figma;
-   * `neutral` = branco (padrão), para as outras telas (carrinho, revisão, hero).
+   * `accent` = laranja e negrito, onde o Figma mostra preço laranja: cards, Detalhe e o total por
+   * linha (Carrinho, "Seus NFTs" do Pagamento e recibo);
+   * `neutral` = branco (padrão), onde o Figma não pinta o preço (hoje só o `/dev/kit` o exibe).
    */
   tone?: 'accent' | 'neutral'
   /**

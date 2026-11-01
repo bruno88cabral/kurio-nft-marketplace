@@ -49,7 +49,7 @@ export interface CheckoutGateInput {
   quoteError: boolean
 }
 
-/** Por que "Ir para o pagamento" (e o "Confirmar compra") está bloqueado pela cotação. */
+/** Por que "Conectar e finalizar" (e o "Confirmar compra") está bloqueado pela cotação. */
 export type CheckoutBlock = 'error' | 'loading' | 'recalculating' | 'issues'
 
 /** Aviso da cotação com `issues` (indisponível ou preço alterado), no Carrinho e no Pagamento. */
@@ -72,7 +72,7 @@ export function checkoutBlock({ quote, recalculating, quoteError }: CheckoutGate
   return undefined
 }
 
-/** "Ir para o pagamento" só com cotação atual: existe, sem recotação, sem erro de recotação e sem `issues`. */
+/** "Conectar e finalizar" só com cotação atual: existe, sem recotação, sem erro de recotação e sem `issues`. */
 export function canCheckout(input: CheckoutGateInput): boolean {
   return checkoutBlock(input) === undefined
 }

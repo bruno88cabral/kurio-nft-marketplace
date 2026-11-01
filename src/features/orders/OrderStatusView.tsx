@@ -7,6 +7,7 @@ import { walletsQuery } from '@/api/wallets'
 import type { Id, Nft, Order } from '@/contracts'
 import { buttonVariants } from '@/components/ui/button'
 import { checkoutDraftStore } from '@/features/checkout/checkoutDraft'
+import { cn } from '@/lib/utils'
 import { shortAddress } from '@/lib/wallets'
 import { OrderReceipt } from './OrderReceipt'
 import { applyOrderOutcome } from './orderStatus'
@@ -112,7 +113,7 @@ export function OrderStatusView({ accountId, order }: { accountId: Id; order: Or
 /** "Pedido … · Chave …" discreto abaixo do botão do explorador: o recibo continua exibindo a chave do pedido. */
 function OrderKeys({ order, className }: { order: Order; className?: string }) {
   return (
-    <p className={`text-muted-foreground text-tiny break-all ${className ?? ''}`}>
+    <p className={cn('text-muted-foreground text-caption break-all', className)}>
       Pedido <span className="font-mono">{order.id}</span> · Chave <span className="font-mono">{order.idempotencyKey}</span>
     </p>
   )
