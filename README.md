@@ -43,6 +43,7 @@ Versionadas em `.env.development` e `.env.production`, com os mesmos valores, e 
 | `pnpm preview` | Serve o build de produção localmente. |
 | `pnpm typecheck` | `tsc -b`. |
 | `pnpm lint` | `eslint .`. |
+| `pnpm lighthouse` | `pnpm build` + Lighthouse 3x em Início e Detalhe, mobile e desktop, sobre o `vite preview` (porta 5210). Relatórios e medianas em `lighthouse/reports/`. |
 | `pnpm test` | `vitest run` (ambiente node, sem jsdom: `EthAmount`/`big.js`, interceptor do Axios e sessão, ciclo de vida da sessão, camada de mocks, estado do catálogo na URL, faixa de preço, edição, cache de favoritos e validação de contas, avatar e carteiras). |
 
 ## Fluxo de branches e CI

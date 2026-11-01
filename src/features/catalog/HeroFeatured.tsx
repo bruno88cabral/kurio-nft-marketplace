@@ -181,7 +181,7 @@ function FeaturedSlide(props: CarouselProps) {
           alt=""
           width={ART_SIZE}
           height={ART_SIZE}
-          loading="lazy"
+          // Acima da dobra no mobile: sem `lazy` (Lighthouse "lazy-loaded LCP/above-the-fold")
           decoding="async"
           className="bg-muted border-card pointer-events-none absolute -bottom-3 left-3 size-16 rounded-xl border-2 object-cover md:hidden"
         />
