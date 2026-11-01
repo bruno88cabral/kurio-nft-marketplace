@@ -209,8 +209,11 @@ function KitPage() {
           <Labeled label="no máximo">
             <QuantityStepper value={5} onChange={() => undefined} max={5} />
           </Labeled>
-          <Labeled label="sm (carrinho)">
+          <Labeled label="sm (boxed)">
             <QuantityStepper value={2} onChange={() => undefined} max={5} size="sm" />
+          </Labeled>
+          <Labeled label="cart (Carrinho: contorno no celular, laranja a partir de md)">
+            <QuantityStepper value={2} onChange={() => undefined} max={5} appearance="cart" />
           </Labeled>
           <Labeled label="desabilitado">
             <QuantityStepper value={2} onChange={() => undefined} max={5} disabled />
@@ -243,6 +246,9 @@ function KitPage() {
           <Labeled label="skeleton">
             <PriceSummary loading />
           </Labeled>
+          <Labeled label="desconto sempre visível (Carrinho)">
+            <PriceSummary quote={quote} alwaysShowDiscount />
+          </Labeled>
         </div>
       </Section>
 
@@ -273,6 +279,12 @@ function KitPage() {
           </Labeled>
           <Labeled label="collapsible (Pagamento)">
             <CouponInput status="idle" collapsible onApply={() => undefined} />
+          </Labeled>
+          <Labeled label="attached (Carrinho; pílula abaixo de md)">
+            <CouponInput status="idle" appearance="attached" onApply={() => undefined} />
+          </Labeled>
+          <Labeled label="attached inválido">
+            <CouponInput status="invalid" appearance="attached" appliedCode="QUALQUER" onApply={() => undefined} onRemove={() => undefined} />
           </Labeled>
         </div>
       </Section>

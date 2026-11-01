@@ -25,16 +25,22 @@ export interface PriceSummaryProps {
   /** Título opcional acima das linhas (ex.: "Resumo"). */
   title?: string
   /**
-   * `quote` (padrão): cotação, a taxa de rede leva "Estimada". `receipt`: valores já cobrados (recibo do pedido),
-   * sem o "Estimada".
+   * `quote` (padrão): cotação, a taxa de rede leva "Taxa estimada". `receipt`: valores já cobrados (recibo do
+   * pedido), sem o "Taxa estimada".
    */
   mode?: 'quote' | 'receipt'
+  /**
+   * Mostra a linha do desconto mesmo sem cupom, como "(-) 0 ETH" (Carrinho no Figma, MYK-1115). Sem ela, o
+   * desconto só aparece com cupom aplicado ou desconto > 0 (Pagamento, revisão e recibo).
+   */
+  alwaysShowDiscount?: boolean
   className?: string
 }
 
 /**
  * Resumo de valores (Carrinho, Pagamento, Confirmação): subtotal, desconto (só com cupom aplicado
- * ou desconto > 0), taxa de rede (com "Estimada" abaixo, exceto no modo `receipt`), separador e total.
+ * ou desconto > 0, ou sempre com `alwaysShowDiscount`), taxa de rede (com "Taxa estimada" em laranja
+ * abaixo do valor, exceto no modo `receipt`), separador e total com o valor em laranja (Figma).
  */
 export function PriceSummary({
   quote,
@@ -44,6 +50,7 @@ export function PriceSummary({
   staleAction,
   title,
   mode = 'quote',
+  alwaysShowDiscount = false,
   className,
 }: PriceSummaryProps) {
   const showSkeleton = loading || !quote
@@ -71,35 +78,27 @@ export function PriceSummary({
         </div>
       )}
       {showSkeleton ? (
-        <SummarySkeleton />
+        <SummarySkeleton discount={alwaysShowDiscount} />
       ) : (
-        <dl className={cn('flex flex-col gap-2 text-body', stale && 'opacity-60')}>
+        <dl className={cn('text-foreground flex flex-col gap-2 text-body', stale && 'opacity-60')}>
           <Row label="Subtotal" value={formatEthLabel(quote.subtotal)} />
-          {(quote.coupon?.status === 'applied' || cmpEth(quote.discount, ZERO) > 0) && (
+          {(alwaysShowDiscount || quote.coupon?.status === 'applied' || cmpEth(quote.discount, ZERO) > 0) && (
             <Row
-              label={quote.coupon ? `Desconto (${quote.coupon.code})` : 'Desconto'}
-              value={`− ${formatEthLabel(quote.discount)}`}
-              valueClassName="text-text-accent"
+              label={quote.coupon?.status === 'applied' ? `Desconto (${quote.coupon.code})` : 'Desconto'}
+              value={`(-) ${formatEthLabel(quote.discount)}`}
             />
           )}
           <Row
-            label={
-              mode === 'receipt' ? (
-                'Taxa de rede'
-              ) : (
-                <span className="flex flex-col">
-                  <span>Taxa de rede</span>
-                  <span className="text-muted-foreground text-tiny">Estimada</span>
-                </span>
-              )
-            }
+            label="Taxa de rede"
             value={formatEthLabel(quote.networkFee)}
+            hint={mode === 'receipt' ? undefined : 'Taxa estimada'}
           />
           <Separator className="my-1" />
           <Row
             label="Total"
             value={formatEthLabel(quote.total)}
             className="text-body-lg font-bold"
+            valueClassName="text-text-accent"
           />
         </dl>
       )}
@@ -110,30 +109,45 @@ export function PriceSummary({
 function Row({
   label,
   value,
+  hint,
   className,
   valueClassName,
 }: {
   label: ReactNode
   value: string
+  /** Nota pequena em laranja, alinhada à direita abaixo do valor (ex.: "Taxa estimada"). */
+  hint?: string
   className?: string
   valueClassName?: string
 }) {
   return (
     <div className={cn('flex items-start justify-between gap-4', className)}>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={cn('text-foreground text-right tabular-nums', valueClassName)}>{value}</dd>
+      <dt>{label}</dt>
+      <dd className={cn('text-foreground flex flex-col items-end text-right tabular-nums', valueClassName)}>
+        {value}
+        {hint && <span className="text-text-accent text-tiny">{hint}</span>}
+      </dd>
     </div>
   )
 }
 
-/** Mesma caixa do resumo pronto sem cupom (subtotal, taxa de rede com "Estimada", separador, total): 113px. */
-function SummarySkeleton() {
+/**
+ * Mesma caixa do resumo pronto sem cupom (subtotal, taxa de rede com "Taxa estimada", separador, total): 113px.
+ * Com `discount` (o `alwaysShowDiscount` do Carrinho) entra também a linha do desconto.
+ */
+function SummarySkeleton({ discount }: { discount: boolean }) {
   return (
     <div className="flex flex-col gap-2" aria-hidden>
       <div className="flex h-[21px] items-center justify-between gap-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-4 w-20" />
       </div>
+      {discount && (
+        <div className="flex h-[21px] items-center justify-between gap-4">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+      )}
       <div className="flex h-[35px] items-center justify-between gap-4">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="h-4 w-20" />
