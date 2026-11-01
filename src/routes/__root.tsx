@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Link, Outlet, createRootRouteWithContext } from '@tanstack/react-router'
 import { EmptyState } from '@/components/kurio'
 import { MobileTabBar, TAB_BAR_PADDING_CLASS } from '@/components/layout/MobileTabBar'
+import { useHideMobileChrome } from '@/components/layout/routeChrome'
 import { MAIN_CONTENT_ID, SkipLink } from '@/components/layout/SkipLink'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { SiteHeader } from '@/components/layout/SiteHeader'
@@ -21,17 +22,22 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootLayout() {
+  // Rota com `staticData.hideMobileChrome` (ex.: Detalhe): abaixo de `md` ela desenha a própria moldura
+  const hideMobileChrome = useHideMobileChrome()
   return (
     <TooltipProvider>
       <HeadContent />
-      <div className={cn('bg-background text-foreground font-sans flex min-h-dvh flex-col', TAB_BAR_PADDING_CLASS)}>
+      <div
+        data-mobile-chrome={hideMobileChrome ? 'hidden' : undefined}
+        className={cn('bg-background text-foreground font-sans flex min-h-dvh flex-col', !hideMobileChrome && TAB_BAR_PADDING_CLASS)}
+      >
         <SkipLink />
-        <SiteHeader />
+        <SiteHeader className={hideMobileChrome ? 'max-md:hidden' : undefined} />
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 outline-none">
           <Outlet />
         </main>
         <SiteFooter />
-        <MobileTabBar />
+        {!hideMobileChrome && <MobileTabBar />}
       </div>
       <Toaster />
     </TooltipProvider>

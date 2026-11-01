@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { OutOfScopeAction } from '@/components/kurio'
+import { OutOfScopeAction, SocialIcon, type SocialName } from '@/components/kurio'
 import { cn } from '@/lib/utils'
 
 /** Benefícios do Figma: círculo laranja com a letra, título branco e texto marrom. */
@@ -33,48 +32,8 @@ const columns: { title: string; links: string[] }[] = [
   { title: 'Coleções', links: ['Arte digital', 'Fotografia', 'Música', 'Arte 3D', 'Utilidade'] },
 ]
 
-/**
- * Ícones das redes (traço de 24 px no estilo do lucide). O lucide 1.x não tem mais ícones de
- * marca, então os traços ficam aqui.
- */
-const socials: { name: string; icon: ReactNode }[] = [
-  { name: 'Facebook', icon: <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /> },
-  {
-    name: 'Instagram',
-    icon: (
-      <>
-        <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-        <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-      </>
-    ),
-  },
-  {
-    name: 'Twitter',
-    icon: (
-      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
-    ),
-  },
-  {
-    name: 'LinkedIn',
-    icon: (
-      <>
-        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-        <rect width="4" height="12" x="2" y="9" />
-        <circle cx="4" cy="4" r="2" />
-      </>
-    ),
-  },
-  {
-    name: 'YouTube',
-    icon: (
-      <>
-        <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
-        <path d="m10 15 5-3-5-3z" />
-      </>
-    ),
-  },
-]
+/** Redes do footer, na ordem do Figma (os traços estão em `SocialIcon`). */
+const SOCIAL_NAMES: SocialName[] = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
 
 /** Os links do footer são "Em breve" (sem fluxo no desafio), em branco como no Figma. */
 const outOfScopeText = 'text-foreground h-auto justify-start p-0 font-normal opacity-100'
@@ -157,26 +116,15 @@ export function SiteFooter() {
             <section aria-label="Redes sociais" className="flex flex-col gap-3">
               <h2 className="text-lg font-bold">Redes sociais</h2>
               <ul className="flex flex-wrap gap-2">
-                {socials.map((s) => (
-                  <li key={s.name}>
+                {SOCIAL_NAMES.map((s) => (
+                  <li key={s}>
                     <OutOfScopeAction
                       variant="ghost"
                       size="icon"
-                      label={s.name}
+                      label={s}
                       className="border-primary text-text-accent size-8 rounded-sm border opacity-100"
                     >
-                      <svg
-                        aria-hidden
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="size-5"
-                      >
-                        {s.icon}
-                      </svg>
+                      <SocialIcon name={s} className="size-5" />
                     </OutOfScopeAction>
                   </li>
                 ))}

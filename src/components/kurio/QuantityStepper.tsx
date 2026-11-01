@@ -17,6 +17,11 @@ export interface QuantityStepperProps {
   label?: string
   /** Mostra o rótulo visível curto "Qtd." à esquerda (Detalhe mobile, `16:355`). */
   showLabel?: boolean
+  /**
+   * `boxed` (padrão) = botões com borda dentro de uma caixa (Carrinho); `accent` = botões laranja
+   * sólidos em pílula, sem caixa, com alvo de 44 px (Detalhe no Figma).
+   */
+  appearance?: 'boxed' | 'accent'
   className?: string
 }
 
@@ -35,6 +40,7 @@ export function QuantityStepper({
   size = 'md',
   label = 'Quantidade',
   showLabel = false,
+  appearance = 'boxed',
   className,
 }: QuantityStepperProps) {
   const id = useId()
@@ -50,23 +56,28 @@ export function QuantityStepper({
   }
 
   const sm = size === 'sm'
+  const accent = appearance === 'accent'
   const buttonClass = cn(
-    'border-border-soft text-foreground hover:bg-muted focus-visible:ring-ring/50 focus-visible:border-ring inline-flex shrink-0 items-center justify-center border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent',
-    sm ? 'size-6 rounded-sm' : 'size-9 rounded-md',
+    'focus-visible:ring-ring/50 focus-visible:border-ring inline-flex shrink-0 items-center justify-center border outline-none transition-colors focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40',
+    accent
+      ? 'bg-primary text-primary-foreground hover:bg-primary/80 focus-visible:ring-offset-background h-12 w-11 rounded-full border-transparent focus-visible:ring-offset-2 aria-disabled:hover:bg-primary'
+      : 'border-border-soft text-foreground hover:bg-muted aria-disabled:hover:bg-transparent',
+    !accent && (sm ? 'size-6 rounded-sm' : 'size-9 rounded-md'),
   )
 
   return (
     <div data-slot="quantity-stepper" className={cn('inline-flex flex-col gap-1', className)}>
       <div className="inline-flex items-center gap-2">
         {showLabel && (
-          <label htmlFor={id} className="text-muted-foreground text-caption">
+          <label htmlFor={id} className={cn('text-muted-foreground', accent ? 'text-body-lg' : 'text-caption')}>
             Qtd.
           </label>
         )}
         <div
           className={cn(
-            'border-border inline-flex items-center rounded-md border',
-            sm ? 'gap-1 p-0.5' : 'gap-1.5 p-1',
+            'inline-flex items-center',
+            accent ? 'gap-1' : 'border-border rounded-md border',
+            !accent && (sm ? 'gap-1 p-0.5' : 'gap-1.5 p-1'),
           )}
         >
           <button
@@ -77,7 +88,7 @@ export function QuantityStepper({
             aria-disabled={atMin || undefined}
             aria-label="Diminuir quantidade"
           >
-            <Minus aria-hidden className={sm ? 'size-3' : 'size-4'} />
+            <Minus aria-hidden className={sm ? 'size-3' : accent ? 'size-5' : 'size-4'} />
           </button>
           <input
             id={id}
@@ -103,7 +114,7 @@ export function QuantityStepper({
             }}
             className={cn(
               'focus-visible:ring-ring/50 rounded-sm bg-transparent text-center font-medium tabular-nums outline-none focus-visible:ring-3 disabled:opacity-50',
-              sm ? 'h-6 w-7 text-caption' : 'h-9 w-9 text-body',
+              sm ? 'h-6 w-7 text-caption' : accent ? 'text-body-lg h-11 w-11' : 'h-9 w-9 text-body',
             )}
           />
           <button
@@ -114,7 +125,7 @@ export function QuantityStepper({
             aria-disabled={atMax || undefined}
             aria-label="Aumentar quantidade"
           >
-            <Plus aria-hidden className={sm ? 'size-3' : 'size-4'} />
+            <Plus aria-hidden className={sm ? 'size-3' : accent ? 'size-5' : 'size-4'} />
           </button>
         </div>
       </div>

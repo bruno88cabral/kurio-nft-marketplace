@@ -23,12 +23,12 @@ const navItem =
  */
 const outOfScopeNavItem = cn(navItem, 'hover:text-foreground h-full rounded-none p-0 px-1 font-normal opacity-100')
 
-export function SiteHeader() {
+export function SiteHeader({ className }: { className?: string }) {
   const cartCount = useCartCount()
   // No Detalhe o item ativo é "Mercado" (Figma): o NFT é uma página do catálogo
   const onNftDetail = useLocation({ select: (l) => l.pathname.startsWith('/nfts/') })
   return (
-    <header className="bg-background sticky top-0 z-30">
+    <header className={cn('bg-background sticky top-0 z-30', className)}>
       {/* A linha divisória fica dentro do container, não em largura total (Figma) */}
       <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
         <div className="border-border-soft flex h-16 items-center gap-4 border-b md:grid md:grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr]">
