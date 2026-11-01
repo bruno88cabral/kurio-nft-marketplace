@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { withFilter } from '@/lib/catalogSearch'
 import { cn } from '@/lib/utils'
-import { focusCatalog } from './routeFocus'
+import { focusCatalogIfLost } from './routeFocus'
 
 export interface HeaderSearchProps {
   className?: string
@@ -59,7 +59,7 @@ export function HeaderSearch({ className }: HeaderSearchProps) {
     setOpen(false)
     // O campo desmonta: o foco vai para o catálogo com o resultado (não para o `<body>`)
     void navigate({ to: '/', search: withFilter(catalog ?? {}, { q }), hash: 'catalogo' }).then(() =>
-      requestAnimationFrame(focusCatalog),
+      requestAnimationFrame(focusCatalogIfLost),
     )
   }
 

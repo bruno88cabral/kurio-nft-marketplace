@@ -2,7 +2,7 @@
 import { cleanup, render } from '@testing-library/react'
 import type { ParsedLocation } from '@tanstack/react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CATALOG_ANCHOR_ID, focusAfterNavigation, focusCatalog, noteNavigationStart } from './routeFocus'
+import { CATALOG_ANCHOR_ID, focusAfterNavigation, focusCatalog, focusCatalogIfLost, noteNavigationStart } from './routeFocus'
 import { MAIN_CONTENT_ID } from './SkipLink'
 
 const at = (pathname: string, hash = '') => ({ pathname, hash }) as ParsedLocation
@@ -107,6 +107,21 @@ describe('saindo de um modal (login, cadastro)', () => {
     getByText('Carrinho').focus()
     focusAfterNavigation({ fromLocation: at('/'), toLocation: at('/cart'), pathChanged: true })
     expect(active()).toBe(container.querySelector('main'))
+  })
+})
+
+describe('focusCatalogIfLost', () => {
+  it('foco no <body> (o campo da busca desmontou): vai para o catálogo', () => {
+    render(<Page />)
+    focusCatalogIfLost()
+    expect(active()?.id).toBe(CATALOG_ANCHOR_ID)
+  })
+
+  it('o usuário já focou outro controle durante a busca: o foco fica nele', () => {
+    const { getByText } = render(<Page />)
+    getByText('Carrinho').focus()
+    focusCatalogIfLost()
+    expect(active()).toBe(getByText('Carrinho'))
   })
 })
 

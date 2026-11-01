@@ -40,6 +40,15 @@ export function noteNavigationStart() {
 }
 
 /**
+ * Depois da busca: o campo desmontou e o foco caiu no `<body>`, então vai para o catálogo. Se nesse meio-tempo
+ * (a rede simulada tem latência) o usuário já focou outro controle, o foco fica com ele.
+ */
+export function focusCatalogIfLost() {
+  const active = document.activeElement
+  if (active === null || active === document.body) focusCatalog()
+}
+
+/**
  * A nova tela já pôs o foco onde queria: num diálogo modal (login, cadastro) ou num elemento do `<main>`
  * (o `h1` da Confirmação, um `autoFocus`, ou a navegação da conta, que continua montada entre Perfil e Carteiras).
  */
