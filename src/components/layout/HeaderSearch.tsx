@@ -49,7 +49,7 @@ export function HeaderSearch({ className }: HeaderSearchProps) {
         aria-controls={formId}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        {open ? <X aria-hidden /> : <Search aria-hidden />}
+        {open ? <X aria-hidden className="size-5" /> : <Search aria-hidden className="size-5" />}
       </Button>
       {open && (
         <form

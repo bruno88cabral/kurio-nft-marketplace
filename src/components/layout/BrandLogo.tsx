@@ -7,7 +7,7 @@ export function BrandLogo({ className }: { className?: string }) {
       to="/"
       aria-label="Kurio, ir para o Início"
       className={cn(
-        'text-text-accent focus-visible:ring-ring rounded-md text-xl font-bold tracking-[0.2em] outline-none focus-visible:ring-3',
+        'text-foreground focus-visible:ring-ring text-body-lg rounded-md font-bold tracking-wide outline-none focus-visible:ring-3',
         className,
       )}
     >

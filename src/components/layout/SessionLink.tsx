@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { UserRound } from 'lucide-react'
+import { LogIn, UserRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useSession } from '@/auth/useSession'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -30,7 +30,8 @@ export function SessionLink({ className, loadingClassName, children }: SessionLi
     children(label)
   ) : (
     <>
-      <UserRound aria-hidden />
+      {/* Visitante: ícone de login, como no "Entrar" do Figma */}
+      {isAuthenticated ? <UserRound aria-hidden /> : <LogIn aria-hidden />}
       <span className="truncate">{label}</span>
     </>
   )

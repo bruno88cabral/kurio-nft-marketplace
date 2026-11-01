@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils'
 export interface PriceTagProps {
   price: EthAmount
   /**
-   * Preço anterior, exibido riscado ao lado (promoção ou preço que mudou em tempo real).
-   * Ignorado quando é igual a `price`.
+   * Preço anterior, em cinza ao lado, sem riscado como no Figma (promoção ou preço que mudou em
+   * tempo real). O leitor de tela ouve "Preço anterior:". Ignorado quando é igual a `price`.
    */
   previousPrice?: EthAmount
   /**
@@ -17,6 +17,11 @@ export interface PriceTagProps {
   changed?: boolean
   /** `sm` = card do carrossel/carrinho, `md` = card do grid, `lg` = Detalhe. */
   size?: 'sm' | 'md' | 'lg'
+  /**
+   * `accent` = laranja e negrito, o preço dos cards e do Detalhe no Figma;
+   * `neutral` = branco (padrão), para as outras telas (carrinho, revisão, hero).
+   */
+  tone?: 'accent' | 'neutral'
   /**
    * Anuncia mudanças para leitor de tela (`aria-live="polite"`). Use em UMA instância por tela
    * (ex.: o preço do Detalhe), nunca em todos os cards de uma lista.
@@ -31,8 +36,8 @@ const SIZE = {
   lg: 'text-heading',
 } as const
 
-/** Preço em ETH formatado (`formatEthLabel`), com preço anterior riscado opcional. */
-export function PriceTag({ price, previousPrice, changed = false, size = 'md', live = false, className }: PriceTagProps) {
+/** Preço em ETH formatado (`formatEthLabel`), com o preço anterior opcional ao lado. */
+export function PriceTag({ price, previousPrice, changed = false, size = 'md', tone = 'neutral', live = false, className }: PriceTagProps) {
   const direction = previousPrice ? cmpEth(price, previousPrice) : 0
   const showPrevious = previousPrice !== undefined && direction !== 0
 
@@ -46,7 +51,8 @@ export function PriceTag({ price, previousPrice, changed = false, size = 'md', l
     >
       <span
         className={cn(
-          'font-medium text-foreground tabular-nums transition-colors',
+          'tabular-nums transition-colors',
+          tone === 'accent' ? 'text-text-accent font-bold' : 'text-foreground font-medium',
           changed && 'text-text-accent',
         )}
       >
@@ -54,10 +60,10 @@ export function PriceTag({ price, previousPrice, changed = false, size = 'md', l
         {formatEthLabel(price)}
       </span>
       {showPrevious && (
-        <s className="text-muted-foreground text-[0.85em] tabular-nums">
+        <span className="text-muted-foreground font-normal tabular-nums">
           <span className="sr-only">Preço anterior: </span>
           {formatEthLabel(previousPrice)}
-        </s>
+        </span>
       )}
       {changed && (
         <span className="text-text-accent inline-flex items-center gap-0.5 self-center text-tiny font-medium uppercase">

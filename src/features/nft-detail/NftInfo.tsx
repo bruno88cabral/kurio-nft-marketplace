@@ -42,7 +42,7 @@ export function NftBreadcrumb({ nft, className }: { nft: Pick<Nft, 'name' | 'col
   )
 }
 
-/** Coleção, nome (`h1`), criador, rede e preço com o preço anterior riscado. */
+/** Coleção, nome (`h1`), criador, rede e preço em laranja, com o preço anterior ao lado. */
 export function NftInfo({ nft, className }: { nft: InfoNft; className?: string }) {
   return (
     <div data-slot="nft-info" className={cn('flex min-w-0 flex-col gap-3', className)}>
@@ -54,7 +54,7 @@ export function NftInfo({ nft, className }: { nft: InfoNft; className?: string }
         <dt className="text-muted-foreground">Rede</dt>
         <dd>{networkLabel(nft.network)}</dd>
       </dl>
-      <PriceTag price={nft.price} previousPrice={nft.previousPrice} size="lg" live />
+      <PriceTag price={nft.price} previousPrice={nft.previousPrice} size="lg" tone="accent" live />
     </div>
   )
 }

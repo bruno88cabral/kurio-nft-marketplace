@@ -16,6 +16,8 @@ import { SessionLink } from './SessionLink'
 
 interface AccountMenuProps {
   className?: string
+  /** Classes do "Entrar" do visitante (no header, o botão laranja sólido do Figma); padrão: `className`. */
+  visitorClassName?: string
   loadingClassName?: string
 }
 
@@ -23,12 +25,12 @@ interface AccountMenuProps {
  * Conta no header: visitante e carregando delegam ao `SessionLink` ("Entrar" / skeleton);
  * logado abre um menu com Perfil, Carteiras e Sair. A tab bar mobile continua com o `SessionLink`.
  */
-export function AccountMenu({ className, loadingClassName }: AccountMenuProps) {
+export function AccountMenu({ className, visitorClassName, loadingClassName }: AccountMenuProps) {
   const { account, isAuthenticated } = useSession()
   const { signOut, pending } = useSignOut()
 
   if (!isAuthenticated || !account) {
-    return <SessionLink className={className} loadingClassName={loadingClassName} />
+    return <SessionLink className={visitorClassName ?? className} loadingClassName={loadingClassName} />
   }
 
   return (

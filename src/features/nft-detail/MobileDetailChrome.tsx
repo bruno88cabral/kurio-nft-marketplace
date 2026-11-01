@@ -58,7 +58,7 @@ export function MobilePurchaseBar({
         className,
       )}
     >
-      <PriceTag price={nft.price} size="md" className="min-w-0" />
+      <PriceTag price={nft.price} size="md" tone="accent" className="min-w-0" />
       {soldOut ? (
         <Button type="button" disabled>
           <Ban aria-hidden />
