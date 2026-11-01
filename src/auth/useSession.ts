@@ -10,7 +10,7 @@ export function sessionQuery() {
     queryKey: SESSION_QUERY_KEY,
     queryFn: async ({ signal }) => (await apiClient.get<Session>('/auth/session', { signal })).data,
     enabled: getToken() !== null,
-    // 401 já limpa o token e invalida; repetir só atrasa o "deslogado"
+    // 401 é sessão morta: o ciclo de vida (`notifyExpired`) limpa e reseta; repetir só atrasa o "deslogado"
     retry: false,
   })
 }
@@ -24,7 +24,7 @@ export interface UseSession {
 
 export function useSession(): UseSession {
   const { data, isPending, fetchStatus } = useQuery(sessionQuery())
-  // Sem token válido o cache antigo não vale (o 401 limpa o token e o refetch da invalidação re-renderiza aqui)
+  // Sem token válido o dado em cache não vale; o reset do ciclo de vida re-renderiza aqui
   const session = getToken() === null ? undefined : data
   return {
     account: session?.account,

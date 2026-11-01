@@ -232,6 +232,9 @@ function KitPage() {
               }
             />
           </Labeled>
+          <Labeled label="recibo (mode=receipt)">
+            <PriceSummary quote={quoteWithCoupon} mode="receipt" />
+          </Labeled>
           <Labeled label="skeleton">
             <PriceSummary loading />
           </Labeled>
@@ -255,10 +258,10 @@ function KitPage() {
             <CouponInput status="applying" onApply={() => undefined} />
           </Labeled>
           <Labeled label="inválido">
-            <CouponInput status="invalid" onApply={() => undefined} />
+            <CouponInput status="invalid" appliedCode="QUALQUER" onApply={() => undefined} onRemove={() => undefined} />
           </Labeled>
           <Labeled label="expirado">
-            <CouponInput status="expired" onApply={() => undefined} />
+            <CouponInput status="expired" appliedCode="EXPIRED5" onApply={() => undefined} onRemove={() => undefined} />
           </Labeled>
           <Labeled label="aplicado">
             <CouponInput status="applied" appliedCode="KURIO10" onApply={() => undefined} onRemove={() => undefined} />

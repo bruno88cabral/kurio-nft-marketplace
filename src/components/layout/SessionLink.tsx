@@ -3,6 +3,7 @@ import { UserRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useSession } from '@/auth/useSession'
 import { Skeleton } from '@/components/ui/skeleton'
+import { visitorLoginRedirect } from '@/features/account/authRedirect'
 import { cn } from '@/lib/utils'
 
 interface SessionLinkProps {
@@ -19,7 +20,8 @@ interface SessionLinkProps {
  */
 export function SessionLink({ className, loadingClassName, children }: SessionLinkProps) {
   const { account, isAuthenticated, isPending } = useSession()
-  const href = useLocation({ select: (l) => l.href })
+  // Em /login e /signup preserva o redirect que já está lá (não encadeia, MYK-1078)
+  const redirect = useLocation({ select: visitorLoginRedirect })
 
   if (isPending) {
     return <Skeleton aria-hidden className={cn('motion-reduce:animate-none', loadingClassName)} />
@@ -41,7 +43,7 @@ export function SessionLink({ className, loadingClassName, children }: SessionLi
     )
   }
   return (
-    <Link to="/login" search={{ redirect: href }} className={className}>
+    <Link to="/login" search={{ redirect }} className={className}>
       {content}
     </Link>
   )

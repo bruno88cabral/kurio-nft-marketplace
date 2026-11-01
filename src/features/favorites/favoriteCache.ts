@@ -1,6 +1,7 @@
 import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import { favoriteKeys } from '@/api/favorites'
-import type { Favorite, Id, IsoDateTime } from '@/contracts'
+import type { SessionCheck } from '@/auth/sessionLifecycle'
+import { isUnauthorized, type Favorite, type Id, type IsoDateTime } from '@/contracts'
 
 /** `true` se o NFT está na lista de favoritos (lista ausente = nenhum). */
 export function isFavorited(list: readonly Favorite[] | undefined, nftId: Id): boolean {
@@ -23,6 +24,14 @@ export function applyFavoriteToggle(
   return on ? [...current, { nftId, createdAt: now }] : current.filter((f) => f.nftId !== nftId)
 }
 
+/**
+ * A falha merece o toast genérico? 401 (`unauthorized`) não: a sessão expirou e o ciclo de vida
+ * (`notifyExpired`) já mostra "Sua sessão expirou", então seriam dois toasts para o mesmo problema.
+ */
+export function shouldToastFavoriteFailure(error: Error): boolean {
+  return !isUnauthorized(error)
+}
+
 export const favoriteMutationKey = (nftId: Id) => ['favorite', nftId] as const
 
 export interface FavoriteMutationDeps {
@@ -34,10 +43,13 @@ export interface FavoriteMutationDeps {
   now: () => IsoDateTime
   /** Chamado uma vez por falha, depois do rollback (o hook mostra o toast). */
   onFailure: (error: Error) => void
+  /** `sessionLifecycle.captureSession`: o clique captura a sessão em que foi feito. */
+  captureSession: () => SessionCheck
 }
 
 interface FavoriteMutationContext {
   snapshot: Favorite[] | undefined
+  sameSession: SessionCheck
 }
 
 /**
@@ -49,8 +61,18 @@ interface FavoriteMutationContext {
  * - `onSettled`: invalida a lista para reconciliar com o servidor; com cliques em sequência no
  *   mesmo NFT, só o último a terminar invalida (o refetch não sobrescreve um otimista em voo).
  * - `scope`: as requests do mesmo NFT saem em série, então o servidor termina no último clique.
+ * - Sessão: se houve logout/troca de conta antes da resposta, nem o otimista, nem o rollback, nem o
+ *   aviso, nem a invalidação rodam (recriariam `['favorites', <conta anterior>]` na sessão seguinte).
  */
-export function favoriteMutationOptions({ queryClient, accountId, nftId, request, now, onFailure }: FavoriteMutationDeps) {
+export function favoriteMutationOptions({
+  queryClient,
+  accountId,
+  nftId,
+  request,
+  now,
+  onFailure,
+  captureSession,
+}: FavoriteMutationDeps) {
   const queryKey = favoriteKeys.list(accountId)
   const mutationKey = favoriteMutationKey(nftId)
   return mutationOptions<void, Error, boolean, FavoriteMutationContext>({
@@ -58,12 +80,15 @@ export function favoriteMutationOptions({ queryClient, accountId, nftId, request
     scope: { id: `favorite:${accountId}:${nftId}` },
     mutationFn: (on) => request(nftId, on),
     onMutate: async (on) => {
+      const sameSession = captureSession()
       await queryClient.cancelQueries({ queryKey })
+      if (!sameSession()) return { snapshot: undefined, sameSession }
       const snapshot = queryClient.getQueryData<Favorite[]>(queryKey)
       queryClient.setQueryData<Favorite[]>(queryKey, (list) => applyFavoriteToggle(list, nftId, on, now()))
-      return { snapshot }
+      return { snapshot, sameSession }
     },
     onError: (error, on, context) => {
+      if (context && !context.sameSession()) return
       if (context) {
         // `setQueryData(key, undefined)` não faz nada: sem snapshot, desfaz o toggle
         queryClient.setQueryData<Favorite[]>(
@@ -73,7 +98,8 @@ export function favoriteMutationOptions({ queryClient, accountId, nftId, request
       }
       onFailure(error)
     },
-    onSettled: async () => {
+    onSettled: async (_data, _error, _on, context) => {
+      if (context && !context.sameSession()) return
       if (queryClient.isMutating({ mutationKey }) <= 1) await queryClient.invalidateQueries({ queryKey })
     },
   })

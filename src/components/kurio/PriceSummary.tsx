@@ -24,12 +24,17 @@ export interface PriceSummaryProps {
   staleAction?: ReactNode
   /** Título opcional acima das linhas (ex.: "Resumo"). */
   title?: string
+  /**
+   * `quote` (padrão): cotação, a taxa de rede leva "Estimada". `receipt`: valores já cobrados (recibo do pedido),
+   * sem o "Estimada".
+   */
+  mode?: 'quote' | 'receipt'
   className?: string
 }
 
 /**
  * Resumo de valores (Carrinho, Pagamento, Confirmação): subtotal, desconto (só com cupom aplicado
- * ou desconto > 0), taxa de rede com "Estimada" abaixo, separador e total.
+ * ou desconto > 0), taxa de rede (com "Estimada" abaixo, exceto no modo `receipt`), separador e total.
  */
 export function PriceSummary({
   quote,
@@ -38,6 +43,7 @@ export function PriceSummary({
   staleMessage = 'Os valores mudaram desde a última cotação. Revise antes de continuar.',
   staleAction,
   title,
+  mode = 'quote',
   className,
 }: PriceSummaryProps) {
   const showSkeleton = loading || !quote
@@ -78,10 +84,14 @@ export function PriceSummary({
           )}
           <Row
             label={
-              <span className="flex flex-col">
-                <span>Taxa de rede</span>
-                <span className="text-muted-foreground text-tiny">Estimada</span>
-              </span>
+              mode === 'receipt' ? (
+                'Taxa de rede'
+              ) : (
+                <span className="flex flex-col">
+                  <span>Taxa de rede</span>
+                  <span className="text-muted-foreground text-tiny">Estimada</span>
+                </span>
+              )
             }
             value={formatEthLabel(quote.networkFee)}
           />

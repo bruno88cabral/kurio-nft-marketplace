@@ -1,10 +1,11 @@
 import { useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router'
-import { ArrowLeft, Ban, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Ban } from 'lucide-react'
 import type { Nft } from '@/contracts'
-import { OutOfScopeAction, PriceTag } from '@/components/kurio'
+import { PriceTag } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
-import { isSoldOut } from '@/lib/editions'
+import { AddToCartButton } from '@/features/cart/AddToCartButton'
 import { cn } from '@/lib/utils'
+import type { PurchaseSelection } from './usePurchaseSelection'
 
 /**
  * Header de tela do mobile (Figma `70397:240`): voltar + título. Voltar usa o histórico quando a
@@ -38,8 +39,17 @@ export function MobileScreenHeader({ title, className }: { title: string; classN
  * tab bar: gruda no rodapé da tela enquanto o Detalhe rola e, no fim da rota, volta ao fluxo,
  * então nunca cobre o fim do conteúdo nem o footer.
  */
-export function MobilePurchaseBar({ nft, className }: { nft: Pick<Nft, 'price' | 'editions'>; className?: string }) {
-  const soldOut = isSoldOut(nft.editions)
+export function MobilePurchaseBar({
+  nft,
+  selection,
+  className,
+}: {
+  nft: Pick<Nft, 'id' | 'price'>
+  /** A mesma seleção do `PurchasePanel`: a quantidade escolhida no painel é a que a barra adiciona. */
+  selection: PurchaseSelection
+  className?: string
+}) {
+  const { edition, quantity, soldOut } = selection
   return (
     <div
       data-slot="mobile-purchase-bar"
@@ -55,10 +65,9 @@ export function MobilePurchaseBar({ nft, className }: { nft: Pick<Nft, 'price' |
           Esgotado
         </Button>
       ) : (
-        <OutOfScopeAction variant="default" side="top">
-          <ShoppingCart aria-hidden />
-          Adicionar ao carrinho
-        </OutOfScopeAction>
+        edition && (
+          <AddToCartButton item={{ nftId: nft.id, edition: edition.kind, quantity }} available={edition.available} />
+        )
       )}
     </div>
   )

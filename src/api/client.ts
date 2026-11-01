@@ -1,4 +1,4 @@
-import axios, { isAxiosError, isCancel, type AxiosResponse } from 'axios'
+import axios, { isAxiosError, isCancel, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { API_URL } from '@/app/env'
 import { clearStoredSession, getToken } from '@/auth/sessionStorage'
 import { ApiError, isApiErrorBody, type ApiErrorCode } from '@/contracts/errors'
@@ -8,16 +8,36 @@ export const apiClient = axios.create({
   timeout: 10_000,
 })
 
-// Sessão: Bearer em toda request quando há token válido guardado
+/**
+ * Rotas que criam a sessão: não levam o Bearer. Um 401 nelas é "credenciais inválidas", não sessão
+ * morta, e não pode apagar a sessão de quem já está logado (MYK-1078).
+ */
+export const AUTH_ENTRY_PATHS: readonly string[] = ['/auth/login', '/auth/signup']
+
+function isAuthEntryPath(url: string | undefined): boolean {
+  if (url === undefined) return false
+  const path = url.split(/[?#]/, 1)[0] ?? ''
+  return AUTH_ENTRY_PATHS.includes(path.replace(/\/+$/, ''))
+}
+
+// Token que ESTA request levou. Um 401 só derruba a sessão se veio do token atual: uma request em voo
+// com o token antigo não pode apagar a sessão nova (MYK-1078). O `config` é o mesmo objeto que volta em `error.config`.
+const sentTokens = new WeakMap<InternalAxiosRequestConfig, string>()
+
+// Sessão: Bearer em toda request quando há token válido guardado, menos nas rotas de entrada
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
-  if (token) config.headers.set('Authorization', `Bearer ${token}`)
+  if (token && !isAuthEntryPath(config.url)) {
+    config.headers.set('Authorization', `Bearer ${token}`)
+    sentTokens.set(config, token)
+  }
   return config
 })
 
-// `client.ts` não importa `queryClient.ts` (ciclo); quem sabe invalidar o cache registra o callback (start.tsx)
-let unauthorizedHandler: (() => void) | null = null
-export function onUnauthorized(callback: (() => void) | null): void {
+// `client.ts` não importa `queryClient.ts` (ciclo); quem sabe resetar o estado registra o callback (start.tsx).
+// Recebe o token que morreu, para o ciclo de vida deduplicar (vários 401 do mesmo token = uma expiração).
+let unauthorizedHandler: ((token: string) => void) | null = null
+export function onUnauthorized(callback: ((token: string) => void) | null): void {
   unauthorizedHandler = callback
 }
 
@@ -50,10 +70,12 @@ apiClient.interceptors.response.use((response) => {
     throw error
   }
   const { response } = error
-  // 401 numa request que levou token: a sessão morreu. Sem token, é só "não logado" e nada a limpar.
-  if (response?.status === 401 && error.config?.headers.has('Authorization')) {
+  // 401 numa request que levou o token ATUAL: a sessão morreu. Sem token (visitante, rotas de entrada)
+  // ou com um token que já não é o guardado, é só um ApiError para quem chamou e nada a limpar.
+  const sentToken = error.config ? sentTokens.get(error.config) : undefined
+  if (response?.status === 401 && sentToken !== undefined && sentToken === getToken()) {
     clearStoredSession()
-    unauthorizedHandler?.()
+    unauthorizedHandler?.(sentToken)
   }
   if (response && isApiErrorBody(response.data)) {
     throw new ApiError(response.data, response.status, { cause: error })
