@@ -4,22 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { profileKeys } from '@/api/profile'
 import { ApiError, type Profile } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { AvatarField } from './AvatarField'
 import { AVATAR_MESSAGES, MAX_AVATAR_BYTES } from './avatar'
 import { PROFILE_UPDATED_MESSAGE } from './validation'
 
-const { updateProfile, success, session } = vi.hoisted(() => ({
+const { updateProfile, success } = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   success: vi.fn(),
-  session: { same: true },
 }))
 
 vi.mock('@/api/profile', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api/profile')>()), updateProfile }))
 vi.mock('sonner', () => ({ toast: { success } }))
-vi.mock('@/auth/sessionGuard', () => ({
-  captureSession: () => () => session.same,
-  isSameSession: (check: (() => boolean) | undefined) => check?.() === true,
-}))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 const PLAIN: Profile = { accountId: 'user-ana', displayName: 'Ana Souza', wallets: [] }
 const WITH_AVATAR: Profile = { ...PLAIN, avatarUrl: 'data:image/png;base64,AAAA' }
@@ -29,7 +26,6 @@ const input = () => document.querySelector('input[type="file"]') as HTMLInputEle
 const choose = (file?: File) => fireEvent.change(input(), { target: { files: file ? [file] : [] } })
 
 beforeEach(() => {
-  session.same = true
   updateProfile.mockReset()
   success.mockReset()
 })
@@ -139,22 +135,28 @@ describe('AvatarField', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('sessão'))
   })
 
-  it('sessão trocada com a request em voo: sem toast nem cache (sucesso e falha)', async () => {
+  it('sessão trocada com a request em voo: sem toast nem cache (sucesso)', async () => {
     let resolve!: (p: Profile) => void
     updateProfile.mockReturnValueOnce(new Promise<Profile>((r) => (resolve = r)))
     const { queryClient } = renderWithProviders(<AvatarField profile={WITH_AVATAR} />)
     fireEvent.click(screen.getByRole('button', { name: /Remover avatar/ }))
     await waitFor(() => expect(updateProfile).toHaveBeenCalled())
-    session.same = false
+    bumpSession()
     resolve(PLAIN)
-    await waitFor(() => expect(input().disabled).toBe(false))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(success).not.toHaveBeenCalled()
     expect(queryClient.getQueryData(profileKeys.detail('user-ana'))).toBeUndefined()
+  })
 
-    updateProfile.mockRejectedValueOnce(new Error('x'))
+  it('sessão trocada com a request em voo: a falha não vira alerta', async () => {
+    let reject!: (e: unknown) => void
+    updateProfile.mockReturnValueOnce(new Promise<Profile>((_, r) => (reject = r)))
+    renderWithProviders(<AvatarField profile={WITH_AVATAR} />)
     fireEvent.click(screen.getByRole('button', { name: /Remover avatar/ }))
-    await waitFor(() => expect(updateProfile).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(input().disabled).toBe(false))
+    await waitFor(() => expect(updateProfile).toHaveBeenCalled())
+    bumpSession()
+    reject(new Error('x'))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })

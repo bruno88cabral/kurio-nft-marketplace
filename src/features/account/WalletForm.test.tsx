@@ -5,6 +5,7 @@ import { walletKeys } from '@/api/wallets'
 import { profileKeys } from '@/api/profile'
 import { ApiError } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { WalletForm } from './WalletForm'
 import { WALLET_MESSAGES } from './validation'
 
@@ -12,6 +13,7 @@ const { createWallet, success } = vi.hoisted(() => ({ createWallet: vi.fn(), suc
 
 vi.mock('@/api/wallets', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api/wallets')>()), createWallet }))
 vi.mock('sonner', () => ({ toast: { success } }))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 const ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
 const field = (label: string) => screen.getByLabelText<HTMLInputElement>(new RegExp(`^${label}`))
@@ -104,5 +106,22 @@ describe('WalletForm', () => {
     submit()
     expect(await screen.findByText('Apelido repetido')).toBeTruthy()
     expect(success).not.toHaveBeenCalled()
+  })
+
+  it('sessão trocada com a request em voo: sem toast, invalidação nem limpeza do formulário', async () => {
+    let resolve!: (w: unknown) => void
+    createWallet.mockReturnValue(new Promise((r) => (resolve = r)))
+    const { queryClient } = renderWithProviders(<WalletForm accountId="user-ana" />)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    type('Endereço', ADDRESS)
+    await pickNetwork('Ethereum')
+    submit()
+    await waitFor(() => expect(createWallet).toHaveBeenCalled())
+    bumpSession()
+    resolve({})
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
+    expect(success).not.toHaveBeenCalled()
+    expect(invalidate).not.toHaveBeenCalled()
+    expect(field('Endereço').value).toBe(ADDRESS)
   })
 })

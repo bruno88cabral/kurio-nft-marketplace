@@ -3,14 +3,10 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { useAccountForm, type UseAccountFormOptions } from './useAccountForm'
 
-const { session } = vi.hoisted(() => ({ session: { same: true } }))
-
-vi.mock('@/auth/sessionGuard', () => ({
-  captureSession: () => () => session.same,
-  isSameSession: (check: (() => boolean) | undefined) => check?.() === true,
-}))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 type V = { name: string; city: string }
 const FIELDS = ['name', 'city'] as const
@@ -49,7 +45,6 @@ const type = (name: string, value: string) => fireEvent.change(input(name), { ta
 const submit = () => fireEvent.click(screen.getByRole('button', { name: 'enviar' }))
 
 beforeEach(() => {
-  session.same = true
 })
 
 describe('useAccountForm', () => {
@@ -162,9 +157,9 @@ describe('useAccountForm', () => {
     type('name', 'Ana')
     submit()
     await waitFor(() => expect(request).toHaveBeenCalled())
-    session.same = false
+    bumpSession()
     resolve('ok')
-    await waitFor(() => expect(state().submitting).toBe(false))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
@@ -175,9 +170,9 @@ describe('useAccountForm', () => {
     type('name', 'Ana')
     submit()
     await waitFor(() => expect(request).toHaveBeenCalled())
-    session.same = false
+    bumpSession()
     reject(new Error('x'))
-    await waitFor(() => expect(state().submitting).toBe(false))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(state().form).toBeUndefined()
     expect(state().api).toEqual({})
   })

@@ -42,12 +42,12 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    const navs = screen.getAllByRole('navigation', { name: 'Conta', hidden: true })
+    const navs = screen.getAllByRole('navigation', { name: 'Conta' })
     expect(navs).toHaveLength(2)
-    const tabs = screen.getByRole('link', { name: 'Perfil', hidden: true })
+    const tabs = screen.getByRole('link', { name: 'Perfil' })
     expect(tabs.getAttribute('href')).toBe('/profile')
     expect(tabs.getAttribute('aria-current')).toBeNull()
-    expect(screen.getAllByRole('link', { name: 'Carteiras', hidden: true }).map((l) => l.getAttribute('aria-current'))).toEqual([
+    expect(screen.getAllByRole('link', { name: 'Carteiras' }).map((l) => l.getAttribute('aria-current'))).toEqual([
       'page',
       'page',
     ])
@@ -59,7 +59,7 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    for (const button of screen.getAllByRole('button', { name: 'Sair', hidden: true })) fireEvent.click(button)
+    for (const button of screen.getAllByRole('button', { name: 'Sair' })) fireEvent.click(button)
     expect(signOut).toHaveBeenCalledTimes(2)
   })
 
@@ -70,10 +70,10 @@ describe('AccountLayout', () => {
         <p>x</p>
       </AccountLayout>,
     )
-    const saindo = screen.getByRole<HTMLButtonElement>('button', { name: 'Saindo…', hidden: true })
+    const saindo = screen.getByRole<HTMLButtonElement>('button', { name: 'Saindo…' })
     expect(saindo.disabled).toBe(true)
     expect(saindo.getAttribute('aria-busy')).toBe('true')
-    expect((screen.getByRole<HTMLButtonElement>('button', { name: 'Sair', hidden: true })).disabled).toBe(true)
+    expect((screen.getByRole<HTMLButtonElement>('button', { name: 'Sair' })).disabled).toBe(true)
   })
 })
 

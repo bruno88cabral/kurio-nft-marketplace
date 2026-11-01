@@ -4,21 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { profileKeys } from '@/api/profile'
 import { ApiError, type Profile } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { ProfileForm, ProfileFormSkeleton } from './ProfileForm'
 import { PROFILE_UPDATED_MESSAGE } from './validation'
 
-const { updateProfile, success, session } = vi.hoisted(() => ({
+const { updateProfile, success } = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   success: vi.fn(),
-  session: { same: true },
 }))
 
 vi.mock('@/api/profile', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api/profile')>()), updateProfile }))
 vi.mock('sonner', () => ({ toast: { success } }))
-vi.mock('@/auth/sessionGuard', () => ({
-  captureSession: () => () => session.same,
-  isSameSession: (check: (() => boolean) | undefined) => check?.() === true,
-}))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 const PROFILE: Profile = { accountId: 'user-ana', displayName: 'Ana Souza', wallets: [] }
 const name = () => screen.getByLabelText<HTMLInputElement>(/^Nome de exibição/)
@@ -26,7 +23,6 @@ const save = () => screen.getByRole<HTMLButtonElement>('button', { name: /^Salva
 const type = (value: string) => fireEvent.change(name(), { target: { value } })
 
 beforeEach(() => {
-  session.same = true
   updateProfile.mockReset()
   success.mockReset()
 })
@@ -96,11 +92,25 @@ describe('ProfileForm', () => {
     type('Outro')
     fireEvent.click(save())
     await waitFor(() => expect(updateProfile).toHaveBeenCalled())
-    session.same = false
+    bumpSession()
     resolve({ ...PROFILE, displayName: 'Outro' })
-    await waitFor(() => expect(save().textContent).not.toContain('Salvando'))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(success).not.toHaveBeenCalled()
     expect(queryClient.getQueryData(profileKeys.detail('user-ana'))).toBeUndefined()
+  })
+
+  it('sessão trocada com a request em voo: a falha não vira alerta nem erro de campo', async () => {
+    let reject!: (e: unknown) => void
+    updateProfile.mockReturnValue(new Promise<Profile>((_, r) => (reject = r)))
+    renderWithProviders(<ProfileForm profile={PROFILE} email="ana@kurio.test" />)
+    type('Outro')
+    fireEvent.click(save())
+    await waitFor(() => expect(updateProfile).toHaveBeenCalled())
+    bumpSession()
+    reject(new ApiError({ code: 'validation', message: 'x', fieldErrors: { displayName: 'Nome já usado' } }, 422))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText('Nome já usado')).toBeNull()
   })
 })
 

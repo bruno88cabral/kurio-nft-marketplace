@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { walletKeys } from '@/api/wallets'
 import { ApiError, type Wallet } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { RemoveWalletDialog, RenameWalletDialog } from './WalletDialogs'
 import { WALLET_MESSAGES } from './validation'
 
@@ -12,6 +13,7 @@ const { updateWallet, success } = vi.hoisted(() => ({ updateWallet: vi.fn(), suc
 
 vi.mock('@/api/wallets', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api/wallets')>()), updateWallet }))
 vi.mock('sonner', () => ({ toast: { success } }))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 const PRIMARY: Wallet = { id: 'w1', address: '0x1234567890abcdef1234567890abcdef12345678', network: 'ethereum', role: 'primary', label: 'Principal ETH' }
 const RESERVE: Wallet = { id: 'w2', address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', network: 'polygon', role: 'secondary', label: 'Cofre' }
@@ -80,6 +82,23 @@ describe('RenameWalletDialog', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: walletKeys.list('user-ana') })
     expect(success).toHaveBeenCalledWith(WALLET_MESSAGES.renamed)
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('sessão trocada com a request em voo: sem toast, invalidação, fechamento nem anúncio', async () => {
+    let resolve!: (w: unknown) => void
+    updateWallet.mockReturnValue(new Promise((r) => (resolve = r)))
+    const { queryClient, onOpenChange, onRenamed } = setup(PRIMARY)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    type('Nova')
+    save()
+    await waitFor(() => expect(updateWallet).toHaveBeenCalled())
+    bumpSession()
+    resolve({})
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
+    expect(success).not.toHaveBeenCalled()
+    expect(invalidate).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(onRenamed).not.toHaveBeenCalled()
   })
 
   it('durante o envio mostra "Salvando…" desabilitado', async () => {

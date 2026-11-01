@@ -4,23 +4,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { walletKeys } from '@/api/wallets'
 import { ApiError, type Wallet } from '@/contracts'
 import { renderWithProviders } from '@/test/render'
+import { bumpSession, guardChecks } from '@/test/sessionGuardMock'
 import { WalletList, WalletListSkeleton } from './WalletList'
 import { WALLET_MESSAGES } from './validation'
 
-const { updateWallet, deleteWallet, success, error, session } = vi.hoisted(() => ({
+const { updateWallet, deleteWallet, success, error } = vi.hoisted(() => ({
   updateWallet: vi.fn(),
   deleteWallet: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
-  session: { same: true },
 }))
 
 vi.mock('@/api/wallets', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api/wallets')>()), updateWallet, deleteWallet }))
 vi.mock('sonner', () => ({ toast: { success, error } }))
-vi.mock('@/auth/sessionGuard', () => ({
-  captureSession: () => () => session.same,
-  isSameSession: (check: (() => boolean) | undefined) => check?.() === true,
-}))
+vi.mock('@/auth/sessionGuard', async () => (await import('@/test/sessionGuardMock')).sessionGuardMock())
 
 const PRIMARY: Wallet = { id: 'w1', address: '0x1234567890abcdef1234567890abcdef12345678', network: 'ethereum', role: 'primary', label: 'Principal ETH' }
 const RESERVE: Wallet = { id: 'w2', address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', network: 'polygon', role: 'secondary', label: 'Cofre' }
@@ -41,7 +38,6 @@ function setup(wallets: Wallet[] = [RESERVE, PRIMARY]) {
 }
 
 beforeEach(() => {
-  session.same = true
   for (const fn of [updateWallet, deleteWallet, success, error]) fn.mockReset()
 })
 
@@ -128,9 +124,9 @@ describe('WalletList: definir como principal', () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     choose('Cofre', 'Definir como principal')
     await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeTruthy())
-    session.same = false
+    bumpSession()
     resolve({})
-    await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeNull())
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(success).not.toHaveBeenCalled()
     expect(invalidate).not.toHaveBeenCalled()
     expect(live()).toBe('')
@@ -142,9 +138,9 @@ describe('WalletList: definir como principal', () => {
     const { container } = setup()
     choose('Cofre', 'Definir como principal')
     await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeTruthy())
-    session.same = false
+    bumpSession()
     reject(new Error('x'))
-    await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).toBeNull())
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(error).not.toHaveBeenCalled()
   })
 })
@@ -215,7 +211,7 @@ describe('WalletList: remover', () => {
     expect(success).not.toHaveBeenCalled()
   })
 
-  it('sessão trocada com a request em voo: sem toast nem invalidação (sucesso e falha)', async () => {
+  it('sessão trocada com a request em voo: sem toast nem invalidação (sucesso)', async () => {
     let resolve!: () => void
     deleteWallet.mockReturnValueOnce(new Promise<void>((r) => (resolve = r)))
     const { queryClient } = setup()
@@ -223,16 +219,23 @@ describe('WalletList: remover', () => {
     choose('Cofre', 'Remover')
     fireEvent.click(await screen.findByRole('button', { name: 'Remover' }))
     await screen.findByRole('button', { name: /Removendo/ })
-    session.same = false
+    bumpSession()
     resolve()
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Removendo/ })).toBeNull())
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(success).not.toHaveBeenCalled()
     expect(invalidate).not.toHaveBeenCalled()
+  })
 
-    deleteWallet.mockRejectedValueOnce(new Error('x'))
-    fireEvent.click(screen.getByRole('button', { name: 'Remover' }))
-    await waitFor(() => expect(deleteWallet).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Removendo/ })).toBeNull())
+  it('sessão trocada com a request em voo: a falha não mostra toast', async () => {
+    let reject!: (e: unknown) => void
+    deleteWallet.mockReturnValueOnce(new Promise<void>((_, r) => (reject = r)))
+    setup()
+    choose('Cofre', 'Remover')
+    fireEvent.click(await screen.findByRole('button', { name: 'Remover' }))
+    await screen.findByRole('button', { name: /Removendo/ })
+    bumpSession()
+    reject(new Error('x'))
+    await waitFor(() => expect(guardChecks()).toEqual([false]))
     expect(error).not.toHaveBeenCalled()
   })
 })
