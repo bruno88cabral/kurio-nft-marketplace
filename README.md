@@ -87,7 +87,7 @@ Os dois começam com carrinho vazio e nenhum pedido. Cupons: `KURIO10` (válido,
 
 ### Entrar e sair
 
-1. Com o app aberto (mocks ligados), clique em **Entrar** no header (ou abra `/login`) e use `ana@kurio.test` / `Kurio#2026` (ou `bruno@kurio.test`). O modal abre sobre o Início; ao entrar você volta para onde estava (`?redirect=`), e o header mostra o nome ("Ana Souza"). **Criar conta** abre o cadastro (`/signup`).
+1. Com o app aberto (mocks ligados), clique em **Entrar** no header (ou abra `/login`) e use `ana@kurio.test` / `Kurio#2026` (ou `bruno@kurio.test`). O modal abre sobre o Início; ao entrar você volta para onde estava (`?redirect=`), e o header mostra o nome ("Ana Souza"). No desktop as abas **Entrar | Criar conta** trocam entre `/login` e `/signup`; no celular a tela é inteira, sem header nem tab bar, com o link "Crie uma conta" / "Entre" no rodapé e um **Voltar** no canto (Esc também fecha). As duas formas mantêm o `redirect`.
 2. Abrir uma rota protegida sem sessão (`/profile`, `/wallets`) leva a `/login?redirect=<rota>` e volta para ela depois de entrar. Fechar esse modal (X ou Esc) leva ao Início.
 3. **Sair:** menu da conta no header (nome > "Sair"). No celular e no tablet (abaixo de 1024 px), o botão **Sair** fica no topo de Perfil e Carteiras. O toast é "Você saiu da conta.".
 4. **Trocar de usuário (Ana → Bruno):** saia e entre com o outro e-mail, na **mesma aba**. O cache de favoritos, perfil e carteiras é zerado a cada troca; o Bruno vê as 2 carteiras dele e nenhuma da Ana.
