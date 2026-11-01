@@ -3,7 +3,7 @@ import { parseEth } from '@/lib/eth'
 import { getScenario } from '../scenarios'
 import type { BusEvent } from './bus'
 import { seed } from './seed'
-import { createStore, DB_STORAGE_KEY, type MockStorage } from './store'
+import { createStore, DB_SCHEMA_VERSION, DB_STORAGE_KEY, type MockStorage } from './store'
 
 const scenario = getScenario('default')
 
@@ -115,13 +115,25 @@ describe('createStore', () => {
     const cases: Array<Record<string, string>> = [
       { [DB_STORAGE_KEY]: stale },
       { [DB_STORAGE_KEY]: '{não é json' },
-      { [DB_STORAGE_KEY]: JSON.stringify({ schema: 1, catalog: 'full', db: { users: {} } }) },
+      { [DB_STORAGE_KEY]: JSON.stringify({ schema: DB_SCHEMA_VERSION, catalog: 'full', db: { users: {} } }) },
       { 'kurio:mock-db:v0': stale },
     ]
     for (const initial of cases) {
       const store = createStore({ storage: memoryStorage(initial), scenario })
       expect(store.getDb()).toEqual(seed(scenario))
     }
+  })
+
+  it('descarta o db v1, que ainda apontava para as SVGs removidas na MYK-1079', () => {
+    const db = seed(scenario)
+    for (const nft of Object.values(db.nfts)) {
+      nft.imageUrl = '/nfts/aurora-prime.svg'
+      nft.images = ['/nfts/aurora-prime.svg']
+    }
+    const storage = memoryStorage({ [DB_STORAGE_KEY]: JSON.stringify({ schema: 1, catalog: 'full', db }) })
+    const nfts = Object.values(createStore({ storage, scenario }).getDb().nfts)
+    expect(nfts.length).toBeGreaterThan(0)
+    for (const nft of nfts) expect(nft.imageUrl).toMatch(/^\/nfts\/macaco-.+-960\.webp$/)
   })
 
   it('troca de catálogo (empty ↔ default) refaz o seed; o mesmo catálogo preserva o estado', () => {
