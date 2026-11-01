@@ -9,7 +9,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [
     // O plugin do router precisa vir antes do react()
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    // Fora do Vitest: o plugin injeta HMR e code-splitting que o Vitest não executa (o `routeTree.gen.ts` é commitado)
+    ...(process.env.VITEST ? [] : [tanstackRouter({ target: 'react', autoCodeSplitting: true })]),
     react(),
     tailwindcss(),
   ],
@@ -42,14 +43,12 @@ export default defineConfig({
         lines: 62,
         statements: 63,
         functions: 56,
-        branches: 59,
+        branches: 61,
         // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
         'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/layout/{AccountMenu,SessionLink}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
-        // Rotas: o plugin do router injeta código de HMR (import.meta.hot) que não executa no Vitest; valores medidos
-        'src/routes/_authenticated.tsx': { lines: 91, statements: 92, functions: 100, branches: 81 },
-        'src/routes/{login,signup}.tsx': { lines: 87, statements: 88, functions: 100, branches: 71 },
+        'src/routes/{login,signup,_authenticated}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
       },
     },
   },

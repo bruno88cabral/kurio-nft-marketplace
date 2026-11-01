@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+// Só pelo efeito colateral: registra o cleanup e a limpeza de storage do afterEach
 import '@/test/render'
 import { navigateSpy } from '@/test/routerMock'
 import { focusMainContent, SIGNED_OUT_MESSAGE, useSignOut } from './useSignOut'

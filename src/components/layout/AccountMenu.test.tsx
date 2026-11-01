@@ -86,6 +86,10 @@ describe('AccountMenu', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
     expect(document.activeElement).toBe(main)
     expect(document.activeElement).not.toBe(trigger)
-    act(() => finish())
+    await act(async () => {
+      finish()
+      await Promise.resolve()
+    })
+    expect(screen.queryByRole('menuitem', { name: 'Saindo…' })).toBeNull()
   })
 })

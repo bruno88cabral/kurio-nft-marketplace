@@ -20,7 +20,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 type Ctx = { context: { queryClient: Pick<QueryClient, 'ensureQueryData'> }; location: { href: string } }
 const options = Route.options as unknown as {
   beforeLoad: (ctx: Ctx) => Promise<void>
-  errorComponent: ((props: ErrorComponentProps) => ReactNode) & { preload?: () => Promise<void> }
+  errorComponent: ((props: ErrorComponentProps) => ReactNode)
 }
 
 // Função simples (não `vi.fn`): o Vitest marca como não tratada a rejeição devolvida por um mock
@@ -95,11 +95,9 @@ describe('beforeLoad de /_authenticated', () => {
 })
 
 describe('errorComponent de /_authenticated', () => {
-  it('mostra o aviso e "Tentar novamente" reinicia o boundary e invalida o router', async () => {
+  it('mostra o aviso e "Tentar novamente" reinicia o boundary e invalida o router', () => {
     const reset = vi.fn()
     const ErrorView = options.errorComponent
-    // Componente code-split (lazy): carrega antes de renderizar
-    await ErrorView.preload?.()
     renderWithProviders(<ErrorView error={new Error('x')} reset={reset} info={undefined} />)
     expect(screen.getByText('Não foi possível confirmar sua sessão.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Tentar novamente/ }))
