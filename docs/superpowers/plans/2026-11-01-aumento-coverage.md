@@ -23,17 +23,17 @@ uma subtask `MYK-` da task-mãe "Aumentar coverage de testes para ≥ 80%" e o I
 
 | ID | Task | Depende de | Esforço | Threshold ao fim (linhas/stmts/funcs/branches) | Status | PR / Linear |
 |---|---|---|---|---|---|---|
-| COV-0 | Infra do coverage e CI | — | 0,5 d | baseline medido − 1 | a fazer | |
-| COV-1 | Helpers de teste (`src/test/`) | COV-0 | 0,5 d | igual | a fazer | |
+| COV-0 | Infra do coverage e CI | — | 0,5 d | baseline medido − 1 | concluído na branch `bruno88cabral/cov-rodada-1` (PR: a preencher) | |
+| COV-1 | Helpers de teste (`src/test/`) | COV-0 | 0,5 d | igual | concluído na branch `bruno88cabral/cov-rodada-1` (PR: a preencher) | |
 | COV-2 | Harness MSW + handlers de conta | COV-1 | 1 d | medido − 1 | a fazer | |
 | COV-3 | Handlers de catálogo, carrinho, pedidos e cenários | COV-2 | 1 d | medido − 1 | a fazer | |
 | COV-4 | Smoke tests de `components/ui` | COV-1 | 0,5 d | medido − 1 | a fazer | |
 | COV-5 | `components/kurio` | COV-1 | 0,75 d | medido − 1 | a fazer | |
 | COV-6 | `components/layout` | COV-1 | 0,75 d | medido − 1 | a fazer | |
-| COV-7 | Conta: entrar, cadastrar e sair | COV-1 | 1,5 d | medido − 1 | a fazer | |
-| COV-8 | Conta: perfil, senha, avatar e carteiras | COV-7 | 1,5 d | medido − 1 | a fazer | |
-| COV-9 | Catálogo (Início) | COV-1, COV-4 | 1,25 d | medido − 1 | a fazer | |
-| COV-10 | Detalhe, favoritos, pedidos, lacunas de carrinho e checkout | COV-1 | 1,25 d | medido − 1 | a fazer | |
+| COV-7 | Conta: entrar, cadastrar e sair | COV-1 | 1,5 d | medido − 1 | concluído na branch `bruno88cabral/cov-rodada-1` (PR: a preencher) | |
+| COV-8 | Conta: perfil, senha, avatar e carteiras | COV-7 | 1,5 d | medido − 1 | concluído na branch `bruno88cabral/cov-rodada-1` (PR: a preencher) | |
+| COV-9 | Catálogo (Início) | COV-1, COV-4 | 1,25 d | medido − 1 | concluído na branch `bruno88cabral/cov-rodada-1` (PR: a preencher) | |
+| COV-10 | Detalhe, favoritos, pedidos, lacunas de carrinho e checkout | COV-1 | 1,25 d | medido − 1 | parcial (10a concluído: detalhe e favoritos; pedidos, carrinho e checkout pendentes) | |
 | COV-11 | Rotas e fechamento em 80% | todas | 1 d | **80 / 80 / 80 / 80** | a fazer | |
 | | **Total** | | **~11,5 d** | | | |
 
@@ -84,9 +84,11 @@ depois rebaseia e mede de novo.
   papel. Textos esperados vêm do componente (copy em pt-BR), não inventados.
 - Não alterar código de produção, exceto onde a task disser. Se um arquivo for intestável sem mudança,
   parar e registrar no PR.
-- Testes ficam ao lado do arquivo testado (`Foo.tsx` → `Foo.test.tsx`), como no resto do repo.
+- Testes ficam ao lado do arquivo testado (`Foo.tsx` → `Foo.test.tsx`), como no resto do repo. Exceção: em `src/routes` o
+  arquivo de teste leva o prefixo `-` (ex.: `src/routes/-login.test.tsx`); sem ele o gerador do TanStack Router o
+  trata como rota (`routeFileIgnorePrefix: "-"`).
 - Contas de teste: `ana@kurio.test` / `bruno@kurio.test`, senha `Kurio#2026` (`FIXTURE_PASSWORD`).
-- Commits em pt-BR no formato do repo (`test: ... (COV-n)`), um PR por task para `develop`.
+- Commits em pt-BR no formato do repo (`test: ... (COV-n)`), um PR por task para `develop`; a Rodada 1 foi entregue num PR único (branch `bruno88cabral/cov-rodada-1`).
 
 ## Review Focus
 
@@ -627,14 +629,14 @@ git commit -m "test: detalhe do NFT, favoritos, status do pedido e lacunas de ca
 ### Task COV-11: Rotas e fechamento em 80%
 
 **Files:**
-- Test: `src/routes/routes.test.ts` (guards, `validateSearch`, loaders e `head`)
+- Test: `src/routes/-<rota>.test.tsx` só para as rotas que faltam: `cart.tsx`, `_authenticated/checkout.tsx`, `_authenticated/orders.$orderId.tsx` e `__root.tsx` (guards, `validateSearch`, loaders, `head` e `component`)
 - Test: `src/realtime/socket.test.ts`, `src/mocks/devtools.test.ts` (casos que faltam)
 - Modify: `vite.config.ts` (thresholds 80/80/80/80)
 - Modify: `ARCHITECTURE.md` (seção de testes e a linha "os componentes de formulário de conta (M3) não têm teste
   automatizado"), `README.md` (tabela de scripts com `test:coverage`)
 - Modify: `docs/superpowers/specs/2026-11-01-aumento-coverage-design.md` (status "concluído" e medição final)
 
-- [ ] **Step 1: Escrever `routes.test.ts`**
+- [ ] **Step 1: Escrever os `-<rota>.test.tsx` que faltam**
 
 Chamar `Route.options.beforeLoad`/`loader`/`validateSearch` direto, com `queryClient` de `createTestQueryClient()`:
 - `_authenticated`: sem sessão lança `redirect` para `/login` com o `redirect` do `location.href`; com sessão segue.
@@ -643,7 +645,7 @@ Chamar `Route.options.beforeLoad`/`loader`/`validateSearch` direto, com `queryCl
 - `nfts.$nftId`: `validateSearch` descarta edição inválida; `loader` com id inexistente lança `notFound`; `head` usa
   `'<nome> · Kurio'` e `'NFT · Kurio'` sem dados.
 - `orders.$orderId`: `loader` busca o pedido da conta.
-Os `component` de rota ficam cobertos pelas features; se algum ficar abaixo de 80% e puxar a média, renderizar com `routerMock`.
+O `component` de cada rota também é testado, como na Rodada 1 (rota real via `routeModuleMock` de `@/test/routerMock`, features como stubs).
 
 - [ ] **Step 2: Rodar o coverage completo e fechar os buracos**
 

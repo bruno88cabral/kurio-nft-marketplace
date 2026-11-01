@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-01
 - **Autor:** Bruno Cabral (com Claude)
-- **Status:** aprovado com ajustes (ver seção 7); plano em `docs/superpowers/plans/2026-11-01-aumento-coverage.md`
+- **Status:** Rodada 1 concluída (ver seção 7); plano em `docs/superpowers/plans/2026-11-01-aumento-coverage.md`
 - **Time no Linear:** Mykas (`MYK-`)
 - **Branch alvo:** `develop`
 
@@ -112,6 +112,8 @@ export default defineConfig({
   do `vitest` (5.0.5).
 - `coverage/` no `.gitignore`.
 - CI: o job `test` passa a rodar `pnpm test:coverage`.
+- O plugin `tanstackRouter` fica desligado quando `process.env.VITEST` (Rodada 1, R7): o código de HMR e de
+  code-splitting que ele injeta é inalcançável no Vitest. Dev, build e `routeTree.gen.ts` não mudam.
 - O ambiente continua por arquivo (`// @vitest-environment jsdom`), como hoje. Não mudar o default
   para jsdom: os testes de domínio rodam em node de propósito.
 
@@ -138,6 +140,9 @@ Hoje cada `*.test.tsx` repete `vi.mock('@/api/client')`, `vi.mock('@tanstack/rea
 - `src/test/routerMock.tsx`: fábrica do mock do `@tanstack/react-router` (`Link` vira `<a href>`,
   `Navigate`, `useNavigate`, `useSearch`, `useParams`) para usar em `vi.mock(..., () => routerMock())`.
 - `src/test/session.ts`: contas de teste (`ANA`, `BRUNO`, visitante) e o mock de `useSession`.
+- `src/test/nftFixtures.ts`: `makeNft` e demais fábricas de NFT para os testes de catálogo, detalhe e favoritos.
+- `src/test/authRoute.tsx`: `AuthDialogStub`, `guardarSessao` e `thrownBy` para os testes das rotas de entrada e da guarda.
+- `src/test/sessionGuardMock.ts`: mock da guarda de sessão (`captureSession`) dos testes de conta.
 - `src/test/mockServer.ts`: `setupServer` do `msw/node` com os handlers reais de `src/mocks/handlers` e reset
   do store/cenário entre testes (Fase 1).
 
@@ -159,8 +164,9 @@ fábricas. Os testes existentes **não** precisam migrar; migrar quando forem to
   cobre de uma vez os handlers e as funções finas de `src/api/*` que faltam (`favorites`, `nfts`,
   `profile`, `wallets`, `auth`).
 - **Rotas (`src/routes`):** testar o que tem lógica: `beforeLoad`/guards de `_authenticated.tsx`,
-  `validateSearch` e loaders. O `component` das rotas só monta a feature e é coberto pelos testes das
-  features.
+  `validateSearch`, loaders e `head`. O `component` também é testado (como na Rodada 1), com a rota real e as
+  features como stubs. Os arquivos de teste levam o prefixo `-` (`src/routes/-login.test.tsx`); sem ele o gerador
+  do TanStack Router os trata como rota (`routeFileIgnorePrefix: "-"`).
 
 ## 5. Plano por fases e esforço
 
@@ -224,3 +230,7 @@ quando o Linear tiver cota, uma subtask `MYK-` da task-mãe "Aumentar coverage d
 | 2026-11-01 | Fases da seção 5 refinadas em 12 tasks: a Fase 0 vira COV-0 (infra) + COV-1 (helpers); handlers em COV-2/COV-3; `components/` em COV-4 (ui), COV-5 (kurio), COV-6 (layout); conta em COV-7/COV-8; catálogo em COV-9; demais features em COV-10; rotas e fechamento em COV-11 | tasks menores, cada uma com um PR revisável e o próprio ratchet |
 | 2026-11-01 | Harness do MSW definido: jsdom + `setupServer` + `apiClient` real, `vi.mock('@/mocks/runtime')` com latência 0 | o axios precisa do adapter XHR para URL relativa; latência de 150 ms por request deixaria a suíte lenta |
 | 2026-11-01 | Esforço total revisto de ~10,5 para **~11,5 dias** | smoke tests de ui e helpers separados |
+| 2026-11-01 | **Rodada 1**: 4 fluxos essenciais com 100% (conta de entrada/saída, perfil/senha/avatar/carteiras, catálogo do Início, detalhe e favoritos), executados na ordem COV-0, COV-1, COV-7, COV-8, COV-9, COV-10a. Resultado: global L 80,11 / S 79,25 / F 78,85 / B 79,51; 112 arquivos e 881 testes; 58 de 61 arquivos dos fluxos em 100% | decisão do Bruno de priorizar os fluxos antes do backlog inteiro |
+| 2026-11-01 | R7: plugin `tanstackRouter` desligado quando `process.env.VITEST` | o código de HMR e de code-splitting injetado é inalcançável no Vitest; dev, build e `routeTree.gen.ts` não mudam |
+| 2026-11-01 | Exceções a 100% (R8/R9): `HeroFeatured.tsx:73`, `WalletForm.tsx:39`, `avatar.ts:28`, com thresholds por glob no valor medido | guardas de tipo inalcançáveis (`noUncheckedIndexedAccess`, `filter(Boolean)`, rede já validada); sem `v8 ignore` |
+| 2026-11-01 | Helpers novos fora da §4.3 original: `nftFixtures.ts`, `authRoute.tsx` e `sessionGuardMock.ts` (agora listados na §4.3) | necessários aos testes de detalhe, rotas de entrada e conta |
