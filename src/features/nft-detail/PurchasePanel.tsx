@@ -1,17 +1,18 @@
-import { Ban, Info, Share2, ShoppingCart } from 'lucide-react'
+import { Ban, CircleAlert, Info, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import type { Nft, NftEditionKind } from '@/contracts'
 import { EditionChips, OutOfScopeAction, QuantityStepper } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
+import { AddToCartButton } from '@/features/cart/AddToCartButton'
 import { NftFavoriteButton } from '@/features/favorites/FavoriteButton'
-import { editionLabel, isSoldOut } from '@/lib/editions'
+import { editionLabel } from '@/lib/editions'
 import { cn } from '@/lib/utils'
-import { clampEditionQuantity, resolveEdition } from './edition'
+import type { PurchaseSelection } from './usePurchaseSelection'
 
 export interface PurchasePanelProps {
   nft: Pick<Nft, 'id' | 'name' | 'editions'>
-  /** Edição pedida em `?edition=` (pode não existir no NFT ou estar esgotada). */
-  requestedEdition: NftEditionKind | undefined
+  /** Edição e quantidade escolhidas (`usePurchaseSelection`, compartilhada com a `MobilePurchaseBar`). */
+  selection: PurchaseSelection
   onEditionChange: (kind: NftEditionKind) => void
   className?: string
 }
@@ -20,14 +21,14 @@ export interface PurchasePanelProps {
  * Área de compra: edição (chips, escolha na URL), quantidade (1..available da edição), carrinho
  * e compartilhar (fora de escopo neste milestone, "Em breve") e favoritar (funcional).
  * No mobile o "Adicionar ao carrinho" sai daqui e fica na barra fixa (`MobilePurchaseBar`).
- * Remonte com `key={nft.id}` ao trocar de NFT (a quantidade é estado local).
+ * A seleção (edição + quantidade) vem da rota, que remonta com `key={nft.id}` ao trocar de NFT.
  */
-export function PurchasePanel({ nft, requestedEdition, onEditionChange, className }: PurchasePanelProps) {
-  const soldOut = isSoldOut(nft.editions)
-  const { edition, unavailable } = resolveEdition(nft, requestedEdition)
-  const [rawQuantity, setRawQuantity] = useState(1)
-  // Clamp derivado (sem efeito): trocar para uma edição com menos unidades limita na hora
-  const quantity = clampEditionQuantity(edition, rawQuantity)
+export function PurchasePanel({ nft, selection, onEditionChange, className }: PurchasePanelProps) {
+  const { edition, unavailable, quantity, setQuantity, soldOut } = selection
+  // 409 do carrinho: vale só para a edição e a quantidade em que ocorreu (muda a escolha, o aviso some)
+  const [stockError, setStockError] = useState<{ key: string; message: string } | null>(null)
+  const selectionKey = `${edition?.kind}:${quantity}`
+  const stockMessage = stockError?.key === selectionKey ? stockError.message : null
 
   return (
     <section aria-labelledby="nft-compra" data-slot="purchase-panel" className={cn('flex flex-col gap-5', className)}>
@@ -72,7 +73,7 @@ export function PurchasePanel({ nft, requestedEdition, onEditionChange, classNam
 
       <QuantityStepper
         value={quantity}
-        onChange={setRawQuantity}
+        onChange={setQuantity}
         min={1}
         max={edition?.available ?? 1}
         disabled={soldOut || !edition}
@@ -87,16 +88,27 @@ export function PurchasePanel({ nft, requestedEdition, onEditionChange, classNam
             Esgotado
           </Button>
         ) : (
-          <OutOfScopeAction variant="default" size="lg" className="hidden md:inline-flex">
-            <ShoppingCart aria-hidden />
-            Adicionar ao carrinho
-          </OutOfScopeAction>
+          edition && (
+            <AddToCartButton
+              item={{ nftId: nft.id, edition: edition.kind, quantity }}
+              available={edition.available}
+              onStockError={(message) => setStockError(message === null ? null : { key: selectionKey, message })}
+              size="lg"
+              className="hidden md:inline-flex"
+            />
+          )
         )}
         <NftFavoriteButton nft={nft} className="h-10" />
         <OutOfScopeAction variant="outline" size="icon-lg" label="Compartilhar">
           <Share2 aria-hidden />
         </OutOfScopeAction>
       </div>
+      {stockMessage && (
+        <p role="alert" className="text-destructive text-caption hidden items-center gap-1.5 md:inline-flex">
+          <CircleAlert aria-hidden className="size-3.5 shrink-0" />
+          {stockMessage}
+        </p>
+      )}
     </section>
   )
 }

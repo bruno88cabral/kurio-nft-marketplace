@@ -51,6 +51,9 @@ export interface ExpiredNavigation {
 /** Chamado depois de cada login/cadastro (ex.: merge do carrinho do visitante, MYK-1051). */
 export type SessionEstablishedHook = (auth: AuthResponse) => void | Promise<void>
 
+/** Chamado, síncrono, a cada reset privado (ex.: o reconciliador do tempo real esquece versões e `eventId`, MYK-1091). */
+export type PrivateResetListener = () => void
+
 type TimerHandle = ReturnType<typeof setTimeout>
 
 export interface SessionLifecycleDeps {
@@ -92,6 +95,11 @@ export interface SessionLifecycle {
   resumeSession: () => void
   /** Registra um hook pós-login; devolve a função que o remove. */
   onSessionEstablished: (hook: SessionEstablishedHook) => () => void
+  /**
+   * Registra um ouvinte do reset privado (login, cadastro, troca de conta, logout, expiração e o `storage` de outra
+   * aba), chamado no mesmo bloco síncrono que zera o cache privado. Devolve a função que o remove.
+   */
+  onPrivateReset: (listener: PrivateResetListener) => () => void
   setExpiredNavigation: (navigation: ExpiredNavigation | null) => void
 }
 
@@ -101,6 +109,7 @@ const MAX_TIMER_MS = 2_147_483_647
 export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycle {
   const { queryClient } = deps
   const hooks = new Set<SessionEstablishedHook>()
+  const resetListeners = new Set<PrivateResetListener>()
   const privateFilter = { predicate: (query: { queryKey: QueryKey }) => isPrivateQueryKey(query.queryKey) }
   let expiryTimer: TimerHandle | null = null
   let navigation: ExpiredNavigation | null = null
@@ -136,6 +145,14 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
       predicate: (query) => isPrivateQueryKey(query.queryKey) && query.getObserversCount() === 0,
     })
     queryClient.getMutationCache().clear()
+    for (const listener of resetListeners) {
+      try {
+        listener()
+      } catch (e) {
+        // Um ouvinte com falha não pode deixar o reset pela metade
+        console.error('[session] ouvinte do reset privado falhou', e)
+      }
+    }
   }
 
   async function resetPrivateState() {
@@ -228,6 +245,10 @@ export function createSessionLifecycle(deps: SessionLifecycleDeps): SessionLifec
     onSessionEstablished: (hook) => {
       hooks.add(hook)
       return () => void hooks.delete(hook)
+    },
+    onPrivateReset: (listener) => {
+      resetListeners.add(listener)
+      return () => void resetListeners.delete(listener)
     },
     setExpiredNavigation: (next) => {
       navigation = next
