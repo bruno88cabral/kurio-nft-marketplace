@@ -40,10 +40,10 @@ export default defineConfig({
       ],
       reporter: ['text-summary', 'json-summary', 'html'],
       thresholds: {
-        lines: 68,
-        statements: 68,
-        functions: 65,
-        branches: 68,
+        lines: 75,
+        statements: 74,
+        functions: 73,
+        branches: 75,
         // COV-7: fluxo "entrar, cadastrar, sair e guarda de rota" travado em 100%
         'src/features/account/{LoginForm,SignupForm,AuthDialog,PasswordInput}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/features/account/{useAuthForm,useSignOut,authGuards,authRedirect,validation}.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
@@ -55,6 +55,15 @@ export default defineConfig({
         'src/components/layout/HeaderSearch.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/components/kurio/{NftCard,StateMessage,PriceTag}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
         'src/routes/index.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // COV-8: fluxo "Conta: perfil, senha, avatar e carteiras" travado em 100% (WalletForm e avatar: ver abaixo)
+        'src/features/account/{ProfileForm,PasswordForm,AvatarField,WalletList,WalletDialogs,AccountLayout,AccountPanel}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/features/account/useAccountForm.ts': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/components/kurio/{WalletCard,AccountSidebar,FormField}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        'src/routes/_authenticated/{profile,wallets}.tsx': { lines: 100, statements: 100, functions: 100, branches: 100 },
+        // WalletForm: `if (!isNetwork(network)) throw` é inalcançável (validateWallet já recusa rede vazia antes do request)
+        'src/features/account/WalletForm.tsx': { lines: 100, statements: 94, functions: 100, branches: 90 },
+        // avatar.ts: `Array.from(word)[0] ?? ''` em initials é inalcançável (o filter(Boolean) garante palavra não vazia)
+        'src/features/account/avatar.ts': { lines: 100, statements: 100, functions: 100, branches: 90 },
         // HeroFeatured: `if (!current) return null` em FeaturedCarousel é inalcançável (o pai já trata lista vazia)
         'src/features/catalog/HeroFeatured.tsx': { lines: 100, statements: 95, functions: 100, branches: 94 },
       },
