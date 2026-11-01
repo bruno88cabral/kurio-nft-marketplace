@@ -13,7 +13,7 @@ export interface WalletConnectionState {
   selectedId: Id | undefined
   /** A carteira cadastrada de `selectedId`. */
   selected: Wallet | undefined
-  /** A escolhida está conectada (`connectedWalletId` do rascunho). */
+  /** A escolhida está conectada (`connectedWalletId` do rascunho) com um provedor escolhido. */
   connected: boolean
   connection: WalletConnection
   /** Trocar de carteira desconecta a anterior. Com tentativa pendente não faz nada (a carteira fica travada). */
@@ -53,10 +53,11 @@ export function useWalletConnection({
   /** As carteiras em ordem (`sortWallets`); `undefined` enquanto carregam. */
   wallets: readonly Wallet[] | undefined
 }): WalletConnectionState {
-  // A conexão em andamento (carteira e provedor de quando começou) e o número da última, para que uma resposta
-  // antiga não apague o "Conectando…" de uma nova
+  // A conexão em andamento (carteira e provedor de quando começou) e a geração dela. Começar outra conexão, trocar
+  // de carteira ou de provedor e "Desconectar" abrem uma geração nova: só a resposta da geração atual vale (uma
+  // resposta antiga não conecta depois de a seleção mudar e voltar, nem desfaz um "Desconectar")
   const [inFlight, setInFlight] = useState<{ walletId: Id; provider: WalletProvider }>()
-  const lastConnect = useRef(0)
+  const generation = useRef(0)
   const [walletError, setWalletError] = useState<string>()
   // Só depois de um "Desconectar" explícito, em memória: o rascunho guarda conexão, não a história dela
   const [disconnected, setDisconnected] = useState(false)
@@ -67,7 +68,8 @@ export function useWalletConnection({
     pending?.body.walletId ?? (wallets?.some((w) => w.id === draft.walletId) ? draft.walletId : wallets?.[0]?.id)
   const selected = wallets?.find((w) => w.id === selectedId)
   const provider = draft.provider
-  const connected = selectedId !== undefined && draft.connectedWalletId === selectedId
+  // Sem provedor não há conexão (um rascunho anterior ao provedor pode ter `connectedWalletId` sozinho)
+  const connected = selectedId !== undefined && provider !== undefined && draft.connectedWalletId === selectedId
   const connecting = inFlight !== undefined && inFlight.walletId === selectedId && inFlight.provider === provider
   const connection: WalletConnection = connected
     ? { status: 'connected' }
@@ -84,8 +86,15 @@ export function useWalletConnection({
     setDisconnected(false)
   }
 
+  /** Descarta a conexão em andamento: a resposta dela não conecta nem vira erro. */
+  const invalidateConnect = () => {
+    generation.current += 1
+    setInFlight(undefined)
+  }
+
   const selectWallet = (walletId: Id) => {
     if (pending || walletId === selectedId) return
+    invalidateConnect()
     resetFeedback()
     // Trocar de carteira desconecta a anterior
     drafts.set({ ...withoutConnection(drafts.get()), walletId })
@@ -109,6 +118,7 @@ export function useWalletConnection({
 
   const selectProvider = (next: WalletProvider) => {
     if (pending || next === provider) return
+    invalidateConnect()
     resetFeedback()
     // Trocar de provedor desconecta
     drafts.set({ ...withoutConnection(drafts.get()), provider: next })
@@ -118,7 +128,7 @@ export function useWalletConnection({
     if (!selectedId || !provider || connecting) return
     const sameSession = captureSession()
     const walletId = selectedId
-    const id = ++lastConnect.current
+    const id = ++generation.current
     // A carteira e o provedor ainda são os de quando a conexão começou?
     const stillChosen = () => {
       const current = drafts.get()
@@ -128,20 +138,21 @@ export function useWalletConnection({
     resetFeedback()
     try {
       await connectWallet(walletId)
-      if (!sameSession() || !stillChosen()) return
+      if (!sameSession() || id !== generation.current || !stillChosen()) return
       // A pessoa trocou de carteira durante a conexão: a resposta atrasada não desfaz a troca
       const next = withConnectedWallet(drafts.get(), walletId)
       if (next) drafts.set(next)
     } catch (error) {
-      if (!sameSession() || !stillChosen() || id !== lastConnect.current) return
+      if (!sameSession() || id !== generation.current || !stillChosen()) return
       setWalletError(error instanceof ApiError && error.status === 409 ? error.message : WALLET_FAILURE_MESSAGE)
     } finally {
-      if (id === lastConnect.current) setInFlight(undefined)
+      if (id === generation.current) setInFlight(undefined)
     }
   }
 
   const disconnect = () => {
     if (pending || !connected) return
+    invalidateConnect()
     resetFeedback()
     drafts.set(withoutConnection(drafts.get()))
     setDisconnected(true)

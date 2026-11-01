@@ -7,8 +7,10 @@ import { createDraftStore, type CheckoutDraft } from './checkoutDraft'
 import { useWalletConnection } from './useWalletConnection'
 
 const post = vi.hoisted(() => vi.fn())
+// `false` simula a sessão trocada (logout, outra conta) entre o pedido e a resposta
+const session = vi.hoisted(() => ({ same: true }))
 vi.mock('@/api/client', () => ({ apiClient: { post } }))
-vi.mock('@/auth/sessionGuard', () => ({ captureSession: () => () => true }))
+vi.mock('@/auth/sessionGuard', () => ({ captureSession: () => () => session.same }))
 
 const wallet = (id: string, network: Wallet['network'], role: Wallet['role'], label: string): Wallet => ({
   id,
@@ -59,7 +61,17 @@ function deferredConnect() {
 afterEach(() => {
   cleanup()
   post.mockReset()
+  session.same = true
 })
+
+/** Começa um `connect` sem esperar a resposta. */
+function startConnect(result: { current: ReturnType<typeof useWalletConnection> }) {
+  let promise!: Promise<void>
+  act(() => {
+    promise = result.current.connect()
+  })
+  return promise
+}
 
 describe('useWalletConnection', () => {
   it('sem rascunho: a principal escolhida, as redes com carteira na ordem de NETWORKS e sem provedor', () => {
@@ -189,5 +201,86 @@ describe('useWalletConnection', () => {
     const { result } = setup({ provider: 'metamask' })
     await act(() => result.current.connect())
     expect(result.current.connection).toEqual({ status: 'rejected', message: 'A carteira recusou a conexão.' })
+  })
+
+  it('a resposta atrasada não conecta depois de a seleção mudar e voltar (MetaMask → Coinbase → MetaMask)', async () => {
+    const response = deferredConnect()
+    const { result, drafts } = setup({ provider: 'metamask' })
+    const connecting = startConnect(result)
+    act(() => result.current.selectProvider('coinbase'))
+    act(() => result.current.selectProvider('metamask'))
+    expect(result.current.connection).toEqual({ status: 'idle' })
+    await act(async () => {
+      response.resolve(PRIMARY)
+      await connecting
+    })
+    expect(result.current.connected).toBe(false)
+    expect(drafts.get().connectedWalletId).toBeUndefined()
+  })
+
+  it('conexões sobrepostas e "Desconectar": nenhuma resposta tardia reconecta', async () => {
+    const first = deferredConnect()
+    const second = deferredConnect()
+    const { result, drafts } = setup({ provider: 'metamask' })
+    const one = startConnect(result)
+    act(() => result.current.selectProvider('coinbase'))
+    act(() => result.current.selectProvider('metamask'))
+    const two = startConnect(result)
+    await act(async () => {
+      second.resolve(PRIMARY)
+      await two
+    })
+    expect(result.current.connected).toBe(true)
+    act(() => result.current.disconnect())
+    await act(async () => {
+      first.resolve(PRIMARY)
+      await one
+    })
+    expect(result.current.connected).toBe(false)
+    expect(result.current.connection).toEqual({ status: 'disconnected' })
+    expect(drafts.get().connectedWalletId).toBeUndefined()
+  })
+
+  it('trocar de carteira durante a conexão: a resposta não conecta nenhuma das duas', async () => {
+    const response = deferredConnect()
+    const { result, drafts } = setup({ provider: 'metamask' })
+    const connecting = startConnect(result)
+    act(() => result.current.selectWallet('w2'))
+    expect(result.current.connection).toEqual({ status: 'idle' })
+    await act(async () => {
+      response.resolve(PRIMARY)
+      await connecting
+    })
+    expect(result.current.connected).toBe(false)
+    expect(drafts.get()).toEqual({ provider: 'metamask', walletId: 'w2' })
+  })
+
+  it('sessão trocada antes da resposta: não conecta e não mostra erro', async () => {
+    const ok = deferredConnect()
+    const { result, drafts } = setup({ provider: 'metamask' })
+    const connecting = startConnect(result)
+    session.same = false
+    await act(async () => {
+      ok.resolve(PRIMARY)
+      await connecting
+    })
+    expect(drafts.get().connectedWalletId).toBeUndefined()
+    expect(result.current.connection).toEqual({ status: 'idle' })
+
+    const refused = deferredConnect()
+    session.same = true
+    const again = startConnect(result)
+    session.same = false
+    await act(async () => {
+      refused.reject(new ApiError({ code: 'conflict', message: 'A carteira recusou a conexão.' }, 409))
+      await again
+    })
+    expect(result.current.connection).toEqual({ status: 'idle' })
+  })
+
+  it('rascunho antigo com connectedWalletId e sem provedor não conta como conectado', () => {
+    const { result } = setup({ walletId: 'w1', connectedWalletId: 'w1' })
+    expect(result.current.connected).toBe(false)
+    expect(result.current.connection).toEqual({ status: 'idle' })
   })
 })

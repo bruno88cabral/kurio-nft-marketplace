@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { CircleCheck, LoaderCircle, Wallet as WalletIcon } from 'lucide-react'
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import type { Id, Wallet } from '@/contracts'
 import {
@@ -65,6 +65,7 @@ export function WalletStep({
   onDisconnect,
   locked,
 }: WalletStepProps) {
+  const headingId = useId()
   const connectRef = useRef<HTMLButtonElement>(null)
   if (isError && !wallets) {
     return (
@@ -114,10 +115,10 @@ export function WalletStep({
           A carteira fica fixa até o pedido anterior ser resolvido.
         </p>
       )}
-      <h3 className="text-body font-medium">
+      <h3 id={headingId} className="text-body font-medium">
         Carteira e rede
       </h3>
-      <WalletOptionGroup value={provider} onValueChange={onSelectProvider} label="Carteira e rede" disabled={locked}>
+      <WalletOptionGroup value={provider} onValueChange={onSelectProvider} labelledBy={headingId} disabled={locked}>
         {WALLET_PROVIDERS.map((option) => (
           <WalletOption
             key={option}
@@ -160,6 +161,7 @@ export function WalletStep({
               onClick={() => {
                 // O "Conectar" toma o lugar do "Desconectar": o foco vai para ele, não para o <body>
                 flushSync(onDisconnect)
+                // "Conectada" exige provedor (`useWalletConnection`), então o "Conectar com …" sempre volta
                 connectRef.current?.focus()
               }}
             >

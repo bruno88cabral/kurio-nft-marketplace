@@ -123,7 +123,7 @@ const describedText = (element: HTMLElement) =>
 
 /** Escolhe o provedor em "Carteira e rede" (o "Conectar com …" só aparece com um provedor). */
 async function chooseProvider(name = 'MetaMask') {
-  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(name) }))
+  fireEvent.click(await screen.findByRole('radio', { name }))
   return screen.findByRole('button', { name: `Conectar com ${name}` })
 }
 
@@ -198,7 +198,8 @@ describe('CheckoutPage', () => {
     await screen.findByText('A carteira fica fixa até o pedido anterior ser resolvido.')
     expect(screen.queryByRole('button', { name: /^Conectar/ })).toBeNull()
     expect(screen.queryByText('Escolha como conectar.')).toBeNull()
-    // Os provedores também ficam travados
+    // Os provedores também ficam travados, e o grupo se chama pelo título visível
+    expect(screen.getByRole('radiogroup', { name: 'Carteira e rede' })).toBeTruthy()
     for (const radio of screen.getAllByRole('radio')) expect((radio as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -216,6 +217,15 @@ describe('CheckoutPage', () => {
     expect(orderCalls()).toHaveLength(0)
   })
 
+  it('rascunho antigo conectado sem provedor: não conta como conectada, sem "Desconectar", e o CTA fica bloqueado', async () => {
+    checkoutDraftStore(ANA.id).set({ walletId: WALLET.id, connectedWalletId: WALLET.id })
+    renderPage()
+    await screen.findByText('Escolha como conectar.')
+    expect(screen.queryByRole('button', { name: 'Desconectar' })).toBeNull()
+    expect(confirmButton().getAttribute('aria-disabled')).toBe('true')
+    expect(describedText(confirmButton())).toEqual(['Conecte uma carteira para confirmar.'])
+  })
+
   it('a recusa (409) aparece no WalletOption do provedor, com "Tentar novamente", e não envia pedido', async () => {
     const message = 'A carteira recusou a conexão. Aprove o pedido no app da carteira e tente de novo.'
     api.post.mockImplementation((url: string) => {
@@ -226,7 +236,10 @@ describe('CheckoutPage', () => {
     renderPage()
     fireEvent.click(await chooseProvider())
     const retry = await screen.findByRole('button', { name: 'Tentar novamente' })
-    const option = screen.getByRole('radio', { name: /MetaMask/ }).closest('[data-slot="wallet-option"]')
+    // O nome do rádio é só o provedor; a recusa vem uma vez, como descrição
+    const radio = screen.getByRole('radio', { name: 'MetaMask' })
+    expect(describedText(radio)).toEqual([message])
+    const option = radio.closest('[data-slot="wallet-option"]')
     expect(option?.getAttribute('data-status')).toBe('rejected')
     expect(option?.textContent).toContain(message)
     expect(screen.getByRole('alert').textContent).toBe(message)
@@ -262,6 +275,7 @@ describe('CheckoutPage', () => {
     const draft: CheckoutDraft = {
       walletId: WALLET.id,
       connectedWalletId: WALLET.id,
+      provider: 'metamask',
       idempotencyKey: 'k1',
       keyFingerprint: `q0:${WALLET.id}`,
       attempt: { quoteId: 'q0', walletId: WALLET.id },
@@ -278,7 +292,7 @@ describe('CheckoutPage', () => {
     await act(() => queryClient.refetchQueries({ queryKey: quoteQuery(ANA.id, cart).queryKey }))
 
     // A tentativa sai (ex.: `declined`): a Revisão volta ao carrinho e mostra q2
-    act(() => drafts.set({ walletId: WALLET.id, connectedWalletId: WALLET.id }))
+    act(() => drafts.set({ walletId: WALLET.id, connectedWalletId: WALLET.id, provider: 'metamask' }))
     await waitFor(() => expect(confirmButton().getAttribute('aria-disabled')).toBeNull())
     expect(screen.getAllByText('0.5 ETH').length).toBeGreaterThan(0)
 
