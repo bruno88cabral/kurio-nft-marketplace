@@ -35,7 +35,7 @@ const OUT_OF_SCOPE_ITEMS: readonly { label: string; icon: LucideIcon }[] = [
 ]
 
 const itemClass =
-  'relative flex h-11 w-full items-center justify-start gap-3 rounded-none px-6 text-body font-normal text-text-accent outline-none transition-colors focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 [&_svg]:size-5 [&_svg]:shrink-0'
+  'relative flex h-11 w-full items-center justify-start gap-3 rounded-none px-6 text-body font-normal text-text-accent outline-none transition-colors focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring [&_svg]:size-5 [&_svg]:shrink-0'
 
 /**
  * Menu lateral da conta (Figma `Desktop/Perfil do Colecionador.png` e `Carteiras.png`, MYK-1102): painel

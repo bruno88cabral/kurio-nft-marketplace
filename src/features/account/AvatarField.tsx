@@ -115,7 +115,7 @@ export function AvatarField({ profile }: { profile: Profile }) {
           htmlFor={inputId}
           className={cn(
             buttonVariants({ variant: 'default' }),
-            'h-11 cursor-pointer px-6 font-bold peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:pointer-events-none peer-disabled:opacity-50',
+            'h-11 cursor-pointer px-6 font-bold peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring peer-disabled:pointer-events-none peer-disabled:opacity-50',
           )}
         >
           {uploading && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}

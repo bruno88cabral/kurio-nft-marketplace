@@ -94,6 +94,9 @@
     --kurio-text-secondary: #CFB28C;
     --kurio-border: #3F2319;
     --kurio-border-soft: #55321F;
+    /* Borda de campos e controles (input, select, checkbox, rádio): ≥ 3:1 sobre fundo, card e muted
+       (WCAG 1.4.11, MYK-1113). O Figma usa #3F2319 (1,34:1); o preenchimento dos campos continua o de antes */
+    --kurio-input-border: #946A4F;
     --kurio-elevated: #FBFBFB;
 
     --background: var(--kurio-ink);
@@ -112,7 +115,7 @@
     --accent-foreground: var(--kurio-ink);
     --destructive: oklch(0.704 0.191 22.216);
     --border: var(--kurio-border);
-    --input: var(--kurio-border);
+    --input: var(--kurio-input-border);
     --ring: var(--kurio-primary);
     --chart-1: var(--kurio-primary);
     --chart-2: var(--kurio-text-accent);
@@ -160,7 +163,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;

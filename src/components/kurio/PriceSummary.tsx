@@ -93,11 +93,12 @@ export function PriceSummary({
             value={formatEthLabel(quote.networkFee)}
             hint={mode === 'receipt' ? undefined : 'Taxa estimada'}
           />
-          <Separator className="my-1" />
+          {/* A linha acima do total é a borda da própria linha: um separador solto dentro do `<dl>` o invalida
+              (só `dt`/`dd`, axe `definition-list`); mesma altura de antes (my-1 + 1px) */}
           <Row
             label="Total"
             value={formatEthLabel(quote.total)}
-            className="text-body-lg font-bold"
+            className="border-border text-body-lg mt-1 border-t pt-3 font-bold"
             valueClassName="text-text-accent"
           />
         </dl>

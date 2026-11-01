@@ -199,7 +199,7 @@ export function CollectorForm({
               <span
                 className={cn(
                   FIELD_CLASS,
-                  'border-input dark:bg-input/30 text-body inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5',
+                  'border-input dark:bg-border/30 text-body inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5',
                 )}
               >
                 .eth
