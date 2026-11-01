@@ -5,8 +5,14 @@ import { DB_COLLECTIONS, resourceKey, type MockDb, type ResourceType } from './s
 import { seed } from './seed'
 
 export const DB_STORAGE_KEY = 'kurio:mock-db:v1'
-/** Versão do formato gravado; subir quando o `MockDb` mudar de forma incompatível. */
-export const DB_SCHEMA_VERSION = 1
+/**
+ * Versão do formato gravado; subir quando o `MockDb` mudar de forma incompatível **ou quando o seed
+ * mudar de um jeito que o estado salvo quebre** (ex.: caminho de asset removido). Ao subir, o db salvo
+ * no navegador é descartado e refeito pelo seed.
+ * - 2 (MYK-1079): as artes viraram `/nfts/macaco-*-960.webp` e 25 SVGs saíram de `public/nfts/`; um db
+ *   v1 ainda apontava para elas, e na Vercel o rewrite devolvia o `index.html` no lugar da imagem.
+ */
+export const DB_SCHEMA_VERSION = 2
 
 export type MockStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
