@@ -4,6 +4,7 @@ import {
   CHECKOUT_BLOCK_MESSAGE,
   checkoutBlock,
   couponStatus,
+  guestPartialAddMessage,
   guestStockLimitMessage,
   issuesByLine,
   QUOTE_ISSUES_MESSAGE,
@@ -95,5 +96,12 @@ describe('guestStockLimitMessage', () => {
     expect(guestStockLimitMessage(1)).toBe('Só resta 1 unidade desta edição, e ela já está no seu carrinho.')
     expect(guestStockLimitMessage(7)).toBe('Só restam 7 unidades desta edição, e todas já estão no seu carrinho.')
     expect(guestStockLimitMessage(0)).toBe('Esta edição está esgotada.')
+  })
+})
+
+describe('guestPartialAddMessage', () => {
+  it('diz a quantidade que ficou no carrinho, no singular e no plural', () => {
+    expect(guestPartialAddMessage(1)).toBe('Só resta 1 unidade desta edição: seu carrinho ficou com 1.')
+    expect(guestPartialAddMessage(3)).toBe('Só restam 3 unidades desta edição: seu carrinho ficou com 3.')
   })
 })

@@ -88,3 +88,14 @@ export function guestStockLimitMessage(available: number): string {
     ? 'Só resta 1 unidade desta edição, e ela já está no seu carrinho.'
     : `Só restam ${units} unidades desta edição, e todas já estão no seu carrinho.`
 }
+
+/**
+ * Visitante que pediu mais do que coube: a linha ficou no `available` (`floor`), menos do que a soma pedida (ou
+ * desceu até ele, com o estoque que caiu). Não é "Adicionado ao carrinho": segue o caminho do 409 do logado.
+ */
+export function guestPartialAddMessage(available: number): string {
+  const units = Math.floor(available)
+  return units === 1
+    ? 'Só resta 1 unidade desta edição: seu carrinho ficou com 1.'
+    : `Só restam ${units} unidades desta edição: seu carrinho ficou com ${units}.`
+}

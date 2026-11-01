@@ -50,18 +50,18 @@ describe('useCart montado (visitante)', () => {
     expect(api.get).not.toHaveBeenCalled()
   })
 
-  it('add re-renderiza com a linha nova e resolve false quando a linha já está no available', async () => {
+  it('add re-renderiza com a linha nova e resolve partial (só parte coube) ou unchanged (a linha já está no available)', async () => {
     const { result } = setup()
     await act(async () => {
-      await expect(result.current.add(line(2), { available: 3 })).resolves.toBe(true)
+      await expect(result.current.add(line(2), { available: 3 })).resolves.toBe('added')
     })
     expect(result.current.items).toEqual([line(2)])
     await act(async () => {
-      await expect(result.current.add(line(5), { available: 3 })).resolves.toBe(true)
+      await expect(result.current.add(line(5), { available: 3 })).resolves.toBe('partial')
     })
     expect(result.current.items).toEqual([line(3)])
     await act(async () => {
-      await expect(result.current.add(line(1), { available: 3 })).resolves.toBe(false)
+      await expect(result.current.add(line(1), { available: 3 })).resolves.toBe('unchanged')
     })
     expect(result.current.totalQuantity).toBe(3)
     expect(JSON.parse(localStorage.getItem(ANONYMOUS_CART_KEY) ?? 'null')).toEqual([line(3)])
@@ -110,7 +110,7 @@ describe('useCart montado (logado)', () => {
     const { result } = setup()
     await waitFor(() => expect(result.current.isPending).toBe(false))
     await act(async () => {
-      await expect(result.current.add(line(2), { available: 1 })).resolves.toBe(true)
+      await expect(result.current.add(line(2), { available: 1 })).resolves.toBe('added')
     })
     expect(api.post).toHaveBeenCalledWith('/cart/items', line(2))
     await waitFor(() => expect(result.current.items).toEqual([line(2)]))

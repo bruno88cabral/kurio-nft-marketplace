@@ -95,17 +95,25 @@ describe('createAnonymousCartStore', () => {
     expect(store.read()).toEqual([line('a', '1/10', 3)])
   })
 
-  it('add devolve se a linha mudou: false com a linha já no available ou sem estoque, sem escrever nem notificar', () => {
+  it('add diz se entrou inteiro, só em parte ou nada; unchanged com a linha já no available ou sem estoque, sem escrever nem notificar', () => {
     const storage = memory()
     const store = createAnonymousCartStore(() => storage)
     const listener = vi.fn()
     store.subscribe(listener)
-    expect(store.add(line('a', '1/10', 2), 3)).toBe(true)
-    expect(store.add(line('a', '1/10', 5), 3)).toBe(true) // clamp parcial: 2 -> 3
-    expect(store.add(line('a', '1/10', 1), 3)).toBe(false) // já no limite
-    expect(store.add(line('b', 'open', 1), 0)).toBe(false) // sem estoque
+    expect(store.add(line('a', '1/10', 2), 3)).toBe('added')
+    expect(store.add(line('a', '1/10', 5), 3)).toBe('partial') // clamp parcial: 2 -> 3
+    expect(store.add(line('a', '1/10', 1), 3)).toBe('unchanged') // já no limite
+    expect(store.add(line('b', 'open', 1), 0)).toBe('unchanged') // sem estoque
     expect(store.read()).toEqual([line('a', '1/10', 3)])
     expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('add de linha nova acima do available e add com o estoque que caiu (a linha desce) são partial', () => {
+    const storage = memory(JSON.stringify([line('a', '1/10', 5)]))
+    const store = createAnonymousCartStore(() => storage)
+    expect(store.add(line('b', 'open', 4), 2)).toBe('partial') // linha nova: 4 pedidas, 2 cabem
+    expect(store.add(line('a', '1/10', 1), 3)).toBe('partial') // estoque caiu para 3: 5 -> 3
+    expect(store.read()).toEqual([line('a', '1/10', 3), line('b', 'open', 2)])
   })
 
   it('clear remove a chave', () => {

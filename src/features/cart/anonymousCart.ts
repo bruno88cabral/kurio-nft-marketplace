@@ -83,6 +83,18 @@ export function withoutItem(items: readonly CartItem[], nftId: Id, edition: NftE
   return items.filter((i) => !sameLine(i, nftId, edition))
 }
 
+/**
+ * O que o `add` do visitante fez com a linha. `partial`: a linha mudou, mas não subiu a quantidade pedida inteira
+ * (o `available` cortou a soma, ou o estoque caiu e a linha desceu até ele). É o caso em que o logado receberia o 409.
+ */
+export type AddResult = 'added' | 'partial' | 'unchanged'
+
+/** Compara a linha antes e depois do `withItem` (a lista já mudou). */
+export function addResult(before: readonly CartItem[], after: readonly CartItem[], item: CartItem): AddResult {
+  const quantityIn = (items: readonly CartItem[]) => items.find((i) => sameLine(i, item.nftId, item.edition))?.quantity ?? 0
+  return quantityIn(after) === quantityIn(before) + item.quantity ? 'added' : 'partial'
+}
+
 export interface AnonymousCartStore {
   /** Linhas atuais; nunca lança. */
   read: () => CartItem[]
@@ -90,8 +102,8 @@ export interface AnonymousCartStore {
   getSnapshot: () => readonly CartItem[]
   /** Escritas locais e o evento `storage` de outra aba (o `storage` só dispara em OUTRA aba). */
   subscribe: (listener: () => void) => () => void
-  /** `true` se a linha mudou; `false` quando nada coube (a linha já está no `available`, sem estoque ou quantidade inválida). */
-  add: (item: CartItem, available: number) => boolean
+  /** Soma na linha, limitada ao `available`; diz se entrou inteiro, só em parte ou nada (`AddResult`). */
+  add: (item: CartItem, available: number) => AddResult
   setQuantity: (nftId: Id, edition: NftEditionKind, quantity: number, available?: number) => void
   remove: (nftId: Id, edition: NftEditionKind) => void
   clear: () => void
@@ -153,9 +165,9 @@ export function createAnonymousCartStore(getStorage: () => SessionStorageLike | 
     add: (item, available) => {
       const current = getSnapshot()
       const next = withItem(current, item, available)
-      if (sameItems(current, next)) return false
+      if (sameItems(current, next)) return 'unchanged'
       write(next)
-      return true
+      return addResult(current, next, item)
     },
     setQuantity: (nftId, edition, quantity, available) => write(withQuantity(getSnapshot(), nftId, edition, quantity, available)),
     remove: (nftId, edition) => write(withoutItem(getSnapshot(), nftId, edition)),

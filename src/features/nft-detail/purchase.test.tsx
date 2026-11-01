@@ -3,9 +3,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ApiError, type CartItem, type Nft } from '@/contracts'
+import type { AddResult } from '@/features/cart/anonymousCart'
 import { parseEth } from '@/lib/eth'
 
-const add = vi.fn<(item: CartItem, opts: { available: number }) => Promise<boolean>>()
+const add = vi.fn<(item: CartItem, opts: { available: number }) => Promise<AddResult>>()
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
 const navigate = vi.fn()
@@ -58,7 +59,7 @@ const addButtons = () => screen.getAllByRole('button', { name: 'Adicionar ao car
 beforeEach(() => {
   cartState = { isPending: false, isAuthenticated: false }
   add.mockReset()
-  add.mockResolvedValue(true)
+  add.mockResolvedValue('added')
   toastSuccess.mockReset()
   toastError.mockReset()
   navigate.mockReset()
@@ -114,7 +115,7 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
   })
 
   it('visitante já no limite (nada coube): aviso no painel no padrão do 409, sem "Adicionado ao carrinho"', async () => {
-    add.mockResolvedValue(false)
+    add.mockResolvedValue('unchanged')
     render(<Detail />)
     fireEvent.click(addButtons()[0])
     const alert = await screen.findByRole('alert')
@@ -124,10 +125,28 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
   })
 
   it('visitante já no limite na barra mobile: toast de erro, sem "Adicionado ao carrinho"', async () => {
-    add.mockResolvedValue(false)
+    add.mockResolvedValue('unchanged')
     render(<Detail />)
     fireEvent.click(addButtons()[1])
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Só restam 7 unidades desta edição, e todas já estão no seu carrinho.'))
+    expect(toastSuccess).not.toHaveBeenCalled()
+  })
+
+  it('visitante com só parte da quantidade cabendo: aviso no painel com o que ficou no carrinho, sem "Adicionado ao carrinho"', async () => {
+    add.mockResolvedValue('partial')
+    render(<Detail />)
+    fireEvent.click(addButtons()[0])
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Só restam 7 unidades desta edição: seu carrinho ficou com 7.')
+    expect(toastSuccess).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('visitante com só parte cabendo na barra mobile: toast de erro, sem "Adicionado ao carrinho"', async () => {
+    add.mockResolvedValue('partial')
+    render(<Detail />)
+    fireEvent.click(addButtons()[1])
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Só restam 7 unidades desta edição: seu carrinho ficou com 7.'))
     expect(toastSuccess).not.toHaveBeenCalled()
   })
 
@@ -140,7 +159,7 @@ describe('Adicionar ao carrinho (Detalhe)', () => {
 
   it('enquanto envia fica aria-busy e ignora o segundo clique', async () => {
     let resolve: () => void = () => undefined
-    add.mockImplementation(() => new Promise<boolean>((r) => (resolve = () => r(true))))
+    add.mockImplementation(() => new Promise<AddResult>((r) => (resolve = () => r('added'))))
     render(<Detail />)
     const [desktop] = addButtons()
     fireEvent.click(desktop)

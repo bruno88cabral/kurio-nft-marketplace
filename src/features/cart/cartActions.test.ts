@@ -106,17 +106,17 @@ describe('guestCartActions (visitante)', () => {
   it('add respeita o available e soma na mesma linha', async () => {
     const t = setup()
     const guest = guestCartActions(t.guestStore)
-    await expect(guest.add(item(2), { available: 3 })).resolves.toBe(true)
-    await expect(guest.add(item(5), { available: 3 })).resolves.toBe(true)
+    await expect(guest.add(item(2), { available: 3 })).resolves.toBe('added')
+    await expect(guest.add(item(5), { available: 3 })).resolves.toBe('partial')
     expect(t.guestStore.read()).toEqual([item(3)])
     expect(JSON.parse(t.storage.map.get('kurio:cart') ?? 'null')).toEqual([item(3)])
   })
 
-  it('add com a linha já no available resolve false e não muda nada (o logado receberia 409)', async () => {
+  it('add com a linha já no available resolve unchanged e não muda nada (o logado receberia 409)', async () => {
     const t = setup()
     const guest = guestCartActions(t.guestStore)
     await guest.add(item(3), { available: 3 })
-    await expect(guest.add(item(1), { available: 3 })).resolves.toBe(false)
+    await expect(guest.add(item(1), { available: 3 })).resolves.toBe('unchanged')
     expect(t.guestStore.read()).toEqual([item(3)])
   })
 

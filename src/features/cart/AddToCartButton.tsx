@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ApiError, type CartItem } from '@/contracts'
 import { Button } from '@/components/ui/button'
-import { guestStockLimitMessage } from './cartView'
+import { guestPartialAddMessage, guestStockLimitMessage } from './cartView'
 import { useCart } from './useCart'
 
 export const ADD_TO_CART_FAILURE_MESSAGE = 'Não foi possível adicionar ao carrinho.'
@@ -16,7 +16,8 @@ export interface AddToCartButtonProps {
   /**
    * 409 (acima do estoque): recebe o texto da API para mostrar onde o consumidor quiser (`role="alert"`
    * no painel). O visitante já no limite recebe o mesmo tratamento (`guestStockLimitMessage`). Sem esta prop,
-   * vira toast (barra mobile). `null` = nova tentativa, limpa o aviso.
+   * vira toast (barra mobile). O visitante em que só parte coube também (`guestPartialAddMessage`).
+   * `null` = nova tentativa, limpa o aviso.
    */
   onStockError?: (message: string | null) => void
   size?: 'default' | 'lg'
@@ -43,9 +44,10 @@ export function AddToCartButton({ item, available, onStockError, size, className
     setSending(true)
     onStockError?.(null)
     try {
-      const added = await add(item, { available })
-      if (!added) {
-        const message = guestStockLimitMessage(available)
+      const result = await add(item, { available })
+      // Visitante sem lugar para a quantidade inteira: o aviso vai pelo caminho do 409 do logado, sem "Adicionado"
+      if (result !== 'added') {
+        const message = result === 'partial' ? guestPartialAddMessage(available) : guestStockLimitMessage(available)
         if (onStockError) onStockError(message)
         else toast.error(message)
         return
