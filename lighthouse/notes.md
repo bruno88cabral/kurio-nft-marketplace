@@ -12,7 +12,7 @@ Primeira medição (commit 1872966, mesmo ambiente), medianas:
 Correções aplicadas:
 
 - SEO 83 → 100: `<meta name="description">` no `index.html` (auditoria `meta-description`) e `public/robots.txt`, com `robots\.txt` fora do rewrite SPA do `vercel.json` (auditoria `robots-txt`: antes o `/robots.txt` devolvia o `index.html`, "14 errors found").
-- LCP do Início no mobile: o elemento de LCP é o 1º card do catálogo (176×176), que carregava com `loading="lazy"` e sem `fetchpriority` (`lcp-discovery-insight`). Os 2 primeiros cards da grade (1ª linha do mobile) agora carregam `eager` com `fetchpriority="high"` (`NftGrid`, `ABOVE_THE_FOLD`).
+- LCP do Início no mobile: o elemento de LCP é o 1º card do catálogo (176×176), que carregava com `loading="lazy"` e sem `fetchpriority` (`lcp-discovery-insight`). Os 2 primeiros cards da grade (1ª linha do mobile) agora carregam `eager` com `fetchpriority="high"` (`NftGrid`, `ABOVE_THE_FOLD`). Na medição final o item "LCP resources shouldn't use loading=lazy" passa, mas o LCP não mudou além do ruído: o `resourceLoadDelay` (~720 ms, a imagem só existe depois do mock responder) domina, e o Lighthouse ainda marca `priorityHinted` como falso para o elemento de LCP (a investigar). A variação entre execuções no Início mobile é alta (49 a 75).
 - A miniatura do próximo destaque no hero mobile (acima da dobra) perdeu o `loading="lazy"`.
 
 ## Justificativa do que ficou abaixo da meta

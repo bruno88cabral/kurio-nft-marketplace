@@ -297,4 +297,15 @@ Nestas receitas, **"confirme"** é: "Confirmar compra" na página (que valida o 
 
 ## Lighthouse
 
-> TODO (M5/M6): ainda não foi medido.
+`pnpm lighthouse` faz o build otimizado, sobe o `vite preview` na porta 5210 e roda o Lighthouse 3 vezes em Início (`/`) e Detalhe (`/nfts/nft-001`), mobile e desktop, com o Chrome do sistema (headless, perfil limpo a cada execução) e os mocks no cenário `default`. A configuração versionada está em `lighthouse/config.mjs`; os 12 relatórios HTML/JSON, `summary.json` e `summary.md` (medianas, LCP/CLS/TBT, versões, ambiente e justificativas) ficam em `lighthouse/reports/`.
+
+Medianas da medição versionada (detalhes em [`lighthouse/reports/summary.md`](lighthouse/reports/summary.md)):
+
+| Página | Perfil | Performance | Accessibility | Best Practices | SEO | LCP | CLS | TBT |
+|---|---|---|---|---|---|---|---|---|
+| Início | mobile | 69 | 100 | 100 | 100 | 4355 ms | 0.000 | 639 ms |
+| Início | desktop | 96 | 100 | 100 | 100 | 1348 ms | 0.000 | 14 ms |
+| Detalhe | mobile | 76 | 100 | 100 | 100 | 3837 ms | 0.000 | 500 ms |
+| Detalhe | desktop | 96 | 100 | 100 | 100 | 1389 ms | 0.000 | 36 ms |
+
+Performance no mobile fica abaixo de 90: o build publicado é a demo com MSW, cujo chunk (~174 kB gzip) é avaliado e cujo Service Worker é registrado antes do primeiro render (necessário para interceptar o socket), o que domina o TBT; e a imagem do LCP só existe depois que o mock responde. Nada disso foi desligado para a auditoria (§10). Justificativa completa no `summary.md`.
