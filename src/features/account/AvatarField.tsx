@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, ImageUp, LoaderCircle, Trash2, UserRound } from 'lucide-react'
+import { CircleAlert, LoaderCircle, UserRound } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { toast } from 'sonner'
 import { profileKeys, updateProfile } from '@/api/profile'
@@ -9,12 +9,14 @@ import type { Profile } from '@/contracts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { ACCOUNT_LABEL_CLASS } from './AccountLayout'
 import { AVATAR_ACCEPT, AVATAR_MESSAGES, checkAvatarFile, initials, readAsDataUrl } from './avatar'
 import { PROFILE_UPDATED_MESSAGE, toFormErrors } from './validation'
 
 /**
- * Avatar do perfil: prévia (imagem ou iniciais), "Alterar avatar" (input de arquivo com label,
- * salva na hora) e "Remover avatar" (`avatarUrl: ''`). Arquivo de tipo ou tamanho inválido mostra
+ * Avatar do perfil em linha (Figma, MYK-1102): círculo pequeno com a imagem ou as iniciais, "Alterar"
+ * laranja sólido (input de arquivo com label, salva na hora) e "Remover" como texto (`avatarUrl: ''`); os
+ * nomes acessíveis são "Alterar avatar" e "Remover avatar". Arquivo de tipo ou tamanho inválido mostra
  * o erro sem request. A imagem não é redimensionada.
  */
 export function AvatarField({ profile }: { profile: Profile }) {
@@ -23,6 +25,7 @@ export function AvatarField({ profile }: { profile: Profile }) {
   const inputId = `${id}-input`
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
+  const titleId = `${id}-title`
   const inputRef = useRef<HTMLInputElement>(null)
   const refocusInput = useRef(false)
   const [error, setError] = useState<string>()
@@ -85,62 +88,55 @@ export function AvatarField({ profile }: { profile: Profile }) {
   const fallback = initials(name)
 
   return (
-    <div data-slot="avatar-field" className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <Avatar aria-busy={busy || undefined} className="size-20 sm:size-24">
-        {profile.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={label} />}
-        <AvatarFallback role="img" aria-label={label} className="text-heading">
-          {fallback ? <span aria-hidden>{fallback}</span> : <UserRound aria-hidden className="size-8" />}
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="flex min-w-0 flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={inputRef}
-            id={inputId}
-            type="file"
-            accept={AVATAR_ACCEPT}
-            disabled={busy}
-            aria-describedby={cn(hintId, error && errorId)}
-            aria-invalid={error ? true : undefined}
-            onChange={(event) => void onFileChange(event)}
-            className="peer sr-only"
-          />
-          <label
-            htmlFor={inputId}
-            className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'h-11 cursor-pointer peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:pointer-events-none peer-disabled:opacity-50',
-            )}
-          >
-            {uploading ? (
-              <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
-            ) : (
-              <ImageUp aria-hidden />
-            )}
-            Alterar avatar
-          </label>
-          {profile.avatarUrl && (
-            <Button type="button" variant="ghost" className="h-11" disabled={busy} onClick={remove}>
-              {removing ? (
-                <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
-              ) : (
-                <Trash2 aria-hidden />
-              )}
-              Remover avatar
-            </Button>
+    <div data-slot="avatar-field" role="group" aria-labelledby={titleId} className="flex min-w-0 flex-col gap-2">
+      <p id={titleId} className={ACCOUNT_LABEL_CLASS}>
+        Avatar
+      </p>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Avatar aria-busy={busy || undefined} className="bg-card size-12">
+          {profile.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={label} />}
+          <AvatarFallback role="img" aria-label={label} className="bg-card text-text-accent text-body">
+            {fallback ? <span aria-hidden>{fallback}</span> : <UserRound aria-hidden className="size-5" />}
+          </AvatarFallback>
+        </Avatar>
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept={AVATAR_ACCEPT}
+          disabled={busy}
+          aria-describedby={cn(hintId, error && errorId)}
+          aria-invalid={error ? true : undefined}
+          onChange={(event) => void onFileChange(event)}
+          className="peer sr-only"
+        />
+        {/* Figma: "Alterar" laranja sólido; o nome acessível continua "Alterar avatar" */}
+        <label
+          htmlFor={inputId}
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            'h-11 cursor-pointer px-6 font-bold peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:pointer-events-none peer-disabled:opacity-50',
           )}
-        </div>
-        <p id={hintId} className="text-muted-foreground text-tiny">
-          PNG, JPEG, WebP ou GIF, até 140 KB.
-        </p>
-        {error && (
-          <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
-            <CircleAlert aria-hidden className="size-3.5 shrink-0" />
-            {error}
-          </p>
+        >
+          {uploading && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
+          Alterar{' '}<span className="sr-only">avatar</span>
+        </label>
+        {profile.avatarUrl && (
+          <Button type="button" variant="ghost" className="h-11 px-2 font-normal" disabled={busy} onClick={remove}>
+            {removing && <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />}
+            Remover{' '}<span className="sr-only">avatar</span>
+          </Button>
         )}
       </div>
+      <p id={hintId} className="text-muted-foreground text-tiny">
+        PNG, JPEG, WebP ou GIF, até 140 KB.
+      </p>
+      {error && (
+        <p id={errorId} role="alert" className="text-destructive text-caption inline-flex items-center gap-1.5">
+          <CircleAlert aria-hidden className="size-3.5 shrink-0" />
+          {error}
+        </p>
+      )}
     </div>
   )
 }

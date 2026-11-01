@@ -18,6 +18,9 @@ vi.mock('@tanstack/react-router', () => ({
       {children}
     </a>
   ),
+  useRouter: () => ({ history: { back: vi.fn() } }),
+  useNavigate: () => vi.fn(),
+  useCanGoBack: () => false,
 }))
 
 const { CartPage } = await import('./CartPage')
@@ -73,10 +76,10 @@ function renderPage() {
   )
 }
 
-const blockedCta = () => screen.getByRole('button', { name: 'Ir para o pagamento' })
+const blockedCta = () => screen.getByRole('button', { name: 'Conectar e finalizar' })
 const describedBy = (element: HTMLElement) => document.getElementById(element.getAttribute('aria-describedby') ?? '')?.textContent
 
-describe('CartPage: "Ir para o pagamento" bloqueado diz o motivo', () => {
+describe('CartPage: "Conectar e finalizar" bloqueado diz o motivo', () => {
   it('sem cotação ainda: "Calculando o total…"', async () => {
     renderPage()
     await screen.findByText('Solar Veil')
@@ -100,7 +103,22 @@ describe('CartPage: "Ir para o pagamento" bloqueado diz o motivo', () => {
   it('cotação atual: vira link, sem motivo', async () => {
     postQuote = () => Promise.resolve({ data: quote() })
     renderPage()
-    const link = await screen.findByRole('link', { name: 'Ir para o pagamento' })
+    const link = await screen.findByRole('link', { name: 'Conectar e finalizar' })
     expect(link.getAttribute('aria-describedby')).toBeNull()
+  })
+})
+
+describe('CartPage: layout do Figma', () => {
+  it('total da linha, desconto sempre visível e "Continuar explorando"', async () => {
+    postQuote = () => Promise.resolve({ data: quote() })
+    renderPage()
+    await screen.findByRole('link', { name: 'Conectar e finalizar' })
+    expect(screen.getByRole('heading', { level: 1, name: 'Carrinho de NFTs' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Resumo da carteira' })).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Resumo do pedido' })).toBeTruthy()
+    expect(screen.getByText('(-) 0 ETH')).toBeTruthy()
+    expect(screen.getByText('Taxa estimada')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Continuar explorando' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Voltar' })).toBeTruthy()
   })
 })

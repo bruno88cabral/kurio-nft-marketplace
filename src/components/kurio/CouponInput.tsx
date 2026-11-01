@@ -25,6 +25,11 @@ export interface CouponInputProps {
    * promocional? Aplique aqui", que expande o próprio campo no lugar. Abre sozinho fora de `idle`.
    */
   collapsible?: boolean
+  /**
+   * `default`: "Cupom de desconto" com o "Aplicar" separado. `attached` (Carrinho, Figma): rótulo "Código
+   * promocional" em negrito e o campo colado ao "Aplicar" laranja; abaixo de `md` vira a pílula do Figma mobile.
+   */
+  appearance?: 'default' | 'attached'
   className?: string
 }
 
@@ -44,8 +49,10 @@ export function CouponInput({
   onRemove,
   errorMessage,
   collapsible = false,
+  appearance = 'default',
   className,
 }: CouponInputProps) {
+  const attached = appearance === 'attached'
   const id = useId()
   const errorId = `${id}-error`
   const [code, setCode] = useState('')
@@ -116,10 +123,10 @@ export function CouponInput({
 
   return (
     <div data-slot="coupon-input" data-status={status} className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className="text-caption text-muted-foreground">
-        Cupom de desconto
+      <label htmlFor={id} className={attached ? 'text-body text-foreground font-bold' : 'text-caption text-muted-foreground'}>
+        {attached ? 'Código promocional' : 'Cupom de desconto'}
       </label>
-      <div className="flex gap-2">
+      <div className={cn('flex', !attached && 'gap-2')}>
         <Input
           id={id}
           value={code}
@@ -135,16 +142,24 @@ export function CouponInput({
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}
-          placeholder="Código"
+          placeholder={attached ? 'Digite o código promocional...' : 'Código'}
           readOnly={applying}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="h-10 uppercase placeholder:normal-case"
+          className={cn(
+            'h-10 uppercase placeholder:normal-case',
+            attached &&
+              'border-border-soft placeholder:text-muted-foreground rounded-r-none border-r-0 max-md:h-12 max-md:rounded-l-full max-md:pr-8 max-md:pl-5',
+          )}
         />
         <Button
           type="button"
-          variant="secondary"
-          className="h-10 px-4"
+          variant={attached ? 'default' : 'secondary'}
+          className={cn(
+            'h-10 px-4',
+            attached &&
+              'text-body relative z-10 rounded-l-none font-bold max-md:from-text-accent max-md:to-primary max-md:-ml-6 max-md:h-12 max-md:rounded-full max-md:bg-linear-to-r max-md:px-6',
+          )}
           onClick={submit}
           disabled={!code.trim()}
           aria-disabled={applying || undefined}

@@ -39,9 +39,9 @@ export function CatalogGrid() {
     body = (
       <div aria-busy="true" className="flex flex-col gap-8">
         <span className="sr-only">Carregando NFTs…</span>
-        <NftGridSkeleton count={CATALOG_PAGE_SIZE} />
+        <NftGridSkeleton count={CATALOG_PAGE_SIZE} staggered />
         {/* Reserva a linha da paginação (size-9), para o grid pronto não empurrar o que vem depois */}
-        <div aria-hidden className="flex h-9 justify-center gap-1">
+        <div aria-hidden className="flex h-9 justify-end gap-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="size-9" />
           ))}
@@ -82,7 +82,7 @@ export function CatalogGrid() {
   } else {
     body = (
       <div className="flex flex-col gap-8">
-        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" favoritable />
+        <NftGrid items={data.items} stale={list.isPlaceholderData} label="Resultados do catálogo" favoritable staggered />
         <CatalogPagination page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     )

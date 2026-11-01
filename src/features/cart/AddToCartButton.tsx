@@ -20,16 +20,35 @@ export interface AddToCartButtonProps {
    * `null` = nova tentativa, limpa o aviso.
    */
   onStockError?: (message: string | null) => void
+  /**
+   * `add` (padrão): adiciona e mostra o toast "Adicionado ao carrinho" com "Ver carrinho".
+   * `buy`: o "Comprar" do Figma; adiciona e leva ao carrinho (de onde se segue para o pagamento).
+   * Os avisos de estoque e de falha são os mesmos nos dois.
+   */
+  intent?: 'add' | 'buy'
+  /** Texto visível (padrão: "Adicionar ao carrinho" ou "Comprar", conforme o `intent`). */
+  label?: string
+  /** Só o ícone, com o `label` como nome acessível (botão redondo do Detalhe mobile). */
+  iconOnly?: boolean
   size?: 'default' | 'lg'
   className?: string
 }
 
 /**
- * "Adicionar ao carrinho" do Detalhe (painel e barra mobile). Visitante adiciona local, sem login.
+ * "Adicionar ao carrinho" e "Comprar" do Detalhe (painel e barra mobile). Visitante adiciona local, sem login.
  * Enquanto envia (ou a sessão está sendo confirmada) fica `aria-busy` e ignora cliques (`aria-disabled`, não
  * `disabled`, para o foco não se perder).
  */
-export function AddToCartButton({ item, available, onStockError, size, className }: AddToCartButtonProps) {
+export function AddToCartButton({
+  item,
+  available,
+  onStockError,
+  intent = 'add',
+  label = intent === 'buy' ? 'Comprar' : 'Adicionar ao carrinho',
+  iconOnly = false,
+  size,
+  className,
+}: AddToCartButtonProps) {
   const { add, isPending, isAuthenticated } = useCart()
   // Sessão (token guardado) ainda sendo confirmada: adicionar agora cairia no carrinho local de visitante
   const confirmingSession = isPending && !isAuthenticated
@@ -50,6 +69,10 @@ export function AddToCartButton({ item, available, onStockError, size, className
         const message = result === 'partial' ? guestPartialAddMessage(available) : guestStockLimitMessage(available)
         if (onStockError) onStockError(message)
         else toast.error(message)
+        return
+      }
+      if (intent === 'buy') {
+        void navigate({ to: '/cart' })
         return
       }
       toast.success('Adicionado ao carrinho', {
@@ -73,6 +96,7 @@ export function AddToCartButton({ item, available, onStockError, size, className
       type="button"
       size={size}
       className={className}
+      aria-label={iconOnly ? label : undefined}
       aria-busy={sending || confirmingSession || undefined}
       aria-disabled={sending || confirmingSession || undefined}
       onClick={() => void submit()}
@@ -80,9 +104,9 @@ export function AddToCartButton({ item, available, onStockError, size, className
       {sending ? (
         <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
       ) : (
-        <ShoppingCart aria-hidden />
+        (iconOnly || intent === 'add') && <ShoppingCart aria-hidden />
       )}
-      Adicionar ao carrinho
+      {!iconOnly && label}
     </Button>
   )
 }

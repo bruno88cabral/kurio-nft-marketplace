@@ -61,8 +61,16 @@ describe('CartLine', () => {
     expect(screen.getByText('Indisponível')).toBeTruthy()
   })
 
-  it('"Remover" tem nome com o item e a edição', () => {
+  it('a lixeira é só ícone, com o nome do item e da edição', () => {
     render(<ul><CartLine {...props} /></ul>)
-    expect(screen.getByRole('button', { name: /Remover Crease Nova, Edição 1\/50/ })).toBeTruthy()
+    const remove = screen.getByRole('button', { name: 'Remover Crease Nova, Edição 1/50' })
+    expect(remove.textContent).toBe('')
+  })
+
+  it('mostra o preço unitário e o total da linha (`unitPrice × quantity`, só exibição)', () => {
+    render(<ul><CartLine {...props} /></ul>)
+    expect(screen.getByText('1.35 ETH')).toBeTruthy()
+    expect(screen.getByText('4.05 ETH')).toBeTruthy()
+    expect(screen.getByText('Edição: 1/50')).toBeTruthy()
   })
 })

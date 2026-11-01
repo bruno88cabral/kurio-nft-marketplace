@@ -52,15 +52,44 @@ describe('CouponInput: "Remover"', () => {
 describe('PriceSummary: modo recibo', () => {
   const values = { subtotal: parseEth('0.35'), discount: parseEth('0'), networkFee: parseEth('0.002'), total: parseEth('0.352') }
 
-  it('cotação: a taxa de rede diz "Estimada"', () => {
+  it('cotação: a taxa de rede diz "Taxa estimada"', () => {
     render(<PriceSummary quote={values} />)
-    expect(screen.getByText('Estimada')).toBeTruthy()
+    expect(screen.getByText('Taxa estimada')).toBeTruthy()
   })
 
-  it('recibo: a taxa já foi cobrada, sem "Estimada"', () => {
+  it('recibo: a taxa já foi cobrada, sem "Taxa estimada"', () => {
     render(<PriceSummary quote={values} mode="receipt" />)
-    expect(screen.queryByText('Estimada')).toBeNull()
+    expect(screen.queryByText('Taxa estimada')).toBeNull()
     expect(screen.getByText('Taxa de rede')).toBeTruthy()
     expect(screen.getByText('0.002 ETH')).toBeTruthy()
+  })
+})
+
+describe('PriceSummary: desconto', () => {
+  const values = { subtotal: parseEth('0.35'), discount: parseEth('0'), networkFee: parseEth('0.002'), total: parseEth('0.352') }
+
+  it('sem cupom, o desconto só aparece com `alwaysShowDiscount` (Carrinho), como "(-) 0 ETH"', () => {
+    const { rerender } = render(<PriceSummary quote={values} />)
+    expect(screen.queryByText('Desconto')).toBeNull()
+    rerender(<PriceSummary quote={values} alwaysShowDiscount />)
+    expect(screen.getByText('Desconto')).toBeTruthy()
+    expect(screen.getByText('(-) 0 ETH')).toBeTruthy()
+  })
+
+  it('com cupom aplicado, o rótulo leva o código', () => {
+    render(
+      <PriceSummary
+        quote={{ ...values, discount: parseEth('0.035'), total: parseEth('0.317'), coupon: { code: 'KURIO10', status: 'applied' } }}
+      />,
+    )
+    expect(screen.getByText('Desconto (KURIO10)')).toBeTruthy()
+    expect(screen.getByText('(-) 0.035 ETH')).toBeTruthy()
+  })
+})
+
+describe('CouponInput: aparência "attached" (Carrinho)', () => {
+  it('rótulo "Código promocional" e o placeholder do Figma', () => {
+    render(<CouponInput appearance="attached" status="idle" onApply={() => undefined} />)
+    expect(screen.getByLabelText('Código promocional').getAttribute('placeholder')).toBe('Digite o código promocional...')
   })
 })
