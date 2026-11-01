@@ -34,6 +34,12 @@ export const AUTH_COLUMN_CLASS = 'mx-auto w-full md:max-w-[340px]'
 export const AUTH_INPUT_CLASS =
   'bg-background dark:bg-background border-border h-12 rounded-xl px-4 focus-visible:border-primary md:h-10 md:rounded-sm md:px-4'
 
+/**
+ * Rótulo visível e discreto acima do campo. O Figma só desenha o placeholder, que some ao digitar:
+ * o rótulo fica por acessibilidade (WCAG 3.3.2), como decidiu a MYK-1097.
+ */
+export const AUTH_LABEL_CLASS = 'text-muted-foreground font-normal'
+
 /** Botão principal: alto e bem arredondado no mobile (Figma), compacto no desktop. */
 export const AUTH_SUBMIT_CLASS = 'text-body-lg md:text-body h-14 w-full rounded-xl font-bold md:h-11 md:rounded-sm'
 

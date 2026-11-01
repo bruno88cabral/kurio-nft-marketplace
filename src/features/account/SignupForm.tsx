@@ -4,7 +4,7 @@ import { signup } from '@/api/auth'
 import { FormField } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AUTH_COLUMN_CLASS, AUTH_INPUT_CLASS, AUTH_SUBMIT_CLASS, FormAlert } from './AuthDialog'
+import { AUTH_COLUMN_CLASS, AUTH_INPUT_CLASS, AUTH_LABEL_CLASS, AUTH_SUBMIT_CLASS, FormAlert } from './AuthDialog'
 import { AuthSwitchLink } from './AuthSwitchLink'
 import { PasswordInput } from './PasswordInput'
 import { SocialLogin } from './SocialLogin'
@@ -17,9 +17,9 @@ const linkClass =
   'text-text-accent focus-visible:ring-ring rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3'
 
 /**
- * Cadastro do Figma: só placeholders, sem rótulo visível (o rótulo fica para o leitor de tela, com o
- * mesmo texto do placeholder). "Nome de usuário" é o texto do Figma; o contrato só tem o nome de
- * exibição (`name`), que é o que este campo preenche.
+ * Cadastro do Figma, com o placeholder do Figma e um rótulo visível discreto acima de cada campo (o
+ * Figma só tem placeholder, que some ao digitar; WCAG 3.3.2). "Nome de usuário" é o texto do Figma;
+ * o contrato só tem o nome de exibição (`name`), que é o que este campo preenche.
  */
 export function SignupForm({ redirect }: { redirect: string | undefined }) {
   const form = useAuthForm({
@@ -36,7 +36,7 @@ export function SignupForm({ redirect }: { redirect: string | undefined }) {
     <div className="flex flex-col gap-8 md:gap-6">
       <form noValidate onSubmit={form.onSubmit} className={`${AUTH_COLUMN_CLASS} flex flex-col gap-4`}>
         <FormAlert message={form.formError} />
-        <FormField label="Nome de usuário" hideLabel required error={form.errors.name} apiError={form.apiErrors.name}>
+        <FormField label="Nome de usuário" labelClassName={AUTH_LABEL_CLASS} required error={form.errors.name} apiError={form.apiErrors.name}>
           {(control) => (
             <Input
               {...control}
@@ -48,7 +48,7 @@ export function SignupForm({ redirect }: { redirect: string | undefined }) {
           )}
         </FormField>
         <div className="flex flex-col gap-1.5">
-          <FormField label="E-mail" hideLabel required error={form.errors.email} apiError={form.apiErrors.email}>
+          <FormField label="E-mail" labelClassName={AUTH_LABEL_CLASS} required error={form.errors.email} apiError={form.apiErrors.email}>
             {(control) => (
               <Input
                 {...control}
@@ -71,7 +71,7 @@ export function SignupForm({ redirect }: { redirect: string | undefined }) {
         </div>
         <FormField
           label="Senha"
-          hideLabel
+          labelClassName={AUTH_LABEL_CLASS}
           required
           description={DEMO_PASSWORD_NOTICE}
           error={form.errors.password}
@@ -89,7 +89,7 @@ export function SignupForm({ redirect }: { redirect: string | undefined }) {
         </FormField>
         <FormField
           label="Confirmar senha"
-          hideLabel
+          labelClassName={AUTH_LABEL_CLASS}
           required
           error={form.errors.confirmPassword}
           apiError={form.apiErrors.confirmPassword}

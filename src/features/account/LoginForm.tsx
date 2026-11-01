@@ -3,7 +3,7 @@ import { login } from '@/api/auth'
 import { FormField, OutOfScopeAction } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AUTH_COLUMN_CLASS, AUTH_INPUT_CLASS, AUTH_SUBMIT_CLASS, FormAlert } from './AuthDialog'
+import { AUTH_COLUMN_CLASS, AUTH_INPUT_CLASS, AUTH_LABEL_CLASS, AUTH_SUBMIT_CLASS, FormAlert } from './AuthDialog'
 import { AuthSwitchLink } from './AuthSwitchLink'
 import { PasswordInput } from './PasswordInput'
 import { SocialLogin } from './SocialLogin'
@@ -25,8 +25,8 @@ export function LoginForm({ redirect }: { redirect: string | undefined }) {
     <div className="flex flex-col gap-8 md:gap-6">
       <form noValidate onSubmit={form.onSubmit} className={`${AUTH_COLUMN_CLASS} flex flex-col gap-4`}>
         <FormAlert message={form.formError} />
-        {/* Figma: sem rótulo visível, só o placeholder; o rótulo fica para o leitor de tela */}
-        <FormField label="E-mail" hideLabel required error={form.errors.email} apiError={form.apiErrors.email}>
+        {/* O Figma só tem placeholder; o rótulo fica visível e discreto (WCAG 3.3.2), ver ARCHITECTURE */}
+        <FormField label="E-mail" labelClassName={AUTH_LABEL_CLASS} required error={form.errors.email} apiError={form.apiErrors.email}>
           {(control) => (
             <Input
               {...control}
@@ -39,7 +39,7 @@ export function LoginForm({ redirect }: { redirect: string | undefined }) {
             />
           )}
         </FormField>
-        <FormField label="Senha" hideLabel required error={form.errors.password} apiError={form.apiErrors.password}>
+        <FormField label="Senha" labelClassName={AUTH_LABEL_CLASS} required error={form.errors.password} apiError={form.apiErrors.password}>
           {(control) => (
             <PasswordInput
               {...control}
