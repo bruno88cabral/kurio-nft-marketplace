@@ -36,7 +36,10 @@ src/
   routes/       rotas do TanStack Router (file-based; routeTree.gen.ts é gerado)
 public/
   fonts/        Roboto Mono self-hosted (.woff2 de 400/500/700)
+  nfts/         artes dos NFTs: 4 fotos em AVIF e WebP, 320 e 960 px (ver "Substituição de assets")
   mockServiceWorker.js
+scripts/
+  optimize-nft-art.mjs  conversão PNG -> AVIF/WebP das artes (fora do bundle; sharp carregado de fora do repo)
 ```
 
 **Regra: os tipos em `src/contracts` são a fonte única** de formato de dados. O cliente, os mocks (handlers REST e emissão de eventos) e, no futuro, os testes importam dos mesmos tipos. Nenhum tipo de payload é redeclarado fora dali.
@@ -140,7 +143,9 @@ Base do M2 para CLS e LCP (**ainda não medida**):
 - **`fetchpriority="high"`** na arte do hero (Início) e na arte principal do Detalhe (`eager`); as demais ficam lazy.
 - **Rota do Início em chunk próprio** (`dist/assets/routes-*.js`, ~28 kB), separada do `start-*.js`.
 
-Pendente: AVIF/WebP (as artes ainda são SVG, ver "Substituição de assets"), LCP/CLS/TBT e medição com Lighthouse, que fecham o R2 no M5. Uma consequência conhecida do CLS: na primeira carga a paginação aparece só depois dos dados e empurra as promos para baixo. Scripts `test:e2e` e `lighthouse` entram no M5.
+- **Artes em WebP otimizado** (MYK-1079): o `<img>` recebe o WebP de 960 px (37–53 KB, ver "Substituição de assets").
+
+Pendente: o `<picture>` com AVIF e `srcset` 320/960 (os arquivos já existem; liga na MYK-1116), LCP/CLS/TBT e medição com Lighthouse, que fecham o R2 no M5. Uma consequência conhecida do CLS: na primeira carga a paginação aparece só depois dos dados e empurra as promos para baixo. Scripts `test:e2e` e `lighthouse` entram no M5.
 
 ## Seções do enunciado (§12) a preencher
 
@@ -194,7 +199,7 @@ Rotas do socket: `ws.link('<VITE_SOCKET_URL>/*')` (ver "Transporte de tempo real
 - `/nfts/featured` e `/nfts/facets` são registrados **antes** de `/nfts/:nftId`, senão `featured` e `facets` seriam lidos como id.
 - `NftListParams`: `q` (busca em nome, coleção, criador e descrição), `collections` (repetido, `collections=a&collections=b`, ou separado por vírgula; o cliente envia repetido), `priceMin`/`priceMax` (decimais, comparados com `Big`), `network` (`ethereum`, `polygon`, `arbitrum`, `optimism`), `tab` (`all`, `new`, `trending`), `sort` (`newest`, `price_asc`, `price_desc`), `page` e `pageSize` (padrão 12, máximo 100). Valor fora do formato responde 422 com `fieldErrors`.
 - `tab=new` = NFTs criados nos 14 dias anteriores ao mais recente do catálogo (`NEW_WINDOW_DAYS`); `tab=trending` = fração vendida das edições limitadas entre 50% (inclusive) e 100% (exclusive) (`TRENDING_MIN_SOLD`). Empate de ordenação resolvido por `id`.
-- `Nft.images: string[]` é a galeria (`images[0]` é a capa e igual a `imageUrl`; nunca vazio). Hoje todo NFT tem 1 imagem, porque só existe uma arte por NFT (ver "Substituição de assets"); a galeria com miniaturas foi exercitada injetando 3 imagens no db do mock.
+- `Nft.images: string[]` é a galeria (`images[0]` é a capa e igual a `imageUrl`; nunca vazio). No seed, todo NFT tem 3 imagens: a capa e as 2 artes seguintes do rodízio das 4 fotos (regra em "Substituição de assets"), para as miniaturas do Detalhe aparecerem.
 - `Nft.previousPrice?` é o preço "de" riscado (promoção); está em 4 NFTs do seed (`nft-002`, `nft-009`, `nft-014`, `nft-023`).
 - Com o cenário `empty`, `GET /nfts` devolve `items: []` e `GET /nfts/facets` devolve listas vazias e `price: { min: '0', max: '0' }`. O seed normal soma 30 NFTs em 5 coleções (6 cada) e 4 redes (7, 9, 6 e 8), preço de 0.03 a 5.
 
@@ -500,7 +505,7 @@ Código em `src/realtime/` (MYK-1091). O `bindRealtime` é ligado uma vez em `sr
 - **Hero:** eyebrow "Bem-vindo à Kurio", título "Seja dono do futuro da arte digital" (uppercase por CSS) e botão EXPLORAR seguem o Figma `2:2` (conferido por screenshot na MYK-1049); o texto de apoio abaixo do título continua pendente de conferência.
 - **Promos e "Diário da Cunhagem":** os textos foram escritos na implementação (títulos, chamadas, as 3 matérias e as datas) e a escolha das artes de cada post. O card "NFT em destaque" reaproveita o `NftCard` com o badge "Oferta limitada".
 - **Logos de MetaMask, WalletConnect e Coinbase:** não exportados; o `WalletOption` fica só com o nome e o rádio, sem logo nem monograma (decisão do humano).
-- **Artes dos NFTs:** continuam as SVGs placeholder; AVIF/WebP e a troca pelas ilustrações do Figma estão pendentes (ver "Substituição de assets").
+- **Artes dos NFTs:** são as 4 fotos dos macacos exportadas do Figma, distribuídas entre os 30 NFTs por regra fixa (ver "Substituição de assets"); a escolha de qual foto vai em cada promo e matéria do Diário é minha.
 - **Conferência de `/dev/kit`, Início (`14:5226`), Detalhe desktop (`10:244`) e mobile (`15:5536`):** só contra descrições.
 
 ### Decisões de UX
@@ -569,9 +574,32 @@ Código em `src/realtime/` (MYK-1091). O `bindRealtime` é ligado uma vez em `sr
 
 Registro dos assets do Figma substituídos (imagens, ícones, fontes) e o motivo. Fonte: só a Roboto Mono foi adicionada, self-hosted. Os `.woff2` de `public/fonts/` foram copiados do pacote `@fontsource/roboto-mono` 5.3.0 (licença OFL-1.1); a devDependency fica como origem dos arquivos. TODO: `public/favicon.svg` ainda é o do template do Vite; trocar pela marca do Kurio.
 
-**Artes dos NFTs (MYK-1059).** O plano era exportar as ilustrações do Figma (nodes do Início `4:137`, `4:162`, `4:164`, `4:280`–`4:291`, destaque `70410:3798`, promos `4:428`/`4:423`, Detalhe `11:1161` e miniaturas `11:1181`–`11:1190`) e convertê-las para AVIF + WebP em dois tamanhos (~300px card, ~800px detalhe). Em 31/10 o MCP do Figma recusou `get_screenshot` e `download_assets` por limite de chamadas do plano Starter, então **as artes continuam sendo as 30 SVGs placeholder geradas no M1** (`public/nfts/<slug>.svg`, gradiente + formas, `viewBox` 120×120, ~530 bytes cada; nenhum asset de terceiros). O manifest `src/lib/nftArt.ts` (`NFT_ART_MANIFEST`, `nftArtSize`) registra as dimensões reais de cada arquivo; o `NftCard` passa `width`/`height` ao `<img>` (CLS) e `priority` liga `fetchpriority="high"` na arte acima da dobra. `src/lib/nftArt.test.ts` confere o manifest contra os arquivos do disco e contra as `imageUrl` das fixtures. Os logos de MetaMask, WalletConnect e Coinbase também não foram exportados: o `WalletOption` fica só com o nome (sem monograma, decisão do humano).
+**Artes dos NFTs (MYK-1079).** Até a MYK-1059 eram 30 SVGs placeholder geradas no M1 (`<slug>.svg`, `viewBox` 120×120, ~530 bytes cada), porque o MCP do Figma recusou `get_screenshot` e `download_assets` por limite de chamadas. Agora são as fotos reais:
 
-> **Pendente (precisa de cota no Figma):** exportar as artes reais, gerar AVIF/WebP nos dois tamanhos, atualizar o manifest e as `imageUrl` das fixtures e fazer a conferência visual de `/dev/kit` contra o Figma em 390, 768 e 1440 com `get_screenshot` (não feita: a página foi conferida só contra as descrições e node IDs da MYK-1059).
+- **Origem.** Export manual do Figma, feito pelo humano: 4 PNGs de 1000×1000 com cantos arredondados transparentes (`NFT Artwork 03`, `04`, `05` e `09`, ~1,3 MB cada, 5,54 MB no total). São os 4 macacos que se repetem nas telas do Figma. Os PNGs **não** entram no repo.
+- **Conversão.** `scripts/optimize-nft-art.mjs`, com o `sharp` carregado de fora do repo (não é dependência do app nem entra no bundle; o uso está no cabeçalho do script). Recorte 1:1 centralizado (os originais já são quadrados, então nada é cortado; conferido abrindo cada arquivo), larguras 320 px (card, carrinho, pagamento, miniaturas) e 960 px (hero, Detalhe, destaque), sem upscale, AVIF (`quality` 50, `effort` 6) e WebP (`quality` 75, `effort` 6), sem EXIF/ICC/XMP, alpha preservado. Metas: < 25 KB no 320 e < 100 KB no 960. As 4 artes couberam na quality inicial, então a **quality final é 50 (AVIF) e 75 (WebP) em todas** (o script desce de 5 em 5 se alguma passar da meta).
+- **Nomes.** `public/nfts/<slug>-<largura>.<avif|webp>`, com os slugs `macaco-oculos` (03), `macaco-chapeu` (04), `macaco-gola-alta` (05) e `macaco-fones` (09).
+
+| Arquivo | Dimensões | AVIF | WebP |
+| --- | --- | --- | --- |
+| `macaco-oculos-320` | 320×320 | 7,3 KB | 9,5 KB |
+| `macaco-oculos-960` | 960×960 | 27,4 KB | 44,2 KB |
+| `macaco-chapeu-320` | 320×320 | 5,8 KB | 7,7 KB |
+| `macaco-chapeu-960` | 960×960 | 24,4 KB | 42,6 KB |
+| `macaco-gola-alta-320` | 320×320 | 5,5 KB | 7,3 KB |
+| `macaco-gola-alta-960` | 960×960 | 22,4 KB | 37,9 KB |
+| `macaco-fones-320` | 320×320 | 7,6 KB | 9,5 KB |
+| `macaco-fones-960` | 960×960 | 33,9 KB | 53,3 KB |
+
+Totais (KB = 1000 bytes): os 4 PNGs originais somam **5541,6 KB**; os 16 arquivos gerados somam **346,4 KB**; o que o app baixa hoje (os 4 WebP de 960) soma **178,1 KB**, contra ~1385 KB por arte em PNG. As 30 SVGs placeholder somavam 15,9 KB (eram vetores simples, não fotos).
+
+- **Distribuição entre os 30 NFTs** (`src/mocks/fixtures/nfts.ts`). Regra determinística, sem `Math.random`: na ordem de `ROWS`, a capa do NFT de índice `i` é `NFT_ARTS[i % 4]` (óculos, chapéu, gola alta, fones, de novo óculos…) e `images` tem 3 entradas, a capa e as 2 artes seguintes do rodízio (`i + 1` e `i + 2`, módulo 4). Assim o mesmo NFT mostra sempre a mesma arte (catálogo, Detalhe e a regressão visual do M5) e o Detalhe tem miniaturas. Nomes, preços e coleções do seed não mudaram. As promos e o "Diário da Cunhagem" apontam direto para um WebP de 960.
+- **Manifest.** `src/lib/nftArt.ts` exporta `NFT_ARTS` (por arte: `src` = WebP de 960, mais os caminhos AVIF/WebP de 320 e 960) e `NFT_ART_MANIFEST` com as dimensões reais de todos os 16 arquivos; `nftArtSize` continua com o fallback 1:1. `src/lib/nftArt.test.ts` lê as dimensões do cabeçalho de cada arquivo (`VP8X` no WebP, `ispe` no AVIF, `viewBox` no SVG), confere as metas de peso e que toda `imageUrl` e toda imagem de galeria das fixtures resolvem no manifest.
+- **SVGs que ficaram.** `atlas-zero`, `basalt-bloom`, `cold-ember`, `meridian-glow` e `tide-glitch` continuam em `public/nfts/` porque a rota `/dev/kit` aponta para elas (fora do escopo desta troca). As outras 25 foram removidas.
+
+> **Pendente (MYK-1116):** o `<img>` de cada componente usa só o WebP de 960. O `<picture>` com `<source type="image/avif">` e `srcset`/`sizes` (320 nos cards e miniaturas, 960 no hero e no Detalhe) será ligado na MYK-1116, que cuida dos componentes. A conferência visual das telas contra o Figma é das issues MYK-1098 a MYK-1102.
+
+Os logos de MetaMask, WalletConnect e Coinbase não foram exportados: o `WalletOption` fica só com o nome (sem monograma, decisão do humano).
 
 ### Ajustes de acessibilidade
 
