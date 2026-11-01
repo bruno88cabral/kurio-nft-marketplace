@@ -14,7 +14,7 @@ const POSTS = [
     readingTime: 'Leitura de 6 min',
     title: 'Como funciona a propriedade de NFTs',
     excerpt: 'Aprenda a colecionar, negociar e verificar ativos digitais.',
-    art: '/nfts/origami-orbit.svg',
+    art: '/nfts/macaco-oculos-960.webp',
   },
   {
     date: '2026-09-13',
@@ -22,7 +22,7 @@ const POSTS = [
     readingTime: 'Leitura de 2 min',
     title: '10 artistas digitais para acompanhar',
     excerpt: 'Conheça criadores que moldam a cultura digital.',
-    art: '/nfts/reef-pulse.svg',
+    art: '/nfts/macaco-gola-alta-960.webp',
   },
   {
     date: '2026-09-15',
@@ -30,7 +30,7 @@ const POSTS = [
     readingTime: 'Leitura de 3 min',
     title: 'Raridade, atributos e procedência',
     excerpt: 'Entenda raridade, procedência, direitos autorais e utilidade.',
-    art: '/nfts/night-compass.svg',
+    art: '/nfts/macaco-chapeu-960.webp',
   },
   {
     date: '2026-09-15',
@@ -38,7 +38,7 @@ const POSTS = [
     readingTime: 'Leitura de 2 min',
     title: 'Como proteger sua carteira',
     excerpt: 'Proteja sua carteira, seus ativos e sua identidade.',
-    art: '/nfts/kelp-sprite.svg',
+    art: '/nfts/macaco-fones-960.webp',
   },
 ] as const
 

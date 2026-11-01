@@ -11,13 +11,13 @@ const PROMOS = [
     tab: 'new',
     title: 'Lançamentos gênesis de edição limitada',
     text: 'Colecione edições escassas diretamente dos criadores antes da revelação pública.',
-    art: '/nfts/coral-byte.svg',
+    art: '/nfts/macaco-chapeu-960.webp',
   },
   {
     tab: 'trending',
     title: 'Arte digital selecionada e muito mais',
     text: 'Explore novos artistas, coleções verificadas e obras digitais que definem a cultura da internet.',
-    art: '/nfts/tide-glitch.svg',
+    art: '/nfts/macaco-fones-960.webp',
   },
 ] as const
 

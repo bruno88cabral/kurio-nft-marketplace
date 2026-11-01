@@ -1,5 +1,6 @@
 import type { IsoDateTime, Network, Nft, NftEdition, NftEditionKind } from '@/contracts'
 import { parseEth } from '@/lib/eth'
+import { NFT_ARTS } from '@/lib/nftArt'
 import { nftId } from '../db/ids'
 import { COLLECTION_CREATORS, type CollectionName } from './collections'
 
@@ -57,23 +58,28 @@ const PREVIOUS_PRICE: Record<string, string> = {
   'Slate Vine': '0.7',
 }
 
-function slug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-}
-
 function createdAt(daysAgo: number): IsoDateTime {
   return new Date(REFERENCE_MS - daysAgo * DAY_MS).toISOString()
 }
 
+/**
+ * Regra determinística das artes (MYK-1079): há 4 fotos para 30 NFTs. A capa é `NFT_ARTS[index % 4]`
+ * (índice na ordem de `ROWS`) e a galeria acrescenta as 2 artes seguintes, em rodízio. Sem
+ * `Math.random`, para o catálogo, o detalhe e a regressão visual não mudarem entre execuções.
+ */
+function gallery(index: number): string[] {
+  return [0, 1, 2].map((offset) => NFT_ARTS[(index + offset) % NFT_ARTS.length].src)
+}
+
 export const NFTS: readonly Nft[] = ROWS.map(([name, collection, network, price, editions, featured, daysAgo], index): Nft => {
-  // Uma arte por NFT (o manifest de `src/lib/nftArt.ts` só tem a capa); a galeria cresce quando houver variações
-  const imageUrl = `/nfts/${slug(name)}.svg`
+  const images = gallery(index)
+  const imageUrl = images[0]
   const previousPrice = PREVIOUS_PRICE[name]
   return {
     id: nftId(index + 1),
     name,
     imageUrl,
-    images: [imageUrl],
+    images,
     collection,
     description: `${name}, da coleção ${collection}. Arte digital fictícia para o marketplace Kurio.`,
     creator: COLLECTION_CREATORS[collection],
