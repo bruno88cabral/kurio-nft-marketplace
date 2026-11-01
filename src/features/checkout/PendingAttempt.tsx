@@ -19,6 +19,11 @@ export const ORDER_IN_PROGRESS_MESSAGE = 'Seu pedido anterior ainda está em and
 export const ORDER_LOAD_FAILED_MESSAGE = 'Não foi possível consultar o pedido anterior.'
 /** Toast do 409 no "Tentar de novo" com o carrinho vazio: a tentativa sai e a página volta ao /cart. */
 export const ATTEMPT_CONFLICT_MESSAGE = 'O pedido não foi feito: os valores ou o estoque mudaram desde o envio.'
+/**
+ * Título da lista da tentativa com o carrinho vazio. Sem número de etapa: as etapas 1 e 2 não aparecem, e a
+ * lista é o pedido que "Tentar de novo" reenvia (MYK-1111).
+ */
+export const ATTEMPT_SENT_TITLE = 'Pedido enviado'
 
 export type OrderInProgress = Extract<PendingOrderState, { kind: 'in-progress' }>
 
@@ -38,13 +43,13 @@ export function RecoverPendingOrder({ accountId }: { accountId: Id }) {
 
 /**
  * Carrinho vazio com tentativa pendente e snapshot: a lista e os valores do que "Tentar de novo" compra, acima do
- * aviso (`children`). Só exibe: o envio continua com a mesma chave e o mesmo corpo (R4).
+ * aviso (`children`), sob o título "Pedido enviado", sem número de etapa. Só exibe: o envio continua com a mesma chave e o mesmo corpo (R4).
  */
 export function AttemptReview({ snapshot, children }: { snapshot: AttemptSnapshot; children: ReactNode }) {
   const nftOf = useNftDetails(snapshot.items.map((item) => item.nftId))
   return (
     <div className={GRID_CLASS}>
-      <ReviewSection number={3} title="Revisão" attempt lines={attemptLines(snapshot, nftOf)} />
+      <ReviewSection title={ATTEMPT_SENT_TITLE} attempt lines={attemptLines(snapshot, nftOf)} />
       <aside aria-label="Resumo do pedido" className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-24">
         <PriceSummary title="Resumo" quote={snapshot} />
         {children}

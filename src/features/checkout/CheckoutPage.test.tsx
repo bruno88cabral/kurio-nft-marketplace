@@ -28,7 +28,8 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigate,
 }))
 
-const { CheckoutPage, ATTEMPT_CONFLICT_MESSAGE } = await import('./CheckoutPage')
+const { CheckoutPage, ATTEMPT_CONFLICT_MESSAGE, ORDER_IN_PROGRESS_MESSAGE, ORDER_LOAD_FAILED_MESSAGE } = await import('./CheckoutPage')
+const { ATTEMPT_SENT_TITLE } = await import('./PendingAttempt')
 const { checkoutDraftStore } = await import('./checkoutDraft')
 const { ATTEMPT_REVIEW_MESSAGE } = await import('./reviewSource')
 
@@ -135,6 +136,13 @@ describe('CheckoutPage', () => {
     expect(describedText(confirmButton())).toEqual(['Conecte uma carteira para confirmar.'])
     await connectAndWaitForConfirm()
     expect(confirmButton().getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('com o carrinho, as três etapas aparecem numeradas (1, 2, 3)', async () => {
+    renderPage()
+    await screen.findByText('Solar Veil')
+    const steps = ['Seus dados', 'Carteira', 'Revisão'].map((name) => screen.getByRole('heading', { name }).textContent)
+    expect(steps).toEqual(['1Seus dados', '2Carteira', '3Revisão'])
   })
 
   it('duplo clique em "Confirmar compra" envia um único POST /orders (trava com useRef)', async () => {
@@ -262,6 +270,41 @@ describe('CheckoutPage com o carrinho vazio e tentativa pendente', () => {
     // A lista vem antes do aviso no documento
     expect(screen.getByText('Solar Veil').compareDocumentPosition(retry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByTestId('navigate')).toBeNull()
+  })
+
+  it('a lista da tentativa tem o título "Pedido enviado", sem número de etapa', async () => {
+    checkoutDraftStore(ANA.id).set(pendingDraft())
+    renderPage()
+    const heading = await screen.findByRole('heading', { name: ATTEMPT_SENT_TITLE })
+    // Só o título: nenhum número solto ("3") antes dele, e nenhuma etapa "Revisão"
+    expect(heading.textContent).toBe(ATTEMPT_SENT_TITLE)
+    expect(screen.queryByRole('heading', { name: 'Revisão' })).toBeNull()
+  })
+
+  it('"Tentar de novo" reenvia o mesmo corpo (quoteId e carteira) com a mesma chave e abre a Confirmação', async () => {
+    checkoutDraftStore(ANA.id).set(pendingDraft())
+    postOrder = (_body, key) => Promise.resolve({ data: orderOf('q0', key) })
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Tentar de novo' }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/orders/$orderId', params: { orderId: 'o1' } })))
+    expect(orderCalls()).toHaveLength(1)
+    expect(orderCalls()[0]?.[1]).toEqual({ quoteId: 'q0', walletId: WALLET.id })
+    expect(orderCalls()[0]?.[2]).toEqual({ headers: { 'Idempotency-Key': 'k1' } })
+  })
+
+  it('pedido em andamento cuja consulta falhou: "Tentar novamente" na tela consulta de novo, sem reenviar', async () => {
+    checkoutDraftStore(ANA.id).set({ ...pendingDraft(), orderId: 'o1' })
+    const orderLoads = () => api.get.mock.calls.filter(([url]) => url === '/orders/o1')
+    renderPage()
+    expect(await screen.findByText(ORDER_LOAD_FAILED_MESSAGE)).toBeTruthy()
+    expect(screen.getByText(ORDER_IN_PROGRESS_MESSAGE)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull()
+    const loadsBefore = orderLoads().length
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    await waitFor(() => expect(orderLoads().length).toBe(loadsBefore + 1))
+    expect(orderCalls()).toHaveLength(0)
+    // A tentativa continua no rascunho: o pedido existe
+    expect(checkoutDraftStore(ANA.id).get().idempotencyKey).toBe('k1')
   })
 
   it('409 no "Tentar de novo" avisa por toast antes de voltar ao /cart', async () => {
