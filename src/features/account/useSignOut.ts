@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { sessionLifecycle } from '@/auth/sessionLifecycle'
 import { MAIN_CONTENT_ID } from '@/components/layout/SkipLink'
+import { dropCollectorForms } from '@/features/checkout/checkoutDraft'
 
 export const SIGNED_OUT_MESSAGE = 'Você saiu da conta.'
 
@@ -13,7 +14,7 @@ export function focusMainContent() {
 
 /**
  * "Sair": encerra a sessão pelo ciclo de vida (logout na API, reset do estado privado, socket
- * anônimo), avisa, volta ao Início e põe o foco no conteúdo principal. Mesmo hook no menu do header e na sidebar da conta.
+ * anônimo), tira o formulário do colecionador dos rascunhos do checkout, avisa, volta ao Início e põe o foco no conteúdo principal. Mesmo hook no menu do header e na sidebar da conta.
  */
 export function useSignOut() {
   const navigate = useNavigate()
@@ -24,6 +25,8 @@ export function useSignOut() {
     setPending(true)
     try {
       await sessionLifecycle.endSession('logout')
+      // Só no logout explícito: na expiração o formulário do Pagamento fica para a retomada (MYK-1114 D7)
+      dropCollectorForms()
       toast.success(SIGNED_OUT_MESSAGE)
       await navigate({ to: '/' })
       // O botão do AccountLayout (ou o menu do header) que tinha o foco sumiu: sem isso ele cai no

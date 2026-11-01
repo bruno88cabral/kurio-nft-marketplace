@@ -1,6 +1,8 @@
 import type { SessionStorageLike } from '@/auth/sessionStorage'
 import type { CreateOrderRequest, Id, Order } from '@/contracts'
+import { WALLET_PROVIDERS, type WalletProvider } from '@/lib/wallets'
 import { parseAttemptSnapshot, type AttemptSnapshot } from './attemptSnapshot'
+import { COLLECTOR_FIELDS, type CollectorValues } from './collectorForm'
 
 /** Rascunho do checkout em `sessionStorage` (morre com a aba; não vaza para outra aba nem outro login). */
 export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
@@ -34,6 +36,15 @@ export interface CheckoutDraft {
    * da tentativa e com o mesmo `quoteId`; nunca muda o corpo nem a chave do reenvio.
    */
   attemptSnapshot?: AttemptSnapshot
+  /**
+   * Valores do formulário "Perfil do colecionador" (MYK-1114 D7), para sobreviverem a refresh e à expiração da
+   * sessão. Dados privados: caem no logout explícito (`dropCollectorForms`, em `useSignOut`) e no `confirmed`
+   * (`clear`), mas não no reset por expiração. Só exibição e validação no cliente: nunca entram no corpo do
+   * pedido, na chave nem no snapshot da tentativa.
+   */
+  collector?: Partial<CollectorValues>
+  /** Provedor com que a conexão é simulada (só de UI; o `connect` continua sendo do `walletId`). */
+  provider?: WalletProvider
 }
 
 const isString = (value: unknown): value is string => typeof value === 'string' && value !== ''
@@ -43,6 +54,24 @@ function isAttempt(value: unknown): value is CreateOrderRequest {
   const { quoteId, walletId } = value as Record<string, unknown>
   return isString(quoteId) && isString(walletId)
 }
+
+/** Teto de cada valor do formulário guardado (o maior campo, a Observação, vai até 500). */
+const MAX_COLLECTOR_VALUE = 500
+
+/** Só as chaves conhecidas com valor string (vazia vale: a pessoa pode ter apagado o pré-preenchido), truncadas. */
+function parseCollector(value: unknown): Partial<CollectorValues> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const source = value as Record<string, unknown>
+  const collector: Partial<CollectorValues> = {}
+  for (const field of COLLECTOR_FIELDS) {
+    const fieldValue = source[field]
+    if (typeof fieldValue === 'string') collector[field] = fieldValue.slice(0, MAX_COLLECTOR_VALUE)
+  }
+  return Object.keys(collector).length > 0 ? collector : undefined
+}
+
+const isWalletProvider = (value: unknown): value is WalletProvider =>
+  typeof value === 'string' && (WALLET_PROVIDERS as readonly string[]).includes(value)
 
 /** Só os campos válidos do JSON guardado; ausente, ilegível ou malformado vira `{}`. Nunca lança. */
 export function parseCheckoutDraft(raw: string | null): CheckoutDraft {
@@ -64,6 +93,10 @@ export function parseCheckoutDraft(raw: string | null): CheckoutDraft {
       const snapshot = parseAttemptSnapshot(value.attemptSnapshot)
       if (snapshot && snapshot.quoteId === draft.attempt.quoteId) draft.attemptSnapshot = snapshot
     }
+    // Formulário e provedor malformados caem sozinhos, sem derrubar a carteira nem a tentativa
+    const collector = parseCollector(value.collector)
+    if (collector) draft.collector = collector
+    if (isWalletProvider(value.provider)) draft.provider = value.provider
     return draft
   } catch {
     return {}
@@ -150,6 +183,18 @@ export function withConnectedWallet(draft: CheckoutDraft, walletId: Id): Checkou
 export function withoutConnection(draft: CheckoutDraft): CheckoutDraft {
   const next = { ...draft }
   delete next.connectedWalletId
+  return next
+}
+
+/** Com os valores do formulário do colecionador (cópia); o resto do rascunho fica. */
+export function withCollector(draft: CheckoutDraft, values: Partial<CollectorValues>): CheckoutDraft {
+  return { ...draft, collector: { ...values } }
+}
+
+/** Sem o formulário do colecionador, e só ele: carteira, conexão, provedor e tentativa pendente ficam (R4). */
+export function withoutCollector(draft: CheckoutDraft): CheckoutDraft {
+  const next = { ...draft }
+  delete next.collector
   return next
 }
 
@@ -296,6 +341,29 @@ export function dropWalletConnections(storage: SessionStorageLike | null = brows
       const draft = parseCheckoutDraft(raw)
       if (draft.connectedWalletId === undefined) continue
       storage.setItem(key, JSON.stringify(withoutConnection(draft)))
+    } catch {
+      // sem persistência
+    }
+  }
+}
+
+/**
+ * Logout explícito (`useSignOut`, MYK-1114 D7): os valores do formulário do colecionador são dados privados e
+ * caem; carteira, conexão (que o reset já tirou), provedor e tentativa pendente ficam (R4). Não é ouvinte do
+ * `onPrivateReset`, porque o reset também roda na expiração e lá o formulário fica para a retomada. Vale para
+ * todos os rascunhos `kurio:checkout:*` da aba e as cópias em memória. Só reescreve o que tem formulário; não lança.
+ */
+export function dropCollectorForms(storage: SessionStorageLike | null = browserSessionStorage()): void {
+  for (const store of stores.values()) {
+    const draft = store.get()
+    if (draft.collector !== undefined) store.set(withoutCollector(draft))
+  }
+  if (!storage) return
+  for (const key of draftStorageKeys(storage)) {
+    try {
+      const draft = parseCheckoutDraft(storage.getItem(key))
+      if (draft.collector === undefined) continue
+      storage.setItem(key, JSON.stringify(withoutCollector(draft)))
     } catch {
       // sem persistência
     }
