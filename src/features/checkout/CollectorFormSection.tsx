@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Wallet as WalletIcon } from 'lucide-react'
+import { ChevronDown, Wallet as WalletIcon } from 'lucide-react'
 import { useState } from 'react'
 import type { Id, Network, Wallet } from '@/contracts'
 import { EmptyState, ErrorState, FormField } from '@/components/kurio'
@@ -60,7 +60,8 @@ export function CollectorForm({
   // rádio fica marcado para mostrar o porquê (D4). Estado só da tela
   const [wantOther, setWantOther] = useState(false)
   const others = wallets?.filter((w) => w.role !== 'primary') ?? []
-  const checked = useOther || (wantOther && !locked)
+  // O "marcado sem outra carteira" só vale enquanto não há outra: se uma aparecer, o checkbox segue a escolha real
+  const checked = useOther || (wantOther && others.length === 0 && !locked)
   // Com "outra carteira", as opções são só as outras; senão os selects mostram a escolhida (a principal), travados
   const options = useOther ? others : (wallets ?? [])
   const networks = NETWORKS.filter((network) => options.some((w) => w.network === network))
@@ -128,7 +129,7 @@ export function CollectorForm({
                 readOnly
                 rows={1}
                 value={selected.address}
-                className="min-h-11 resize-none font-mono break-all"
+                className="min-h-11 resize-none font-mono break-all md:text-xs"
               />
             )}
           </FormField>
@@ -193,15 +194,17 @@ export function CollectorForm({
                 spellCheck={false}
                 className={cn(FIELD_CLASS, 'min-w-0 flex-1')}
               />
-              {/* O sufixo é fixo: o Figma o desenha como select, mas só existe ".eth" */}
-              <Select value="eth" disabled={control.disabled}>
-                <SelectTrigger aria-label="Sufixo ENS" className={cn(FIELD_CLASS, 'shrink-0')}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="eth">.eth</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* O sufixo é fixo: o Figma o desenha como select, mas só existe ".eth". Fica o visual, sem parada de Tab
+                  (o texto ".eth" segue lido logo depois do campo, e a revisão mostra o nome completo) */}
+              <span
+                className={cn(
+                  FIELD_CLASS,
+                  'border-input dark:bg-input/30 text-body inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5',
+                )}
+              >
+                .eth
+                <ChevronDown aria-hidden className="text-muted-foreground size-4" />
+              </span>
             </div>
           )}
         </FormField>

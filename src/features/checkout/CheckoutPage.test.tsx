@@ -265,6 +265,52 @@ describe('CheckoutPage', () => {
     expect(within(dialog).getAllByText('0.5 ETH').length).toBeGreaterThan(0)
   })
 
+  it('cupom aplicado no Pagamento: a revisão mostra o desconto e confirmar envia um único POST, sem "Os valores mudaram"', async () => {
+    const discounted: Quote = {
+      ...quoteOf('q-cupom'),
+      discount: parseEth('0.035'),
+      total: parseEth('0.317'),
+      coupon: { code: 'KURIO10', status: 'applied' },
+    }
+    api.put.mockImplementation((url: string, body: { code: string }) => {
+      if (url !== '/cart/coupon') return Promise.reject(new Error(`PUT ${url} sem mock`))
+      cart = { ...cart, couponCode: body.code.toUpperCase() }
+      return Promise.resolve({ data: cart })
+    })
+    api.post.mockImplementation((url: string, _body: unknown, config?: { headers?: Record<string, string> }) => {
+      if (url === '/quotes') return Promise.resolve({ data: cart.couponCode ? discounted : quoteOf('q1') })
+      if (url === `/wallets/${WALLET.id}/connect`) return Promise.resolve({ data: WALLET })
+      if (url === '/orders') return Promise.resolve({ data: orderOf('q-cupom', config?.headers?.['Idempotency-Key'] ?? '') })
+      return Promise.reject(new Error(`POST ${url} sem mock`))
+    })
+    renderPage()
+    await connectAndWaitForConfirm()
+    fireEvent.click(screen.getByRole('button', { name: 'Tem um código promocional? Aplique aqui' }))
+    fireEvent.change(screen.getByLabelText('Cupom de desconto'), { target: { value: 'kurio10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+    await screen.findByText(/aplicado/)
+    await waitFor(() => expect(confirmButton().getAttribute('aria-disabled')).toBeNull())
+    fillCollector()
+    const dialog = await openReview()
+    expect(within(dialog).getAllByText('0.317 ETH').length).toBeGreaterThan(0)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar compra' }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/orders/$orderId' })))
+    expect(orderCalls()).toHaveLength(1)
+    expect(orderCalls()[0]?.[1]).toEqual({ quoteId: 'q-cupom', walletId: WALLET.id })
+    expect(screen.queryByText(/Os valores mudaram/)).toBeNull()
+  })
+
+  it('"Seus NFTs" mostra "(x N)" e o subtotal da linha (preço unitário × quantidade, só exibição)', async () => {
+    cart = { items: [{ ...ITEM, quantity: 3 }] }
+    quotes = [{ ...quoteOf('q1'), items: [{ ...ITEM, quantity: 3, unitPrice: parseEth('0.35') }] }]
+    renderPage()
+    const list = await screen.findByRole('region', { name: 'Seus NFTs' })
+    await within(list).findByText('Solar Veil')
+    expect(within(list).getByText('(x 3)')).toBeTruthy()
+    await waitFor(() => expect(within(list).getAllByText('1.05 ETH').length).toBeGreaterThan(0))
+    expect(within(list).getByText(/0\.35 ETH cada/)).toBeTruthy()
+  })
+
   it('o formulário sobrevive a um remount (rascunho do checkout)', async () => {
     renderPage()
     await screen.findByText('Solar Veil')
@@ -333,9 +379,14 @@ describe('CheckoutPage', () => {
     fillCollector()
     const dialog = await openReview()
     const button = within(dialog).getByRole('button', { name: 'Confirmar compra' })
-    fireEvent.click(button)
-    fireEvent.click(button)
-    await waitFor(() => expect(orderCalls()).toHaveLength(1))
+    // Os dois cliques no mesmo tick, sem render entre eles (o diálogo ainda montado, como na animação de saída no
+    // browser): só a trava síncrona do `usePlaceOrder` segura o segundo
+    act(() => {
+      button.click()
+      button.click()
+    })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(orderCalls()).toHaveLength(1)
     await waitFor(() => expect(confirmButton().getAttribute('aria-busy')).toBe('true'))
     // O CTA ocupado não reabre a revisão nem envia de novo
     fireEvent.click(confirmButton())

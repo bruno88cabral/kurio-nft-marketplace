@@ -143,7 +143,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   const wallets = useQuery(walletsQuery(accountId))
   const quote = useCartQuote(accountId, cart)
   const coupon = useCouponActions(useCart())
-  const { submitting, resending, source, reviewed, notice, confirm: confirmOrder, resend } = useCheckoutOrder({
+  const { submitting, resending, source, reviewed, notice, confirm: confirmOrder, markReviewed, resend } = useCheckoutOrder({
     accountId,
     cartItems: cart.items,
     draft,
@@ -195,13 +195,16 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
       return
     }
     setFormInvalid(false)
+    // O diálogo mostra a cotação atual: ela é o que a pessoa revisa, e o envio compara com ela (R3). Sem isto, um
+    // cupom aplicado aqui daria "Os valores mudaram" logo depois de a pessoa confirmar os valores com o cupom
+    markReviewed()
     setReviewOpen(true)
   }
   const confirmReviewed = () => {
     setReviewOpen(false)
     // O que bloqueia o envio pode ter surgido com o diálogo aberto (recotação, tentativa em outra aba): o diálogo
     // fecha, o foco volta ao CTA e o motivo aparece ligado a ele
-    if (!canConfirm || !selectedId) return
+    if (!canConfirm || submitting || !selectedId) return
     confirmOrder(selectedId)
   }
 
@@ -210,6 +213,8 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
   // "Confirmando…" de uma confirmação nova (o `withOrderKey` grava a tentativa antes do POST). Senão, "Confirmar compra"
   const confirmingNew = submitting && !resending
   const cta = orderInProgress !== undefined && !submitting ? 'in-progress' : pending && !confirmingNew ? 'retry' : 'confirm'
+  // O diálogo sumiu por fora (tentativa em outra aba, carteira removida): fecha de vez, para não reabrir sozinho
+  if (reviewOpen && (cta !== 'confirm' || !selected)) setReviewOpen(false)
 
   const lines = attempt
     ? attemptLines(attempt, nftOf)
@@ -364,7 +369,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
 
 function Alert({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p id={id} role="alert"className="text-destructive text-caption inline-flex items-start gap-1.5">
+    <p id={id} role="alert" className="text-destructive text-caption inline-flex items-start gap-1.5">
       <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
       {children}
     </p>

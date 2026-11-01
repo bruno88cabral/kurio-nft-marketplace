@@ -63,8 +63,10 @@ export function ReviewDialog({
         showCloseButton={false}
         className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto sm:max-w-lg"
         onCloseAutoFocus={(event) => {
+          // Sem o CTA (o diálogo fechou porque surgiu uma tentativa), o Radix decide; o "Tentar de novo" se foca
+          if (!returnFocusTo.current) return
           event.preventDefault()
-          returnFocusTo.current?.focus()
+          returnFocusTo.current.focus()
         }}
       >
         <DialogHeader>
@@ -75,7 +77,7 @@ export function ReviewDialog({
         <ReviewList title="Carteira e rede" rows={walletRows} />
         <section aria-label="Seus NFTs" className="flex flex-col gap-3">
           <h3 className="text-body font-medium">Seus NFTs</h3>
-          <ReviewStep lines={lines} />
+          <ReviewStep lines={lines} announce={false} />
         </section>
         <PriceSummary quote={quote} />
         <DialogFooter>

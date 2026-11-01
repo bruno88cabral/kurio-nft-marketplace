@@ -104,6 +104,11 @@ export interface CheckoutOrder extends Pick<PlaceOrder, 'submitting' | 'resendin
   notice: Notice | undefined
   /** "Confirmar compra" com a carteira escolhida; sem revisado não faz nada. */
   confirm: (walletId: Id) => void
+  /**
+   * A cotação na tela passa a ser o revisado (a revisão em diálogo a mostrou, MYK-1120). Só com o carrinho na
+   * tela e uma cotação atual; o "Confirmar" seguinte ainda recota e compara com ela (R3).
+   */
+  markReviewed: () => void
   /** "Tentar de novo" da tentativa pendente. */
   resend: () => void
 }
@@ -206,6 +211,9 @@ export function useCheckoutOrder({
       if (!reviewed) return
       setNotice(undefined)
       order.confirm({ reviewed, walletId, requote }, handle)
+    },
+    markReviewed: () => {
+      if (source.kind === 'cart' && quote.quote && !quote.isPlaceholderData) setReviewed(snapshotOf(quote.quote))
     },
     resend: () => order.resend(handle),
   }
