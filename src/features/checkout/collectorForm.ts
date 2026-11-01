@@ -18,7 +18,7 @@ export interface CollectorValues {
   /** Preenchido com `account.email`; editar aqui não altera a conta. */
   email: string
   referralCode: string
-  /** Sem o ".eth": o sufixo é o select fixo ao lado. */
+  /** Sem o ".eth": o sufixo é um texto fixo ao lado do campo (o Figma o desenha como select). */
   ensName: string
   /** Opcional: `nome.eth` ou endereço `0x`. */
   altWallet: string
@@ -53,7 +53,6 @@ export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/
  * Quem exibe normaliza com `toUpperCase()`.
  */
 export const REFERRAL_CODE_PATTERN = /^[A-Z0-9-]{4,16}$/i
-/** Nome ENS sem o ".eth". */
 /**
  * Nome ENS sem o ".eth": 3 a 63 letras, números ou hífen, sem hífen nas pontas. Testado sobre o valor em
  * minúsculas (o ENS não diferencia maiúsculas).

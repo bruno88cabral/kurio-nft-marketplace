@@ -74,25 +74,22 @@ function startConnect(result: { current: ReturnType<typeof useWalletConnection> 
 }
 
 describe('useWalletConnection', () => {
-  it('sem rascunho: a principal escolhida, as redes com carteira na ordem de NETWORKS e sem provedor', () => {
+  it('sem rascunho: a principal escolhida e sem provedor', () => {
     const { result } = setup({})
     expect(result.current.selected).toEqual(PRIMARY)
-    expect(result.current.networks).toEqual(['ethereum', 'polygon'])
     expect(result.current.useOther).toBe(false)
     expect(result.current.provider).toBeUndefined()
     expect(result.current.connection).toEqual({ status: 'idle' })
   })
 
-  it('selectNetwork escolhe a primeira carteira daquela rede e desconecta', () => {
+  it('selectWallet troca a carteira (e a rede dela) e desconecta; a mesma carteira não desconecta', () => {
     const { result, drafts } = setup({ walletId: 'w1', connectedWalletId: 'w1', provider: 'metamask' })
-    act(() => result.current.selectNetwork('polygon'))
+    act(() => result.current.selectWallet('w1'))
+    expect(result.current.connected).toBe(true)
+    act(() => result.current.selectWallet('w2'))
     expect(result.current.selected).toEqual(POLYGON)
     expect(result.current.connected).toBe(false)
     expect(drafts.get()).toEqual({ walletId: 'w2', provider: 'metamask' })
-    // Já nessa rede: nada muda (não volta para a primeira dela)
-    act(() => result.current.selectWallet('w3'))
-    act(() => result.current.selectNetwork('polygon'))
-    expect(result.current.selectedId).toBe('w3')
   })
 
   it('setUseOther liga a primeira não principal e, desligado, volta à principal', () => {
@@ -133,10 +130,9 @@ describe('useWalletConnection', () => {
     expect(result.current.connection).toEqual({ status: 'idle' })
   })
 
-  it('com tentativa pendente, rede, outra carteira, provedor e desconectar não mudam nada (R4)', () => {
+  it('com tentativa pendente, carteira, outra carteira, provedor e desconectar não mudam nada (R4)', () => {
     const { result, drafts } = setup(PENDING)
     act(() => {
-      result.current.selectNetwork('polygon')
       result.current.setUseOther(true)
       result.current.selectProvider('coinbase')
       result.current.selectWallet('w2')

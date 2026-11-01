@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { connectWallet } from '@/api/wallets'
 import { captureSession } from '@/auth/sessionGuard'
-import { ApiError, type Id, type Network, type Wallet } from '@/contracts'
-import { NETWORKS, type WalletProvider } from '@/lib/wallets'
+import { ApiError, type Id, type Wallet } from '@/contracts'
+import type { WalletProvider } from '@/lib/wallets'
 import { pendingAttempt, withConnectedWallet, withoutConnection, type CheckoutDraft, type CheckoutDraftStore } from './checkoutDraft'
 import type { WalletConnection } from './WalletStep'
 
@@ -16,15 +16,11 @@ export interface WalletConnectionState {
   /** A escolhida está conectada (`connectedWalletId` do rascunho) com um provedor escolhido. */
   connected: boolean
   connection: WalletConnection
-  /** Trocar de carteira desconecta a anterior. Com tentativa pendente não faz nada (a carteira fica travada). */
-  selectWallet: (walletId: Id) => void
-  /** Redes que têm alguma carteira cadastrada, na ordem de `NETWORKS`. */
-  networks: readonly Network[]
   /**
-   * Escolhe a primeira carteira cadastrada daquela rede (a principal antes, ordem de `sortWallets`). A rede não é
-   * um estado à parte: é a da carteira. Trocar desconecta; já estar nessa rede não muda nada.
+   * Trocar de carteira (e com ela a rede, que não é um estado à parte) desconecta a anterior. Com tentativa
+   * pendente não faz nada (a carteira fica travada). O select Rede do formulário escolhe por aqui (D4).
    */
-  selectNetwork: (network: Network) => void
+  selectWallet: (walletId: Id) => void
   /** "Usar outra carteira?": a escolhida não é a principal (derivado, não é estado novo). */
   useOther: boolean
   /** Desligar volta à principal; ligar escolhe a primeira não principal (se não houver, nada muda). */
@@ -40,8 +36,9 @@ export interface WalletConnectionState {
 }
 
 /**
- * A etapa "Carteira e rede" do Pagamento: carteira cadastrada (e a rede dela), provedor e conexão, gravados no
- * rascunho (`kurio:checkout:<accountId>`). Com tentativa pendente nada disso muda (R4).
+ * A carteira do Pagamento: a cadastrada escolhida (e a rede dela) no "Perfil do colecionador", o provedor e a
+ * conexão em "Carteira e rede", gravados no rascunho (`kurio:checkout:<accountId>`). Com tentativa pendente nada
+ * disso muda (R4).
  */
 export function useWalletConnection({
   draft,
@@ -100,14 +97,6 @@ export function useWalletConnection({
     drafts.set({ ...withoutConnection(drafts.get()), walletId })
   }
 
-  const networks = NETWORKS.filter((network) => wallets?.some((w) => w.network === network))
-
-  const selectNetwork = (network: Network) => {
-    if (pending || selected?.network === network) return
-    const target = wallets?.find((w) => w.network === network)
-    if (target) selectWallet(target.id)
-  }
-
   const useOther = selected !== undefined && selected.role !== 'primary'
 
   const setUseOther = (on: boolean) => {
@@ -164,8 +153,6 @@ export function useWalletConnection({
     connected,
     connection,
     selectWallet,
-    networks,
-    selectNetwork,
     useOther,
     setUseOther,
     provider,
