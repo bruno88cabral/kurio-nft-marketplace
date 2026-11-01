@@ -54,21 +54,14 @@ const STATUS_TEXT: Record<Exclude<WalletOptionStatus, 'idle'>, string> = {
   disconnected: 'Desconectada',
 }
 
-/** Monograma colorido no lugar do logo (logos oficiais não foram exportados; ver ARCHITECTURE.md). */
-const MONOGRAM: Record<WalletProvider, { letter: string; className: string }> = {
-  metamask: { letter: 'M', className: 'bg-[#F6851B] text-[#140D0A]' },
-  walletconnect: { letter: 'W', className: 'bg-[#3B99FC] text-[#140D0A]' },
-  coinbase: { letter: 'C', className: 'bg-[#0052FF] text-[#F7F3EC]' },
-}
-
 /**
- * Linha de provedor (Figma mobile `70398:245..247`): ícone 40px, nome, estado e rádio à direita.
+ * Linha de provedor (Figma mobile `70398:245..247`): nome, estado e rádio à direita. Sem logo nem monograma
+ * (decisão do humano: os logos não foram exportados, e a linha fica só com o nome, como no Figma).
  * A linha inteira é o `<label>` do rádio. Precisa estar dentro de `WalletOptionGroup`.
  */
 export function WalletOption({ provider, status = 'idle', rejectedMessage, disabled, className }: WalletOptionProps) {
   const id = `${useId()}-${provider}`
   const statusId = `${id}-status`
-  const monogram = MONOGRAM[provider]
   const text = status === 'rejected' ? (rejectedMessage ?? STATUS_TEXT.rejected) : status !== 'idle' ? STATUS_TEXT[status] : undefined
 
   return (
@@ -84,12 +77,6 @@ export function WalletOption({ provider, status = 'idle', rejectedMessage, disab
         className,
       )}
     >
-      <span
-        aria-hidden
-        className={cn('flex size-10 shrink-0 items-center justify-center rounded-full text-body-lg font-bold', monogram.className)}
-      >
-        {monogram.letter}
-      </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-body font-medium">{walletProviderLabel(provider)}</span>
         {text && (
