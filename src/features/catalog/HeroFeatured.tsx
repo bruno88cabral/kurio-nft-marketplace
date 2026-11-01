@@ -146,26 +146,33 @@ function FeaturedSlide(props: CarouselProps) {
       onKeyDown={onKeyDown}
       className={artBox}
     >
-      <Link
-        to="/nfts/$nftId"
-        params={{ nftId: current.id }}
+      {/* Padrão APG de carrossel: o slide é um grupo ("slide n de N") e a arte dentro dele continua um link */}
+      <div
+        role="group"
         aria-roledescription="slide"
-        className="focus-visible:ring-ring block size-full overflow-hidden rounded-2xl outline-none focus-visible:ring-3"
+        aria-label={`${index + 1} de ${items.length}`}
+        className="size-full"
       >
-        <img
-          // Mesma caixa para todas as artes; a primeira carrega com prioridade (LCP)
-          src={current.imageUrl}
-          alt=""
-          width={ART_SIZE}
-          height={ART_SIZE}
-          fetchPriority={index === 0 ? 'high' : undefined}
-          loading="eager"
-          decoding="async"
-          className="bg-muted size-full object-cover"
-        />
-        {/* A arte não tem sobreposição (Figma); o nome do slide fica só para o leitor de tela */}
-        <span className="sr-only">{`${current.name}, ${current.collection}`}</span>
-      </Link>
+        <Link
+          to="/nfts/$nftId"
+          params={{ nftId: current.id }}
+          className="focus-visible:ring-ring block size-full overflow-hidden rounded-2xl outline-none focus-visible:ring-3"
+        >
+          <img
+            // Mesma caixa para todas as artes; a primeira carrega com prioridade (LCP)
+            src={current.imageUrl}
+            alt=""
+            width={ART_SIZE}
+            height={ART_SIZE}
+            fetchPriority={index === 0 ? 'high' : undefined}
+            loading="eager"
+            decoding="async"
+            className="bg-muted size-full object-cover"
+          />
+          {/* A arte não tem sobreposição (Figma); o nome do slide fica só para o leitor de tela */}
+          <span className="sr-only">{`${current.name}, ${current.collection}`}</span>
+        </Link>
+      </div>
       {/* Mobile (Figma): a miniatura do próximo destaque sobreposta ao canto da arte; decorativa */}
       {next && next !== current && (
         <img
@@ -202,11 +209,12 @@ function FeaturedDots(props: CarouselProps) {
           onClick={() => onIndexChange(i)}
           className="focus-visible:ring-ring flex size-6 items-center justify-center rounded-full outline-none focus-visible:ring-3"
         >
+          {/* O ativo é mais largo (não só cor); o inativo a 80% fica ≥ 3:1 nos fundos do hero (WCAG 1.4.11) */}
           <span
             aria-hidden
             className={cn(
               'bg-primary block h-2 rounded-full transition-[width,opacity] motion-reduce:transition-none',
-              i === index ? 'w-5' : 'w-2 opacity-50',
+              i === index ? 'w-5' : 'w-2 opacity-80',
             )}
           />
         </button>

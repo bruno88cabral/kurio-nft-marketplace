@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useId, type FormEvent } from 'react'
+import { focusCatalog } from '@/components/layout/routeFocus'
 import { activeFilterCount, withFilter } from '@/lib/catalogSearch'
 import { cn } from '@/lib/utils'
 import { CatalogFiltersSheet } from './CatalogToolbar'
@@ -22,7 +23,10 @@ export function CatalogMobileTopBar({ className }: { className?: string }) {
     e.preventDefault()
     const value = new FormData(e.currentTarget).get('q')
     const q = typeof value === 'string' ? value : ''
-    void navigate({ to: '/', search: withFilter(search, { q }), hash: 'catalogo' })
+    // O `key` do campo o remonta com o `q` novo e o foco cairia no `<body>`: vai para o catálogo com o resultado
+    void navigate({ to: '/', search: withFilter(search, { q }), hash: 'catalogo' }).then(() =>
+      requestAnimationFrame(focusCatalog),
+    )
   }
 
   return (

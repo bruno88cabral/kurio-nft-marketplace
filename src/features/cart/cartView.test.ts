@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseEth } from '@/lib/eth'
 import {
   canCheckout,
   CHECKOUT_BLOCK_MESSAGE,
@@ -7,6 +8,7 @@ import {
   guestPartialAddMessage,
   guestStockLimitMessage,
   issuesByLine,
+  lineChangeAnnouncement,
   QUOTE_ISSUES_MESSAGE,
 } from './cartView'
 
@@ -103,5 +105,28 @@ describe('guestPartialAddMessage', () => {
   it('diz a quantidade que ficou no carrinho, no singular e no plural', () => {
     expect(guestPartialAddMessage(1)).toBe('Só resta 1 unidade desta edição: seu carrinho ficou com 1.')
     expect(guestPartialAddMessage(3)).toBe('Só restam 3 unidades desta edição: seu carrinho ficou com 3.')
+  })
+})
+
+describe('lineChangeAnnouncement', () => {
+  const name = 'Emerald Ape #042'
+  const line = (unitPrice: string | undefined, issue?: 'price_changed' | 'unavailable') => ({
+    unitPrice: unitPrice === undefined ? undefined : parseEth(unitPrice),
+    issue,
+  })
+
+  it('preço exibido mudou (tempo real): anuncia', () => {
+    expect(lineChangeAnnouncement(name, line('1.19'), line('1.25'))).toBe('O preço de Emerald Ape #042 mudou.')
+  })
+
+  it('a cotação passou a marcar a linha: "Preço alterado" ou "Indisponível"', () => {
+    expect(lineChangeAnnouncement(name, line('1.19'), line('1.19', 'price_changed'))).toBe('O preço de Emerald Ape #042 mudou.')
+    expect(lineChangeAnnouncement(name, line('1.19'), line('1.19', 'unavailable'))).toBe('Emerald Ape #042 ficou indisponível.')
+  })
+
+  it('não anuncia o primeiro preço, o mesmo valor de novo nem a volta ao normal', () => {
+    expect(lineChangeAnnouncement(name, line(undefined), line('1.19'))).toBeUndefined()
+    expect(lineChangeAnnouncement(name, line('1.190', 'price_changed'), line('1.19', 'price_changed'))).toBeUndefined()
+    expect(lineChangeAnnouncement(name, line('1.19', 'unavailable'), line('1.19'))).toBeUndefined()
   })
 })
