@@ -33,7 +33,7 @@ import { REQUOTE_FAILED_MESSAGE, VALUES_CHANGED_MESSAGE } from './placeOrder'
 import { ReviewDialog } from './ReviewDialog'
 import { ReviewStep } from './ReviewStep'
 import { ATTEMPT_REVIEW_MESSAGE, attemptLines } from './reviewSource'
-import { changeMessages } from './reviewSnapshot'
+import { changeMessages, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
 import { useCollectorForm } from './useCollectorForm'
 import { useNftDetails } from './useNftDetails'
@@ -53,7 +53,8 @@ const CHECKOUT_GRID_CLASS = 'grid grid-cols-[minmax(0,1fr)] items-start gap-8 lg
  * Pagamento (`/checkout`, sob `_authenticated`), no layout do Figma (MYK-1114): o "Perfil do colecionador"
  * (`CollectorForm`, com a carteira cadastrada e a rede) à esquerda; "Seus NFTs", o cupom, o resumo da cotação,
  * "Carteira e rede" (provedor e conexão) e o CTA à direita. "Confirmar compra" valida o formulário no cliente e
- * abre a revisão (`ReviewDialog`); confirmar nela recota e compara com o revisado antes de enviar (R3), e o envio
+ * abre a revisão (`ReviewDialog`, com o diff do que mudou desde o último revisado); confirmar nela recota e compara
+ * com o revisado antes de enviar (R3), e o envio
  * é idempotente, com a chave guardada no rascunho (R4). Nenhum valor é somado aqui.
  *
  * As partes: o envio e o revisado em `usePlaceOrder.ts` (`usePlaceOrder`, `useCheckoutOrder`), a carteira em
@@ -166,6 +167,8 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     prefill: { displayName: profile.data?.displayName ?? (profile.isError ? account.name : undefined), email: account.email },
   })
   const [reviewOpen, setReviewOpen] = useState(false)
+  // O diff que o diálogo mostra: o que mudou entre o último revisado e a cotação exibida ao abri-lo (R-23)
+  const [reviewChanges, setReviewChanges] = useState<readonly SnapshotChange[]>([])
   const ctaRef = useRef<HTMLButtonElement>(null)
   // O último "Confirmar compra" achou erros no formulário; o aviso some quando os erros somem
   const [formInvalid, setFormInvalid] = useState(false)
@@ -186,18 +189,17 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
     [showFormAlert && formAlertId, ...(canConfirm ? [] : [!connected && connectId, showIssues && issuesId, blockReason && blockId])]
       .filter(Boolean)
       .join(' ') || undefined
-  // "Confirmar compra" da página: valida o formulário (erros nos campos, foco no primeiro inválido) e abre a
-  // revisão. O envio só sai do "Confirmar compra" do diálogo
+  // "Confirmar compra" da página: valida o formulário sempre, mesmo com o CTA bloqueado (erros nos campos, foco no
+  // primeiro inválido; sem conexão aparecem os dois motivos, R-25), e só com tudo liberado abre a revisão. O envio
+  // só sai do "Confirmar compra" do diálogo
   const confirm = () => {
-    if (!canConfirm || submitting || !selectedId) return
-    if (!collector.validateAll()) {
-      setFormInvalid(true)
-      return
-    }
-    setFormInvalid(false)
-    // O diálogo mostra a cotação atual: ela é o que a pessoa revisa, e o envio compara com ela (R3). Sem isto, um
-    // cupom aplicado aqui daria "Os valores mudaram" logo depois de a pessoa confirmar os valores com o cupom
-    markReviewed()
+    if (submitting) return
+    const formValid = collector.validateAll()
+    setFormInvalid(!formValid)
+    if (!formValid || !canConfirm || !selectedId) return
+    // O diálogo mostra a cotação atual, e ela passa a ser o revisado (o envio compara com ela, R3). O que mudou desde
+    // o último revisado (evento, intervalo, cupom aplicado aqui) aparece no diálogo como diff, sem bloquear (R-23)
+    setReviewChanges(markReviewed())
     setReviewOpen(true)
   }
   const confirmReviewed = () => {
@@ -361,6 +363,7 @@ function CheckoutContent({ account, cart, orderInProgress }: { account: Account;
           provider={provider}
           lines={lines}
           quote={quoteData}
+          changes={reviewChanges}
         />
       )}
     </div>

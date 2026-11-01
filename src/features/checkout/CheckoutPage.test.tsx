@@ -32,7 +32,8 @@ const { CheckoutPage, ATTEMPT_CONFLICT_MESSAGE, ORDER_IN_PROGRESS_MESSAGE, ORDER
 const { ATTEMPT_SENT_TITLE } = await import('./PendingAttempt')
 const { checkoutDraftStore } = await import('./checkoutDraft')
 const { ATTEMPT_REVIEW_MESSAGE } = await import('./reviewSource')
-const { REVIEW_DIALOG_TITLE } = await import('./ReviewDialog')
+const { REVIEW_DIALOG_TITLE, REVIEW_VALUES_CHANGED_MESSAGE } = await import('./ReviewDialog')
+const { VALUES_CHANGED_MESSAGE } = await import('./placeOrder')
 const { ONLY_PRIMARY_MESSAGE } = await import('./CollectorFormSection')
 const { COLLECTOR_MESSAGES } = await import('./collectorForm')
 
@@ -216,6 +217,25 @@ describe('CheckoutPage', () => {
     expect(await openReview()).toBeTruthy()
   })
 
+  it('"Confirmar compra" sem conexão valida o formulário: os dois motivos aparecem e o foco vai ao primeiro inválido (R-25)', async () => {
+    renderPage()
+    await screen.findByText('Escolha como conectar.')
+    await waitFor(() => expect(collectorField('Nome de exibição').value).toBe('Ana Souza'))
+    fireEvent.click(confirmButton())
+    expect(document.activeElement).toBe(collectorField('Nome de usuário'))
+    expect(collectorField('Nome de usuário').getAttribute('aria-invalid')).toBe('true')
+    expect(describedText(confirmButton())).toEqual(['Revise os campos destacados.', 'Conecte uma carteira para confirmar.'])
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // Formulário válido e ainda sem conexão: só o motivo da conexão, sem revisão e sem envio
+    fillCollector()
+    fireEvent.click(confirmButton())
+    expect(screen.queryByText('Revise os campos destacados.')).toBeNull()
+    expect(describedText(confirmButton())).toEqual(['Conecte uma carteira para confirmar.'])
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(orderCalls()).toHaveLength(0)
+  })
+
   it('o erro de um campo editado aparece no blur e some ao editar', async () => {
     renderPage()
     await screen.findByText('Solar Veil')
@@ -265,7 +285,55 @@ describe('CheckoutPage', () => {
     expect(within(dialog).getAllByText('0.5 ETH').length).toBeGreaterThan(0)
   })
 
-  it('cupom aplicado no Pagamento: a revisão mostra o desconto e confirmar envia um único POST, sem "Os valores mudaram"', async () => {
+  it('preço alterado (nft.updated) antes de abrir a revisão: o diálogo avisa com o diff e confirmar envia um único POST', async () => {
+    postOrder = (_body, key) => Promise.resolve({ data: orderOf('q2', key) })
+    const queryClient = renderPage()
+    await connectAndWaitForConfirm()
+    fillCollector()
+    // O evento recota em segundo plano (0.35 → 0.5); a página só mostra o valor novo
+    quotes = [quoteOf('q2', '0.5')]
+    await act(() => queryClient.refetchQueries({ queryKey: quoteQuery(ANA.id, cart).queryKey }))
+    await waitFor(() => expect(screen.getAllByText('0.5 ETH').length).toBeGreaterThan(0))
+    await waitFor(() => expect(confirmButton().getAttribute('aria-disabled')).toBeNull())
+    const dialog = await openReview()
+    expect(within(dialog).getByText(REVIEW_VALUES_CHANGED_MESSAGE)).toBeTruthy()
+    expect(within(dialog).getByText('Total: de 0.35 ETH para 0.5 ETH.')).toBeTruthy()
+    expect(within(dialog).getByText('Preço alterado de 0.35 ETH para 0.5 ETH.')).toBeTruthy()
+    // O diálogo foi a nova confirmação: o envio compara com q2 e sai sem outro aviso
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar compra' }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/orders/$orderId' })))
+    expect(orderCalls()).toHaveLength(1)
+    expect(orderCalls()[0]?.[1]).toEqual({ quoteId: 'q2', walletId: WALLET.id })
+    expect(screen.queryByText(VALUES_CHANGED_MESSAGE)).toBeNull()
+  })
+
+  it('sem mudança desde o último revisado, o diálogo não avisa', async () => {
+    renderPage()
+    await connectAndWaitForConfirm()
+    fillCollector()
+    const dialog = await openReview()
+    expect(within(dialog).queryByText(REVIEW_VALUES_CHANGED_MESSAGE)).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar e editar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(within(await openReview()).queryByText(REVIEW_VALUES_CHANGED_MESSAGE)).toBeNull()
+  })
+
+  it('preço alterado com o diálogo aberto: confirmar nele dá "Os valores mudaram" e não envia (R3)', async () => {
+    const queryClient = renderPage()
+    await connectAndWaitForConfirm()
+    fillCollector()
+    const dialog = await openReview()
+    expect(within(dialog).queryByText(REVIEW_VALUES_CHANGED_MESSAGE)).toBeNull()
+    quotes = [quoteOf('q2', '0.5')]
+    await act(() => queryClient.refetchQueries({ queryKey: quoteQuery(ANA.id, cart).queryKey }))
+    await waitFor(() => expect(confirmButton().getAttribute('aria-disabled')).toBeNull())
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar compra' }))
+    await screen.findByText(VALUES_CHANGED_MESSAGE)
+    expect(screen.getByText('Total: de 0.35 ETH para 0.5 ETH.')).toBeTruthy()
+    expect(orderCalls()).toHaveLength(0)
+  })
+
+  it('cupom aplicado no Pagamento: a revisão mostra o diff do desconto, sem bloquear, e confirmar envia um único POST', async () => {
     const discounted: Quote = {
       ...quoteOf('q-cupom'),
       discount: parseEth('0.035'),
@@ -293,11 +361,15 @@ describe('CheckoutPage', () => {
     fillCollector()
     const dialog = await openReview()
     expect(within(dialog).getAllByText('0.317 ETH').length).toBeGreaterThan(0)
+    // A mudança é informada no diálogo (cupom e total), que é a nova confirmação: não bloqueia o envio
+    expect(within(dialog).getByText(REVIEW_VALUES_CHANGED_MESSAGE)).toBeTruthy()
+    expect(within(dialog).getByText('Cupom aplicado.')).toBeTruthy()
+    expect(within(dialog).getByText('Total: de 0.35 ETH para 0.317 ETH.')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar compra' }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/orders/$orderId' })))
     expect(orderCalls()).toHaveLength(1)
     expect(orderCalls()[0]?.[1]).toEqual({ quoteId: 'q-cupom', walletId: WALLET.id })
-    expect(screen.queryByText(/Os valores mudaram/)).toBeNull()
+    expect(screen.queryByText(VALUES_CHANGED_MESSAGE)).toBeNull()
   })
 
   it('"Seus NFTs" mostra "(x N)" e o subtotal da linha (preço unitário × quantidade, só exibição)', async () => {
@@ -355,7 +427,7 @@ describe('CheckoutPage', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Usar outra carteira?' }))
     // A primeira outra carteira (ordem de cadastro), e os selects habilitados
-    expect(type().textContent).toContain('Reserva · Viagem · Arbitrum')
+    expect(type().textContent).toBe('Reserva · Viagem')
     expect(collectorField('Endereço da carteira').value).toBe(travel.address)
     expect(network().hasAttribute('disabled')).toBe(false)
 
@@ -364,7 +436,7 @@ describe('CheckoutPage', () => {
     // Só as redes das outras carteiras
     expect(options).toEqual(['Polygon', 'Arbitrum'])
     fireEvent.keyDown(screen.getByRole('option', { name: 'Polygon' }), { key: 'Enter' })
-    await waitFor(() => expect(type().textContent).toContain('Reserva · Cofre · Polygon'))
+    await waitFor(() => expect(type().textContent).toBe('Reserva · Cofre'))
     expect(collectorField('Endereço da carteira').value).toBe(vault.address)
     expect(checkoutDraftStore(ANA.id).get().walletId).toBe(vault.id)
 

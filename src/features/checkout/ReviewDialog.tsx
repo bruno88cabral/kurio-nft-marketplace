@@ -1,13 +1,17 @@
+import { TriangleAlert } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { Wallet } from '@/contracts'
 import { PriceSummary, type PriceSummaryValues } from '@/components/kurio'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { networkLabel, shortAddress, walletProviderLabel, walletRoleLabel, type WalletProvider } from '@/lib/wallets'
+import { lineKey } from '@/features/cart/cartView'
 import type { CollectorValues } from './collectorForm'
+import { changeMessages, type SnapshotChange } from './reviewSnapshot'
 import { ReviewStep, type ReviewLine } from './ReviewStep'
 
 export const REVIEW_DIALOG_TITLE = 'Revise seu pedido'
+export const REVIEW_VALUES_CHANGED_MESSAGE = 'Os valores mudaram desde a revisão anterior.'
 
 export interface ReviewDialogProps {
   open: boolean
@@ -20,13 +24,19 @@ export interface ReviewDialogProps {
   lines: readonly ReviewLine[]
   /** Os valores da cotação na tela (nada é somado aqui). */
   quote: PriceSummaryValues | undefined
+  /**
+   * O que mudou entre o último revisado e a cotação exibida ao abrir (`markReviewed`, R-23). Com mudanças, o diálogo
+   * avisa "Os valores mudaram desde a revisão anterior." com o diff (total, taxa, cupom) e as mensagens por linha.
+   */
+  changes?: readonly SnapshotChange[]
   /** Para onde o foco volta ao fechar: o "Confirmar compra" da página (o clique nem sempre o focou, ex.: Safari). */
   returnFocusTo: RefObject<HTMLElement | null>
 }
 
 /**
  * Revisão antes do envio (MYK-1114 D8): os dados do colecionador, a carteira, o provedor, os itens e o total da
- * cotação exibida. Não chama a API: "Voltar e editar" só fecha (o foco volta ao "Confirmar compra" da página) e
+ * cotação exibida. Se a cotação mudou desde o último revisado, o topo avisa e mostra o diff (`changes`): abrir o
+ * diálogo é a nova confirmação, e a mudança não passa calada (§7 passo 3). Não chama a API: "Voltar e editar" só fecha (o foco volta ao "Confirmar compra" da página) e
  * "Confirmar compra" devolve a decisão a quem abriu.
  */
 export function ReviewDialog({
@@ -38,8 +48,14 @@ export function ReviewDialog({
   provider,
   lines,
   quote,
+  changes = [],
   returnFocusTo,
 }: ReviewDialogProps) {
+  // Só formata o diff que a comparação do R3 já calculou (`changeMessages`): nada é recalculado aqui
+  const messages = changes.length > 0 ? changeMessages(changes) : undefined
+  const reviewLines = messages
+    ? lines.map((line) => ({ ...line, message: messages.byLine.get(lineKey(line.item)) ?? line.message }))
+    : lines
   const rows: [string, string][] = [
     ['Nome de exibição', collector.displayName.trim()],
     ['Nome de usuário', collector.username.trim()],
@@ -73,11 +89,26 @@ export function ReviewDialog({
           <DialogTitle className="text-heading">{REVIEW_DIALOG_TITLE}</DialogTitle>
           <DialogDescription>Confira os dados antes de confirmar. Nada é enviado até você confirmar.</DialogDescription>
         </DialogHeader>
+        {messages && (
+          <div className="text-destructive text-caption flex flex-col gap-1">
+            <p className="inline-flex items-start gap-1.5 font-medium">
+              <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+              {REVIEW_VALUES_CHANGED_MESSAGE}
+            </p>
+            {messages.summary.length > 0 && (
+              <ul className="list-disc pl-10">
+                {messages.summary.map((text) => (
+                  <li key={text}>{text}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <ReviewList title="Colecionador" rows={rows} />
         <ReviewList title="Carteira e rede" rows={walletRows} />
         <section aria-label="Seus NFTs" className="flex flex-col gap-3">
           <h3 className="text-body font-medium">Seus NFTs</h3>
-          <ReviewStep lines={lines} announce={false} />
+          <ReviewStep lines={reviewLines} announce={false} />
         </section>
         <PriceSummary quote={quote} />
         <DialogFooter>

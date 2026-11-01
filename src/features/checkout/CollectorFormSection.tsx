@@ -35,8 +35,8 @@ export interface CollectorFormProps {
   locked: boolean
 }
 
-const walletOptionLabel = (wallet: Wallet) =>
-  `${walletRoleLabel(wallet.role)} · ${wallet.label} · ${networkLabel(wallet.network)}`
+/** "papel · apelido" (D1, R-24): a rede fica no select Rede ao lado, e repeti-la aqui truncava o rótulo. */
+const walletOptionLabel = (wallet: Wallet) => `${walletRoleLabel(wallet.role)} · ${wallet.label}`
 
 /**
  * "Perfil do colecionador" do Pagamento (Figma `Desktop/Pagamento.png`, MYK-1114 D1 a D6), em 2 colunas lidas

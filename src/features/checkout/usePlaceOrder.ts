@@ -16,7 +16,7 @@ import {
   type PlaceOrderOutcome,
 } from './placeOrder'
 import { reviewSource, type ReviewSource } from './reviewSource'
-import { snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
+import { diffSnapshots, snapshotOf, type ReviewSnapshot, type SnapshotChange } from './reviewSnapshot'
 import { useCheckoutDraft } from './useCheckoutDraft'
 
 /** O resultado que a tela trata: `created` já navegou e `stale-session` não mostra nada (`usePlaceOrder`). */
@@ -105,10 +105,12 @@ export interface CheckoutOrder extends Pick<PlaceOrder, 'submitting' | 'resendin
   /** "Confirmar compra" com a carteira escolhida; sem revisado não faz nada. */
   confirm: (walletId: Id) => void
   /**
-   * A cotação na tela passa a ser o revisado (a revisão em diálogo a mostrou, MYK-1120). Só com o carrinho na
-   * tela e uma cotação atual; o "Confirmar" seguinte ainda recota e compara com ela (R3).
+   * Abrir a revisão em diálogo (MYK-1120, R-23): compara a cotação na tela com o revisado (`diffSnapshots`, a mesma
+   * comparação do R3) e devolve as diferenças, que o diálogo mostra ("Os valores mudaram desde a revisão anterior."
+   * com o diff). Só então a cotação na tela passa a ser o revisado. Sem diferença nada muda e a lista vem vazia.
+   * Só com o carrinho na tela e uma cotação atual; o "Confirmar" seguinte ainda recota e compara com ela (R3).
    */
-  markReviewed: () => void
+  markReviewed: () => SnapshotChange[]
   /** "Tentar de novo" da tentativa pendente. */
   resend: () => void
 }
@@ -137,7 +139,8 @@ export function useCheckoutOrder({
   // nada do que é enviado muda) até o envio terminar. O reenvio ("Tentar de novo") já mostra a tentativa.
   const source: ReviewSource = !submitting || resending ? reviewSource(cartItems, draft) : { kind: 'cart', items: cartItems }
 
-  // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança. Com a
+  // O revisado: a primeira cotação mostrada, e depois só o que a tela mostrou ao avisar de uma mudança (no envio ou
+  // no diálogo de revisão, `markReviewed`). Com a
   // tentativa na Revisão, a cotação do carrinho não está na tela: nada é revisado; quando a origem muda, o revisado
   // recomeça (o próximo "Confirmar" compara com o que foi exibido)
   const [reviewed, setReviewed] = useState<ReviewSnapshot>()
@@ -213,7 +216,16 @@ export function useCheckoutOrder({
       order.confirm({ reviewed, walletId, requote }, handle)
     },
     markReviewed: () => {
-      if (source.kind === 'cart' && quote.quote && !quote.isPlaceholderData) setReviewed(snapshotOf(quote.quote))
+      if (source.kind !== 'cart' || !quote.quote || quote.isPlaceholderData) return []
+      const shown = snapshotOf(quote.quote)
+      if (!reviewed) {
+        setReviewed(shown)
+        return []
+      }
+      const changes = diffSnapshots(reviewed, shown)
+      // Uma mudança em segundo plano (evento, intervalo, cupom) antes da revisão não é engolida: o diálogo a mostra
+      if (changes.length > 0) setReviewed(shown)
+      return changes
     },
     resend: () => order.resend(handle),
   }

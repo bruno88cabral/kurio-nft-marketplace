@@ -130,6 +130,8 @@ function ConnectionStatus({ connection, label, provider }: { connection: WalletC
         </p>
       )
     default:
-      return <p className="text-muted-foreground text-caption">Conecte a carteira para confirmar a compra.</p>
+      // Sem conexão o motivo fica só junto ao "Confirmar compra" ("Conecte uma carteira para confirmar.", ligado a
+      // ele por `aria-describedby`); repeti-lo aqui duplicaria o texto. O "Desconectada" está no `WalletOption`
+      return null
   }
 }
