@@ -47,12 +47,24 @@ export const MAX_PROFILE_NAME = 60
 export const MAX_COLLECTOR_NOTE = 500
 /** Nome de usuário: 3 a 20 minúsculas, números ou `_` (sem `@`). */
 export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/
-/** Código de indicação, comparado depois de `toUpperCase()`. */
-export const REFERRAL_CODE_PATTERN = /^[A-Z0-9-]{4,16}$/
+/**
+ * Código de indicação, sem diferenciar maiúsculas. Testado sobre o valor digitado (só com trim), não sobre o
+ * `toUpperCase()`: a conversão expande alguns caracteres Unicode ("ß" vira "SS") e faria passar o que não é ASCII.
+ * Quem exibe normaliza com `toUpperCase()`.
+ */
+export const REFERRAL_CODE_PATTERN = /^[A-Z0-9-]{4,16}$/i
 /** Nome ENS sem o ".eth". */
-export const ENS_LABEL_PATTERN = /^[a-z0-9-]{3,63}$/
-/** ENS completo (`nome.eth`), aceito na carteira secundária. */
-export const ENS_NAME_PATTERN = /^[a-z0-9-]{3,63}\.eth$/
+/**
+ * Nome ENS sem o ".eth": 3 a 63 letras, números ou hífen, sem hífen nas pontas. Testado sobre o valor em
+ * minúsculas (o ENS não diferencia maiúsculas).
+ */
+export const ENS_LABEL_PATTERN = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/
+/**
+ * ENS completo, aceito na carteira secundária: `nome.eth` ou com subdomínios (`nova.kurio.eth`, do Figma mobile).
+ * O rótulo antes do `.eth` segue `ENS_LABEL_PATTERN`; os subdomínios têm de 1 a 63, também sem hífen nas pontas.
+ * Testado sobre o valor em minúsculas.
+ */
+export const ENS_NAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9][a-z0-9-]{1,61}[a-z0-9]\.eth$/
 
 export const COLLECTOR_MESSAGES = {
   usernameRequired: 'Informe um nome de usuário.',
@@ -62,7 +74,7 @@ export const COLLECTOR_MESSAGES = {
   referralCodeRequired: 'Informe o código de indicação.',
   referralCodeInvalid: 'Use de 4 a 16 letras, números ou hífen.',
   ensNameRequired: 'Informe o nome ENS.',
-  ensNameInvalid: 'Use de 3 a 63 letras minúsculas, números ou hífen, sem o .eth.',
+  ensNameInvalid: 'Use de 3 a 63 letras, números ou hífen, sem hífen no início ou no fim e sem o .eth.',
   altWalletInvalid: 'Use um nome .eth ou um endereço 0x com 40 hexadecimais.',
   noteTooLong: `Use até ${MAX_COLLECTOR_NOTE} caracteres.`,
 } as const
@@ -82,14 +94,14 @@ function validateProfileName(profileName: string): string | undefined {
 }
 
 function validateReferralCode(referralCode: string): string | undefined {
-  const value = referralCode.trim().toUpperCase()
+  const value = referralCode.trim()
   if (!value) return COLLECTOR_MESSAGES.referralCodeRequired
   if (!REFERRAL_CODE_PATTERN.test(value)) return COLLECTOR_MESSAGES.referralCodeInvalid
   return undefined
 }
 
 function validateEnsName(ensName: string): string | undefined {
-  const value = ensName.trim()
+  const value = ensName.trim().toLowerCase()
   if (!value) return COLLECTOR_MESSAGES.ensNameRequired
   if (!ENS_LABEL_PATTERN.test(value)) return COLLECTOR_MESSAGES.ensNameInvalid
   return undefined
@@ -98,7 +110,7 @@ function validateEnsName(ensName: string): string | undefined {
 function validateAltWallet(altWallet: string): string | undefined {
   const value = altWallet.trim()
   if (!value) return undefined
-  if (ENS_NAME_PATTERN.test(value) || WALLET_ADDRESS_PATTERN.test(value)) return undefined
+  if (ENS_NAME_PATTERN.test(value.toLowerCase()) || WALLET_ADDRESS_PATTERN.test(value)) return undefined
   return COLLECTOR_MESSAGES.altWalletInvalid
 }
 

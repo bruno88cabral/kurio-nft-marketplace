@@ -78,18 +78,50 @@ describe('validateCollector', () => {
     }
   })
 
-  it('ensName: 3 a 63 minúsculas, números ou hífen, sem o .eth', () => {
+  it('referralCode: só ASCII; o toUpperCase() não faz passar "ßßßß" (vira "SSSSSSSS")', () => {
+    expect('ßßßß'.toUpperCase()).toBe('SSSSSSSS')
+    for (const bad of ['ßßßß', 'çódigo', 'ÁBCD']) {
+      expect(errorOf({ referralCode: bad }).referralCode, bad).toBe(COLLECTOR_MESSAGES.referralCodeInvalid)
+    }
+  })
+
+  it('ensName: 3 a 63 letras, números ou hífen, sem o .eth', () => {
     expect(errorOf({ ensName: 'abc' }).ensName).toBeUndefined()
     expect(errorOf({ ensName: 'a'.repeat(63) }).ensName).toBeUndefined()
-    for (const bad of ['ab', 'a'.repeat(64), 'ana.eth', 'Ana', 'ana_souza']) {
+    expect(errorOf({ ensName: 'a-b' }).ensName).toBeUndefined()
+    for (const bad of ['ab', 'a'.repeat(64), 'ana.eth', 'ana_souza']) {
       expect(errorOf({ ensName: bad }).ensName, bad).toBe(COLLECTOR_MESSAGES.ensNameInvalid)
+    }
+  })
+
+  it('ensName: não diferencia maiúsculas (o ENS normaliza para minúsculas)', () => {
+    for (const ok of ['Ana', ' ANA-Souza ', 'KuRiO']) {
+      expect(errorOf({ ensName: ok }).ensName, ok).toBeUndefined()
+    }
+  })
+
+  it('ensName: sem hífen no início ou no fim, nem só hífens', () => {
+    for (const bad of ['-ana', 'ana-', '---', '-a-']) {
+      expect(errorOf({ ensName: bad }).ensName, bad).toBe(COLLECTOR_MESSAGES.ensNameInvalid)
+    }
+    expect(COLLECTOR_MESSAGES.ensNameInvalid).toBe(
+      'Use de 3 a 63 letras, números ou hífen, sem hífen no início ou no fim e sem o .eth.',
+    )
+  })
+
+  it('altWallet: nome .eth sem diferenciar maiúsculas e com subdomínio (nova.kurio.eth, Figma mobile)', () => {
+    for (const ok of ['Ana.eth', 'ANA-SOUZA.ETH', 'nova.kurio.eth', 'a.b.kurio.eth', 'Nova.Kurio.eth']) {
+      expect(errorOf({ altWallet: ok }).altWallet, ok).toBeUndefined()
+    }
+    for (const bad of ['-ana.eth', 'ana-.eth', '---.eth', 'nova.-kurio.eth', '-nova.kurio.eth', 'nova..kurio.eth', '.kurio.eth', 'nova.ab.eth']) {
+      expect(errorOf({ altWallet: bad }).altWallet, bad).toBe(COLLECTOR_MESSAGES.altWalletInvalid)
     }
   })
 
   it('altWallet: opcional; preenchido, nome.eth ou endereço 0x com 40 hexadecimais', () => {
     expect(errorOf({ altWallet: 'nova-kurio.eth' }).altWallet).toBeUndefined()
     expect(errorOf({ altWallet: ` 0x${'aF'.repeat(20)} ` }).altWallet).toBeUndefined()
-    for (const bad of ['ana', 'ab.eth', `0x${'a'.repeat(39)}`, `0x${'g'.repeat(40)}`]) {
+    for (const bad of ['ana', 'ab.eth', `0x${'a'.repeat(39)}`, `0x${'g'.repeat(40)}`, 'ana.com']) {
       expect(errorOf({ altWallet: bad }).altWallet, bad).toBe(COLLECTOR_MESSAGES.altWalletInvalid)
     }
     expect(COLLECTOR_MESSAGES.altWalletInvalid).toBe('Use um nome .eth ou um endereço 0x com 40 hexadecimais.')

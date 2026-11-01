@@ -2,7 +2,7 @@ import type { SessionStorageLike } from '@/auth/sessionStorage'
 import type { CreateOrderRequest, Id, Order } from '@/contracts'
 import { WALLET_PROVIDERS, type WalletProvider } from '@/lib/wallets'
 import { parseAttemptSnapshot, type AttemptSnapshot } from './attemptSnapshot'
-import { COLLECTOR_FIELDS, type CollectorValues } from './collectorForm'
+import { COLLECTOR_FIELDS, MAX_COLLECTOR_NOTE, type CollectorValues } from './collectorForm'
 
 /** Rascunho do checkout em `sessionStorage` (morre com a aba; não vaza para outra aba nem outro login). */
 export const checkoutDraftKey = (accountId: Id) => `kurio:checkout:${accountId}`
@@ -55,17 +55,22 @@ function isAttempt(value: unknown): value is CreateOrderRequest {
   return isString(quoteId) && isString(walletId)
 }
 
-/** Teto de cada valor do formulário guardado (o maior campo, a Observação, vai até 500). */
-const MAX_COLLECTOR_VALUE = 500
+/**
+ * Teto de cada valor do formulário guardado: o do maior campo, a Observação. Os limites do formulário valem
+ * depois do trim, então um valor maior que o teto é trimado antes de truncar: o que era válido volta inteiro.
+ */
+function capCollectorValue(value: string): string {
+  return value.length <= MAX_COLLECTOR_NOTE ? value : value.trim().slice(0, MAX_COLLECTOR_NOTE)
+}
 
-/** Só as chaves conhecidas com valor string (vazia vale: a pessoa pode ter apagado o pré-preenchido), truncadas. */
+/** Só as chaves conhecidas com valor string (vazia vale: a pessoa pode ter apagado o pré-preenchido), com teto. */
 function parseCollector(value: unknown): Partial<CollectorValues> | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
   const collector: Partial<CollectorValues> = {}
   for (const field of COLLECTOR_FIELDS) {
     const fieldValue = source[field]
-    if (typeof fieldValue === 'string') collector[field] = fieldValue.slice(0, MAX_COLLECTOR_VALUE)
+    if (typeof fieldValue === 'string') collector[field] = capCollectorValue(fieldValue)
   }
   return Object.keys(collector).length > 0 ? collector : undefined
 }

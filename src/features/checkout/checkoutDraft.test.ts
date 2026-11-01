@@ -288,6 +288,17 @@ describe('formulário do colecionador e provedor no rascunho (MYK-1117)', () => 
     expect(parseCheckoutDraft(raw)).toEqual({ walletId: 'w1', collector: { username: 'ana', note: 'a'.repeat(500) } })
   })
 
+  it('o teto do parse é coerente com o limite depois do trim: uma observação válida volta inteira', () => {
+    const useful = 'b'.repeat(500)
+    // Válida no formulário (500 depois do trim), mas com 506 caracteres crus
+    const padded = `   ${useful}   `
+    const short = ` ${'c'.repeat(10)} `
+    const draft = parseCheckoutDraft(JSON.stringify({ collector: { note: padded, username: short } }))
+    expect(draft.collector?.note).toBe(useful)
+    // Dentro do teto, o valor cru fica como foi digitado (espaços inclusos)
+    expect(draft.collector?.username).toBe(short)
+  })
+
   it('collector e provider malformados caem sem derrubar a carteira nem a tentativa', () => {
     for (const bad of [{ collector: 'x', provider: 'phantom' }, { collector: ['a'], provider: 1 }, { collector: { extra: 'x' } }]) {
       const draft = parseCheckoutDraft(JSON.stringify({ ...pendingDraft, ...bad }))
