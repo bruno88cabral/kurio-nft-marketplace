@@ -7,6 +7,8 @@ import { validateRedirectSearch } from '@/lib/redirectSearch'
 export const Route = createFileRoute('/signup')({
   head: () => ({ meta: [{ title: 'Criar conta · Kurio' }] }),
   validateSearch: validateRedirectSearch,
+  // Mobile: página inteira, sem header nem tab bar (Figma); o "Voltar" e o Esc fecham
+  staticData: { hideMobileChrome: true },
   // Já logado: vai direto para o redirect (ou /), sem abrir o modal
   beforeLoad: ({ search }) => {
     const href = authenticatedDestination(search)
@@ -18,7 +20,7 @@ export const Route = createFileRoute('/signup')({
 function SignupPage() {
   const { redirect } = Route.useSearch()
   return (
-    <AuthDialog title="Criar conta" description="Crie sua conta para favoritar e comprar NFTs." redirect={redirect}>
+    <AuthDialog mode="signup" redirect={redirect}>
       <SignupForm redirect={redirect} />
     </AuthDialog>
   )
