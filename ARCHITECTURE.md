@@ -1,6 +1,6 @@
 # Arquitetura
 
-Documento vivo. Hoje cobre o **M0 (Fundação)**, a **camada de mocks do M1** (estado, handlers REST, socket e cenários), o **M2 (Início, Detalhe do NFT, favoritos, layout e a base da sessão no cliente)**, o **M3 (Conta e sessão: ciclo de vida da sessão, login e cadastro em modal, menu da conta, rotas protegidas, Perfil e Carteiras)** e o **M4 (Carrinho, checkout, pedido idempotente, Confirmação e o tempo real no cache)**: as decisões já tomadas e implementadas estão preenchidas; o que vem depois (M5 em diante: Playwright, Lighthouse, deploy) está como `TODO` e **não** deve ser lido como funcionando. As telas do M2, do M3 e do M4 **não foram conferidas contra o Figma por MCP** (estava sem cota); o **Pagamento** foi conferido contra os PNGs exportados do Figma (MYK-1120), e o header, o footer, o card de NFT e o fundo dos modais também (MYK-1098), assim como o Login e o Cadastro (MYK-1101): ver "Desvios do Figma".
+Documento vivo. Hoje cobre o **M0 (Fundação)**, a **camada de mocks do M1** (estado, handlers REST, socket e cenários), o **M2 (Início, Detalhe do NFT, favoritos, layout e a base da sessão no cliente)**, o **M3 (Conta e sessão: ciclo de vida da sessão, login e cadastro em modal, menu da conta, rotas protegidas, Perfil e Carteiras)** e o **M4 (Carrinho, checkout, pedido idempotente, Confirmação e o tempo real no cache)**: as decisões já tomadas e implementadas estão preenchidas; o que vem depois (M5 em diante: Playwright, Lighthouse, deploy) está como `TODO` e **não** deve ser lido como funcionando. As telas do M2, do M3 e do M4 **não foram conferidas contra o Figma por MCP** (estava sem cota); o **Pagamento** foi conferido contra os PNGs exportados do Figma (MYK-1120), e o header, o footer, o card de NFT e o fundo dos modais também (MYK-1098), assim como o Login e o Cadastro (MYK-1101) e o Perfil e as Carteiras (MYK-1102): ver "Desvios do Figma".
 
 ## Estrutura de pastas
 
@@ -465,15 +465,15 @@ Código em `src/realtime/` (MYK-1091). O `bindRealtime` é ligado uma vez em `sr
 **M3 (Conta e sessão), desvios deliberados por falta de contrato:**
 
 - **ENS e tipo de carteira omitidos.** `Wallet` (`id`, `address`, `network`, `role`, `label`) e o mock não têm esses campos; o `WalletCard` aceita `ens`, mas a tela de Carteiras não o preenche. Os campos do Figma `70390:244/247/251/253/260` ficaram fora.
-- **Perfil só com nome de exibição, e-mail (somente leitura) e avatar.** Qualquer outro campo desenhado no Figma (bio, links, redes, banner etc.) está omitido porque `Profile`/`UpdateProfileRequest` não o têm. A lista exata sai do frame `9:1238` quando houver cota.
+- **Perfil só com nome de exibição, e-mail (somente leitura) e avatar.** Nome de usuário, Nome ENS e Apelido da carteira, desenhados no `Desktop/Perfil do Colecionador.png`, estão omitidos porque `Profile`/`UpdateProfileRequest` não os têm.
 - **Nomes das ações de carteira** seguem a spec ("Definir como principal", "Renomear", "Remover"), não os do kit/dev ("Tornar principal", "Desconectar"). "Ver no Etherscan" é `OutOfScopeAction` ("Em breve").
 - **Texto do estado vazio das Carteiras:** sem nenhuma carteira, "Você ainda não adicionou uma carteira."; só com a principal, o texto registrado do Figma `9:1865` ("Você ainda não adicionou uma carteira secundária.").
+- **Carteiras: Tipo de carteira, Nome do perfil, Código de indicação, ENS, "ENS ou carteira secundária", Nome de exibição e E-mail** do formulário do `Desktop/Carteiras.png` estão fora: `CreateWalletRequest` só tem endereço, rede e apelido.
 - **Sem rádio de seleção na tela Carteiras.** Num `RadioGroup` as setas promoveriam a principal sem querer; aqui promover é uma ação explícita do menu (o rádio fica para o Pagamento, M4). Para isso o `WalletCard` ganhou `selectable` e `busy` (opcionais; o padrão do Pagamento não muda).
 
 **M3, escolhas minhas, pendentes de conferência contra o Figma (não conferidas por falta de cota):**
 
-- **Telas e frames não conferidos:** Perfil `9:1238` (sidebar `70420:4594`) e Carteiras `9:1670` (campos `70390:*`). O layout seguiu as descrições das issues.
-- **Perfil e Carteiras abaixo de `lg` (390 e 768) foram inferidos**, pois o Figma só desenha o desktop: abas segmentadas "Perfil" / "Carteiras" (`aria-current`) mais um "Sair" visível no topo, no lugar da `AccountSidebar`; os itens fora de escopo da sidebar não aparecem. O formulário de carteira fica abaixo da lista e só vira cartão lateral em `xl` (1440), porque ao lado, em 768 e 1024, o endereço de 42 caracteres não cabe.
+- **Perfil e Carteiras abaixo de `lg` (390 e 768) foram inferidos**, pois o Figma só desenha o desktop: abas segmentadas "Perfil" / "Carteiras" (`aria-current`) mais um "Sair" visível no topo, no lugar da `AccountSidebar`; os itens fora de escopo da sidebar não aparecem. As grades de 2 colunas viram 1 coluna abaixo de `md` (ver MYK-1102 abaixo).
 - **Login social e "Esqueceu a senha?"** são `OutOfScopeAction` ("Em breve"). Provedores, textos de apoio e layout conferidos contra os PNGs na MYK-1101 (ver abaixo).
 - **Aviso da senha:** "Ambiente de demonstração: não use uma senha real." (pedido no MYK-1070) é escolha minha e continua no cadastro, abaixo da senha (o Figma não o tem).
 - **Fundo do modal:** Início sem o catálogo, ver "Sessão". O Figma mostra o Início com o catálogo, nítido; aqui o overlay só escurece (`bg-black/50`, sem desfoque, MYK-1101).
@@ -585,6 +585,22 @@ Código em `src/realtime/` (MYK-1091). O `bindRealtime` é ligado uma vez em `sr
 - **Botão do cadastro:** "Criar perfil" no mobile e "Criar conta" no desktop, como nos dois frames.
 - **Placeholder do e-mail do login** é "contato@email.com" (o do Figma); o da senha é "Senha" (o Figma mostra a senha preenchida).
 - **Rodapé de troca só no mobile:** no desktop a troca é pelas abas (o Figma não tem rodapé no modal). O link "Entrar com este e-mail" do conflito de cadastro continua nas duas larguras.
+
+**Perfil e Carteiras conferidos contra os PNGs (MYK-1102).** `Desktop/Perfil do Colecionador.png` e `Desktop/Carteiras.png` comparados em 1440, com a Ana (só a principal) e o Bruno (principal e reserva); 768 e 390 revistos (abas segmentadas). O que segue o Figma:
+
+- **Sidebar "Meu perfil" (`AccountSidebar`):** painel `#241612` com o título "Meu perfil" branco e em negrito (nome da `nav`); ícone em cada item (Dados do perfil, Carteiras, Atividade, Lista de interesse, Ofertas, Arquivos baixados, Suporte); itens em laranja, o ativo só com a barra laranja à esquerda (sem fundo) e `aria-current="page"`; "Sair" laranja e em negrito, com ícone, abaixo de uma linha. Os itens sem tela continuam `OutOfScopeAction`, agora sem a opacidade de desabilitado (como no header e no footer).
+- **Páginas sem cards:** o `AccountPanel` saiu. O `<h1>` do Perfil é o título pequeno "Perfil do colecionador", sem o "Perfil" grande nem o subtítulo; nas Carteiras o `<h1>` "Carteiras" é `sr-only` e a página abre com os `<h2>` "Carteira principal" e "Carteira secundária".
+- **Perfil:** grade de 2 colunas a partir de `md` (Nome de exibição e E-mail à esquerda, Avatar à direita), rótulos brancos em texto de corpo e asterisco laranja nos obrigatórios; avatar em linha (círculo de 48 px, "Alterar" laranja sólido e "Remover" como texto, com os nomes acessíveis "Alterar avatar" e "Remover avatar"); "Alterar senha" na mesma página, numa coluna, com o olho de mostrar senha; um único "Salvar" laranja no fim.
+- **Carteiras:** "Carteira principal" com o subtítulo do Figma e "Adicionar" em laranja à direita; o formulário em 2 colunas, sem card, com "Salvar carteira" laranja; "Carteira secundária" com "Você ainda não adicionou uma carteira secundária.", o rádio "Igual à carteira principal" e "Adicionar". Os dois "Adicionar" levam o foco ao primeiro campo do formulário.
+
+**Desvios que ficam (MYK-1102):**
+
+- **Um "Salvar", dois envios.** Perfil e senha têm endpoints diferentes (`PATCH /profile` e `POST /profile/password`). O "Salvar" valida no cliente o que mudou (o nome, se diferente do salvo; a senha, se algum dos três campos foi preenchido); com erro de cliente em qualquer um, nada é enviado e o foco vai ao primeiro campo inválido. Sem erro, envia cada um: cada envio tem o seu toast ("Perfil atualizado.", "Senha alterada.") e os erros da API voltam nos próprios campos, então o perfil pode ser salvo e a senha recusada ("Senha atual incorreta.") no mesmo clique. "Salvar" fica desabilitado sem nada para salvar. Os campos de senha não têm asterisco (a troca é opcional), como no Figma. O avatar continua salvando sozinho ao escolher o arquivo (`useAccountForm` ganhou `check`, `send` e `focusFirstInvalid` para isso).
+- **Carteiras como lista, não como formulário da principal.** O Figma desenha um formulário de edição da principal; o contrato não edita endereço nem rede. A principal aparece como `WalletCard` (com Definir como principal, Renomear, Ver no Etherscan e Remover no menu), o formulário cadastra uma carteira nova (a primeira vira principal; as seguintes, secundárias, regra do mock) e as reservas ficam em "Carteira secundária". Campos: Rede | Apelido da carteira (opcional), Endereço da carteira, lidos linha a linha; o apelido do Figma tem asterisco, mas o contrato o deixa opcional ("Carteira N").
+- **"Igual à carteira principal"** é `OutOfScopeAction` com o desenho do rádio: não há contrato para parear carteiras.
+- **"Remover" do avatar só aparece com avatar** (o Figma o mostra sempre); sem avatar o círculo mostra as iniciais.
+- **Textos de ajuda mantidos** abaixo dos campos (contador do nome e do apelido, formato do endereço, "O e-mail não pode ser alterado.", formatos e limite do avatar, mínimo da senha e o aviso de senha de demonstração): o Figma não os tem.
+- **Header logado** continua com o menu da conta (o Figma desenha o "Entrar").
 
 **Escolhas minhas, pendentes de conferência contra o Figma:**
 
